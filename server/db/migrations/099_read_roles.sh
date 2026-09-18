@@ -138,14 +138,10 @@ $$;
 -- Keep product API credentials scoped to the exact current query surface.
 -- `sources` names the device or app behind a raw sample and `category_labels`
 -- decodes a category sample's integer value; both joined by /v1/samples and
--- /v1/sleep/daily. `batches` is the upload log /v1/users aggregates per user
--- (last sync, batch and sample counts); it holds no credential — the token
--- that wrote a batch is only an integer id into device_tokens, which stays
--- off this list. An install created before those endpoints picks the tables
--- up on its next migrate run, because this file runs every time.
+-- /v1/sleep/daily. An install created before those endpoints picks the two up
+-- on its next migrate run, because this file runs every time.
 GRANT SELECT ON TABLE
   users,
-  batches,
   sources,
   sample_types,
   category_labels,
@@ -157,6 +153,7 @@ GRANT SELECT ON TABLE
   state_of_mind,
   medication_dose_events,
   activity_summaries,
+  quantity_rollups,
   aggregate_series,
   aggregate_samples,
   metric_daily,
@@ -203,7 +200,6 @@ BEGIN
   IF EXISTS (
     WITH expected_public(nspname, relname, privilege_type, is_grantable) AS (VALUES
       ('public', 'users', 'SELECT', false),
-      ('public', 'batches', 'SELECT', false),
       ('public', 'sources', 'SELECT', false),
       ('public', 'sample_types', 'SELECT', false),
       ('public', 'category_labels', 'SELECT', false),
@@ -215,6 +211,7 @@ BEGIN
       ('public', 'state_of_mind', 'SELECT', false),
       ('public', 'medication_dose_events', 'SELECT', false),
       ('public', 'activity_summaries', 'SELECT', false),
+      ('public', 'quantity_rollups', 'SELECT', false),
       ('public', 'aggregate_series', 'SELECT', false),
       ('public', 'aggregate_samples', 'SELECT', false),
       ('public', 'metric_daily', 'SELECT', false),
@@ -224,6 +221,18 @@ BEGIN
       ('public', 'quantity_samples'),
       ('public', 'workout_route_points'),
       ('public', 'workout_series_points')
+    ), allowed_continuous_aggregates(view_schema, view_name,
+                                     materialization_hypertable_schema,
+                                     materialization_hypertable_name) AS (
+      SELECT
+        ca.view_schema::text,
+        ca.view_name::text,
+        ca.materialization_hypertable_schema::text,
+        ca.materialization_hypertable_name::text
+      FROM timescaledb_information.continuous_aggregates ca
+      JOIN allowed_hypertables ah
+        ON ah.hypertable_schema = ca.hypertable_schema::text
+       AND ah.hypertable_name = ca.hypertable_name::text
     ),
     -- TimescaleDB copies a hypertable's ACL onto the relations that store
     -- it, so api_reader must hold exactly SELECT on each of them and on
@@ -249,6 +258,55 @@ BEGIN
       JOIN allowed_hypertables ah
         ON ah.hypertable_schema = ch.hypertable_schema::text
        AND ah.hypertable_name = ch.hypertable_name::text
+      UNION
+      SELECT ch.chunk_schema::text, ch.chunk_name::text
+      FROM timescaledb_information.chunks ch
+      JOIN allowed_continuous_aggregates ca
+        ON ca.materialization_hypertable_schema = ch.hypertable_schema::text
+       AND ca.materialization_hypertable_name = ch.hypertable_name::text
+    ), allowed_continuous_aggregate_helpers(nspname, relname) AS (
+      SELECT n.nspname::text, c.relname::text
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN allowed_continuous_aggregates ca
+        ON ca.materialization_hypertable_schema = n.nspname
+      WHERE n.nspname = '_timescaledb_internal'
+        AND c.relkind = 'v'
+        AND c.relname IN (
+          SELECT '_partial_view_' ||
+                 regexp_replace(ca.materialization_hypertable_name,
+                                 '^_materialized_hypertable_', '')
+          FROM allowed_continuous_aggregates ca
+          UNION
+          SELECT '_direct_view_' ||
+                 regexp_replace(ca.materialization_hypertable_name,
+                                 '^_materialized_hypertable_', '')
+          FROM allowed_continuous_aggregates ca
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM pg_rewrite rw
+          JOIN pg_depend d
+            ON d.classid = 'pg_rewrite'::regclass
+           AND d.objid = rw.oid
+           AND d.refclassid = 'pg_class'::regclass
+           AND d.refobjid <> c.oid
+          JOIN pg_class rc ON rc.oid = d.refobjid
+          JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+          WHERE rw.ev_class = c.oid
+            AND EXISTS (
+              SELECT 1
+              FROM timescaledb_information.hypertables h
+              WHERE h.hypertable_schema = rn.nspname
+                AND h.hypertable_name = rc.relname
+                AND EXISTS (
+                  SELECT 1
+                  FROM allowed_hypertables ah
+                  WHERE ah.hypertable_schema = h.hypertable_schema::text
+                    AND ah.hypertable_name = h.hypertable_name::text
+                )
+            )
+        )
     ), allowed_column_sets(cols) AS (
       SELECT array_agg(a.attname::text ORDER BY a.attname)
       FROM allowed_hypertables ah
@@ -274,6 +332,15 @@ BEGIN
       SELECT nspname, relname, 'SELECT', false FROM allowed_chunks
       UNION
       SELECT nspname, relname, 'SELECT', false FROM allowed_columnstore
+      UNION
+      SELECT nspname, relname, 'SELECT', false FROM allowed_continuous_aggregate_helpers
+      UNION
+      SELECT
+        ca.materialization_hypertable_schema,
+        ca.materialization_hypertable_name,
+        'SELECT',
+        false
+      FROM allowed_continuous_aggregates ca
     ), expected AS (
       SELECT * FROM expected_public
       UNION
