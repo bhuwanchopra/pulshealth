@@ -2,7 +2,63 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { makeScale, niceBounds, smoothPath, type Pt } from "@/lib/chart";
-import { displayUnit, formatValue, formatFull, tickLabel } from "@/lib/format";
+import { displayUnit, formatValue, tickLabel } from "@/lib/format";
+
+function bucketLabel(timestampMs: number, bucketMs: number): string {
+  const start = new Date(timestampMs);
+
+  if (bucketMs <= 24 * 60 * 60 * 1000) {
+    return start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (bucketMs <= 14 * 24 * 60 * 60 * 1000) {
+    const end = new Date(timestampMs + bucketMs - 1);
+
+    const startText = start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+
+    const endText = end.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    return `${startText}–${endText}`;
+  }
+
+  if (bucketMs <= 31 * 24 * 60 * 60 * 1000) {
+    return start.toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  if (bucketMs <= 92 * 24 * 60 * 60 * 1000) {
+    const end = new Date(timestampMs + bucketMs - 1);
+
+    const startText = start.toLocaleDateString(undefined, {
+      month: "short",
+    });
+
+    const endText = end.toLocaleDateString(undefined, {
+      month: "short",
+      year: "numeric",
+    });
+
+    return `${startText}–${endText}`;
+  }
+
+  return start.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  });
+}
 import type { Series } from "@/lib/types";
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 46 };
@@ -181,7 +237,9 @@ export function TrendChart({ series, color, height = 300 }: { series: Series; co
             top: `${(sy(hp.value) / height) * 100}%`,
           }}
         >
-          <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 2 }}>{formatFull(hp.t)}</div>
+          <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 2 }}>
+            {bucketLabel(hp.t, series.bucketMs)}
+          </div>
           <div style={{ fontWeight: 600 }}>
             {formatValue(hp.value)} <span style={{ color: "var(--muted)", fontWeight: 400 }}>{displayUnit(series.unit)}</span>
           </div>
