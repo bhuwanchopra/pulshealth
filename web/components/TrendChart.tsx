@@ -44,7 +44,7 @@ export function TrendChart({
   const pts = series.points;
   const isBar = series.agg === "sum";
   const fullMax = Math.max(0, pts.length - 1);
-  const isZoomed = domain[0] > 0.01 || domain[1] < fullMax - 0.01;
+  const isZoomed = effectiveDomain[0] > 0.01 || effectiveDomain[1] < fullMax - 0.01;
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -58,18 +58,18 @@ export function TrendChart({
     return () => ro.disconnect();
   }, []);
 
-  useLayoutEffect(() => {
-    setDomain([0, Math.max(1, pts.length - 1)]);
-    setHover(null);
-  }, [series.identifier, pts.length, series.bucketMs]);
+  const domainKey = series.identifier + ":" + pts.length + ":" + series.bucketMs;
+  const initialDomain: ChartDomain = [0, Math.max(1, pts.length - 1)];
+  const [domainKeyState, setDomainKeyState] = useState(domainKey);
+  const effectiveDomain = domainKeyState === domainKey ? domain : initialDomain;
 
   const model = useMemo(() => {
     const innerW = w - PAD.left - PAD.right;
     const innerH = height - PAD.top - PAD.bottom;
     if (!pts.length) return null;
 
-    const visibleStart = Math.max(0, Math.floor(domain[0]));
-    const visibleEnd = Math.min(pts.length - 1, Math.ceil(domain[1]));
+    const visibleStart = Math.max(0, Math.floor(effectiveDomain[0]));
+    const visibleEnd = Math.min(pts.length - 1, Math.ceil(effectiveDomain[1]));
     const visible = pts.slice(visibleStart, visibleEnd + 1);
     const values = visible.map((p) => p.value).filter(Number.isFinite);
     const mins = visible.map((p) => p.min ?? p.value).filter(Number.isFinite);
@@ -80,8 +80,8 @@ export function TrendChart({
     [lo, hi] = niceBounds(lo, hi);
 
     const sx = isBar
-      ? (i: number) => PAD.left + (innerW * (i - domain[0] + 0.5)) / Math.max(1, domain[1] - domain[0] + 1)
-      : makeScale(domain[0], Math.max(domain[0] + 1, domain[1]), PAD.left, PAD.left + innerW);
+      ? (i: number) => PAD.left + (innerW * (i - effectiveDomain[0] + 0.5)) / Math.max(1, effectiveDomain[1] - effectiveDomain[0] + 1)
+      : makeScale(effectiveDomain[0], Math.max(effectiveDomain[0] + 1, effectiveDomain[1]), PAD.left, PAD.left + innerW);
     const sy = makeScale(lo, hi, PAD.top + innerH, PAD.top);
 
     const linePts: Pt[] = visible.map((p, offset) => [sx(visibleStart + offset), sy(p.value)]);
@@ -94,21 +94,21 @@ export function TrendChart({
     });
 
     const labelCount = isZoomed ? 6 : 6;
-    const span = Math.max(1, domain[1] - domain[0]);
+    const span = Math.max(1, effectiveDomain[1] - effectiveDomain[0]);
     const step = Math.max(1, Math.ceil(span / labelCount));
-    const first = Math.ceil(domain[0] / step) * step;
+    const first = Math.ceil(effectiveDomain[0] / step) * step;
     const xlabels: { i: number; x: number; t: number }[] = [];
-    for (let i = first; i <= domain[1] + 0.001; i += step) {
+    for (let i = first; i <= effectiveDomain[1] + 0.001; i += step) {
       const index = Math.min(pts.length - 1, Math.max(0, Math.round(i)));
       if (!xlabels.some((d) => d.i === index)) xlabels.push({ i: index, x: sx(i), t: pts[index].t });
     }
-    for (const i of [Math.round(domain[0]), Math.round(domain[1])]) {
+    for (const i of [Math.round(effectiveDomain[0]), Math.round(effectiveDomain[1])]) {
       const index = Math.min(pts.length - 1, Math.max(0, i));
       if (!xlabels.some((d) => d.i === index)) xlabels.push({ i: index, x: sx(index), t: pts[index].t });
     }
     xlabels.sort((a, b) => a.x - b.x);
 
-    const barW = isBar ? Math.max(2, (innerW / Math.max(1, domain[1] - domain[0] + 1)) * 0.62) : 0;
+    const barW = isBar ? Math.max(2, (innerW / Math.max(1, effectiveDomain[1] - effectiveDomain[0] + 1)) * 0.62) : 0;
     return {
       innerW, innerH, sx, sy, lo, hi, linePts, bandTop, bandBot,
       grid, xlabels, visibleStart, visibleEnd, barW,
@@ -139,7 +139,7 @@ export function TrendChart({
     if (!svg) return 0;
     const rect = svg.getBoundingClientRect();
     const chartX = PAD.left + ((clientX - rect.left) / rect.width) * w;
-    const raw = domain[0] + ((chartX - PAD.left) / (w - PAD.left - PAD.right)) * (domain[1] - domain[0]);
+    const raw = effectiveDomain[0] + ((chartX - PAD.left) / (w - PAD.left - PAD.right)) * (effectiveDomain[1] - effectiveDomain[0]);
     return Math.max(0, Math.min(pts.length - 1, Math.round(raw)));
   }
 
@@ -147,8 +147,9 @@ export function TrendChart({
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const chartX = PAD.left + ((e.clientX - rect.left) / rect.width) * w;
-    const center = domain[0] + ((chartX - PAD.left) / (w - PAD.left - PAD.right)) * (domain[1] - domain[0]);
+    const center = effectiveDomain[0] + ((chartX - PAD.left) / (w - PAD.left - PAD.right)) * (effectiveDomain[1] - effectiveDomain[0]);
     const factor = e.deltaY < 0 ? WHEEL_ZOOM : 1 / WHEEL_ZOOM;
+    setDomainKeyState(domainKey);
     setDomain((d) => zoomDomain(d, center, factor, 0, fullMax, MIN_ZOOM_POINTS));
   }
 
@@ -190,12 +191,14 @@ export function TrendChart({
         const midpoint = (a.x + b.x) / 2;
         const chartMid = PAD.left + (midpoint / rectWidth) * w;
         const center = g.startDomain[0] + ((chartMid - PAD.left) / (w - PAD.left - PAD.right)) * (g.startDomain[1] - g.startDomain[0]);
+        setDomainKeyState(domainKey);
         setDomain(zoomDomain(g.startDomain, center, factor, 0, fullMax, MIN_ZOOM_POINTS));
         return;
       }
       if (g.pointers.size === 1 && g.startDomain[1] - g.startDomain[0] < fullMax - 0.01) {
         const dx = p.x - g.startPointerX;
         const indexDelta = -(dx / Math.max(1, rect.width)) * (g.startDomain[1] - g.startDomain[0]);
+        setDomainKeyState(domainKey);
         setDomain(panDomain(g.startDomain, indexDelta, 0, fullMax));
         return;
       }
@@ -219,12 +222,14 @@ export function TrendChart({
   }
 
   function onDoubleClick() {
+    setDomainKeyState(domainKey);
     setDomain([0, fullMax]);
     setHover(null);
   }
 
-  const hp = hover != null ? pts[hover] : null;
-  const hx = hover != null ? sx(hover) : 0;
+  const hoverIndex = hover != null && hover >= 0 && hover < pts.length ? hover : null;
+  const hp = hoverIndex != null ? pts[hoverIndex] : null;
+  const hx = hoverIndex != null ? sx(hoverIndex) : 0;
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
@@ -232,7 +237,7 @@ export function TrendChart({
         {isZoomed && (
           <button
             type="button"
-            onClick={() => { setDomain([0, fullMax]); setHover(null); }}
+            onClick={() => { setDomainKeyState(domainKey); setDomain([0, fullMax]); setHover(null); }}
             aria-label="Reset chart zoom"
             style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6 }}
           >
@@ -290,14 +295,14 @@ export function TrendChart({
             <path className="fadein" d={smoothPath(linePts, 0.55)} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           </>
         )}
-        {hp && hover >= visibleStart && hover <= visibleEnd && (
+        {hp && hoverIndex != null && hoverIndex >= visibleStart && hoverIndex <= visibleEnd && (
           <>
             <line x1={hx} y1={PAD.top} x2={hx} y2={height - PAD.bottom} stroke="var(--border-strong)" />
             <circle cx={hx} cy={sy(hp.value)} r={4.5} fill={color} stroke="var(--bg)" strokeWidth={2} />
           </>
         )}
       </svg>
-      {hp && hover >= visibleStart && hover <= visibleEnd && (
+      {hp && hoverIndex != null && hoverIndex >= visibleStart && hoverIndex <= visibleEnd && (
         <div className="chart-tip" style={{ left: `${(hx / w) * 100}%`, top: `${(sy(hp.value) / height) * 100}%` }}>
           <div style={{ color: "var(--muted)", fontSize: 11, marginBottom: 2 }}>{formatFull(hp.t)}</div>
           <div style={{ fontWeight: 600 }}>{formatValue(hp.value)} <span style={{ color: "var(--muted)", fontWeight: 400 }}>{displayUnit(series.unit)}</span></div>
