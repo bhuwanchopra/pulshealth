@@ -44,6 +44,10 @@ export function TrendChart({
   const pts = series.points;
   const isBar = series.agg === "sum";
   const fullMax = Math.max(0, pts.length - 1);
+  const domainKey = series.identifier + ":" + pts.length + ":" + series.bucketMs;
+  const initialDomain: ChartDomain = [0, Math.max(1, pts.length - 1)];
+  const [domainKeyState, setDomainKeyState] = useState(domainKey);
+  const effectiveDomain = domainKeyState === domainKey ? domain : initialDomain;
   const isZoomed = effectiveDomain[0] > 0.01 || effectiveDomain[1] < fullMax - 0.01;
 
   useLayoutEffect(() => {
@@ -57,11 +61,6 @@ export function TrendChart({
     setW(Math.max(320, Math.round(el.getBoundingClientRect().width)));
     return () => ro.disconnect();
   }, []);
-
-  const domainKey = series.identifier + ":" + pts.length + ":" + series.bucketMs;
-  const initialDomain: ChartDomain = [0, Math.max(1, pts.length - 1)];
-  const [domainKeyState, setDomainKeyState] = useState(domainKey);
-  const effectiveDomain = domainKeyState === domainKey ? domain : initialDomain;
 
   const model = useMemo(() => {
     const innerW = w - PAD.left - PAD.right;
@@ -114,7 +113,7 @@ export function TrendChart({
       grid, xlabels, visibleStart, visibleEnd, barW,
       base: sy(isBar ? 0 : lo),
     };
-  }, [pts, w, height, domain, isBar, isZoomed]);
+  }, [pts, w, height, effectiveDomain, isBar, isZoomed]);
 
   if (!pts.length || !model) {
     return (
@@ -162,7 +161,7 @@ export function TrendChart({
       gestureRef.current = {
         pointers: new Map([[e.pointerId, p]]),
         startDistance: null,
-        startDomain: domain,
+        startDomain: effectiveDomain,
         startPointerX: p.x,
       };
     } else {
@@ -170,7 +169,7 @@ export function TrendChart({
       if (existing.pointers.size === 2) {
         const [a, b] = [...existing.pointers.values()];
         existing.startDistance = Math.hypot(a.x - b.x, a.y - b.y);
-        existing.startDomain = domain;
+        existing.startDomain = effectiveDomain;
         existing.startPointerX = p.x;
       }
     }
