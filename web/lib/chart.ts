@@ -58,8 +58,14 @@ export function clampDomain(domain: ChartDomain, min: number, max: number, minSp
 
 export function zoomDomain(domain: ChartDomain, center: number, factor: number, min: number, max: number, minSpan = 2): ChartDomain {
   if (!Number.isFinite(factor) || factor <= 0) return domain;
-  const span = (domain[1] - domain[0]) / factor;
-  return clampDomain([center - (center - domain[0]) * (span / (domain[1] - domain[0])), center + (domain[1] - center) * (span / (domain[1] - domain[0]))], min, max, minSpan);
+  const currentSpan = domain[1] - domain[0];
+  if (currentSpan <= 0) return domain;
+  const targetSpan = currentSpan / factor;
+  const start = center - (center - domain[0]) * (targetSpan / currentSpan);
+  const end = center + (domain[1] - center) * (targetSpan / currentSpan);
+  const boundedSpan = Math.min(Math.max(minSpan, end - start), max - min);
+  const centeredStart = center - boundedSpan / 2;
+  return clampDomain([centeredStart, centeredStart + boundedSpan], min, max, minSpan);
 }
 
 export function panDomain(domain: ChartDomain, delta: number, min: number, max: number): ChartDomain {
