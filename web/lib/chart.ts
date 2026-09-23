@@ -45,3 +45,27 @@ export function makeScale(domainMin: number, domainMax: number, rangeMin: number
   const d = domainMax - domainMin || 1;
   return (v: number) => rangeMin + ((v - domainMin) / d) * (rangeMax - rangeMin);
 }
+
+export type ChartDomain = readonly [number, number];
+
+export function clampDomain(domain: ChartDomain, min: number, max: number, minSpan = 2): ChartDomain {
+  if (max <= min) return [min, min];
+  const span = Math.min(Math.max(minSpan, domain[1] - domain[0]), max - min);
+  let start = domain[0];
+  start = Math.max(min, Math.min(start, max - span));
+  return [start, start + span];
+}
+
+export function zoomDomain(domain: ChartDomain, center: number, factor: number, min: number, max: number, minSpan = 2): ChartDomain {
+  if (!Number.isFinite(factor) || factor <= 0) return domain;
+  const span = (domain[1] - domain[0]) / factor;
+  return clampDomain([center - (center - domain[0]) * (span / (domain[1] - domain[0])), center + (domain[1] - center) * (span / (domain[1] - domain[0]))], min, max, minSpan);
+}
+
+export function panDomain(domain: ChartDomain, delta: number, min: number, max: number): ChartDomain {
+  const span = domain[1] - domain[0];
+  if (span >= max - min) return [min, max];
+  let start = domain[0] + delta;
+  start = Math.max(min, Math.min(start, max - span));
+  return [start, start + span];
+}
