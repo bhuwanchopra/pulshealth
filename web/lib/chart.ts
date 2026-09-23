@@ -64,8 +64,12 @@ export function zoomDomain(domain: ChartDomain, center: number, factor: number, 
   const start = center - (center - domain[0]) * (targetSpan / currentSpan);
   const end = center + (domain[1] - center) * (targetSpan / currentSpan);
   const boundedSpan = Math.min(Math.max(minSpan, end - start), max - min);
-  const centeredStart = center - boundedSpan / 2;
-  return clampDomain([centeredStart, centeredStart + boundedSpan], min, max, minSpan);
+  const centerRatio = (center - domain[0]) / currentSpan;
+  const boundedStart = Math.min(
+    max - boundedSpan,
+    Math.max(min, center - centerRatio * boundedSpan),
+  );
+  return [boundedStart, boundedStart + boundedSpan];
 }
 
 export function panDomain(domain: ChartDomain, delta: number, min: number, max: number): ChartDomain {
