@@ -22,7 +22,6 @@ type Gesture = {
   pointers: Map<number, Pointer>;
   startDistance: number | null;
   startDomain: ChartDomain;
-  startCenter: number;
   startPointerX: number;
 };
 
@@ -163,7 +162,6 @@ export function TrendChart({
         pointers: new Map([[e.pointerId, p]]),
         startDistance: null,
         startDomain: domain,
-        startCenter: indexAtClientX(e.clientX),
         startPointerX: p.x,
       };
     } else {
@@ -213,7 +211,6 @@ export function TrendChart({
       else if (g.pointers.size === 1) {
         const [p] = [...g.pointers.values()];
         g.startDomain = domain;
-        g.startCenter = indexAtClientX(e.clientX);
         g.startPointerX = p.x;
         g.startDistance = null;
         g.pointers = new Map([[e.pointerId, p]]);
