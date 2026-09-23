@@ -2,7 +2,6 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  clampDomain,
   makeScale,
   niceBounds,
   panDomain,
@@ -24,6 +23,7 @@ type Gesture = {
   startDistance: number | null;
   startDomain: ChartDomain;
   startCenter: number;
+  startPointerX: number;
 };
 
 export function TrendChart({
@@ -164,6 +164,7 @@ export function TrendChart({
         startDistance: null,
         startDomain: domain,
         startCenter: indexAtClientX(e.clientX),
+        startPointerX: p.x,
       };
     } else {
       existing.pointers.set(e.pointerId, p);
@@ -171,6 +172,7 @@ export function TrendChart({
         const [a, b] = [...existing.pointers.values()];
         existing.startDistance = Math.hypot(a.x - b.x, a.y - b.y);
         existing.startDomain = domain;
+        existing.startPointerX = p.x;
       }
     }
     setHover(indexAtClientX(e.clientX));
@@ -193,6 +195,12 @@ export function TrendChart({
         setDomain(zoomDomain(g.startDomain, center, factor, 0, fullMax, MIN_ZOOM_POINTS));
         return;
       }
+      if (g.pointers.size === 1 && g.startDomain[1] - g.startDomain[0] < fullMax - 0.01) {
+        const dx = p.x - g.startPointerX;
+        const indexDelta = -(dx / Math.max(1, rect.width)) * (g.startDomain[1] - g.startDomain[0]);
+        setDomain(panDomain(g.startDomain, indexDelta, 0, fullMax));
+        return;
+      }
     }
     setHover(indexAtClientX(e.clientX));
   }
@@ -206,6 +214,7 @@ export function TrendChart({
         const [p] = [...g.pointers.values()];
         g.startDomain = domain;
         g.startCenter = indexAtClientX(e.clientX);
+        g.startPointerX = p.x;
         g.startDistance = null;
         g.pointers = new Map([[e.pointerId, p]]);
       }
