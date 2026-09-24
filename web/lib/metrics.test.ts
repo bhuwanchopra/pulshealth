@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultAgg, isCumulative } from "./metrics";
+import { defaultAgg, isCumulative, RANGES } from "./metrics";
 
 describe("metric semantics", () => {
   it("sums cumulative types and averages discrete ones", () => {
