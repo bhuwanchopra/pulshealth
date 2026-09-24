@@ -82,6 +82,7 @@ services:
       # (ALTER DATABASE … SET) on every run, so changing it later is: edit
       # .env, `docker compose up -d`.
       PULS_TIME_ZONE: ${PULS_TIME_ZONE:-UTC}
+      PULS_MAX_EXPORT_DAYS: ${PULS_MAX_EXPORT_DAYS:-366}
     volumes:
       - ./db/migrate.sh:/puls/migrate.sh:ro
       - ./db/migrations:/puls/migrations:ro
@@ -93,6 +94,18 @@ services:
     image: ghcr.io/pulshealth/ingest:${PULS_VERSION:-latest}
     restart: unless-stopped
     logging: *app-logging
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.pulshealth-ingest.rule=Host(`health.database-dungeon.win`) && (PathPrefix(`/v1`) || Path(`/healthz`))"
+      - "traefik.http.routers.pulshealth-ingest.entrypoints=websecure"
+      - "traefik.http.routers.pulshealth-ingest.tls=true"
+      - "traefik.http.routers.pulshealth-ingest.tls.certresolver=cf"
+      - "traefik.http.routers.pulshealth-ingest.middlewares=secure-headers@file"
+      - "traefik.http.services.pulshealth-ingest.loadbalancer.server.port=8080"
     environment:
       # Connects as the scoped DML-only `ingest` role (created and kept
       # current by 099_read_roles.sh from INGEST_DB_PASSWORD) — the only
@@ -131,9 +144,12 @@ services:
         condition: service_completed_successfully
 
   api:
-    image: ghcr.io/pulshealth/api:${PULS_VERSION:-latest}
+    image: pulshealth-api:dev
     restart: unless-stopped
     logging: *app-logging
+    build:
+      context: ./api
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgres://api_reader:${API_DB_PASSWORD}@db:5432/postgres?sslmode=disable
       PULS_API_TOKEN: ${PULS_API_TOKEN:?set in .env}
@@ -146,6 +162,7 @@ services:
       # Same calendar zone as the database (see the db service). The api
       # refuses to start on an unknown zone name.
       PULS_TIME_ZONE: ${PULS_TIME_ZONE:-UTC}
+      PULS_MAX_EXPORT_DAYS: ${PULS_MAX_EXPORT_DAYS:-366}
       # Whether X-Forwarded-* may be believed: the client an auth failure is
       # charged to, and the host /openapi.json advertises. Same switch and
       # same default as ingest's.
@@ -195,9 +212,21 @@ services:
     # network as the read-only `grafana` role — same data Grafana sees.
     # The developer overlay builds it from the sibling web/ directory
     # (../web relative to this file), so build from a full checkout.
-    image: ghcr.io/pulshealth/web:${PULS_VERSION:-latest}
+    image: pulshealth-web:dev
     restart: unless-stopped
     logging: *app-logging
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.pulshealth-web.rule=Host(`health.database-dungeon.win`)"
+      - "traefik.http.routers.pulshealth-web.entrypoints=websecure"
+      - "traefik.http.routers.pulshealth-web.tls=true"
+      - "traefik.http.routers.pulshealth-web.tls.certresolver=cf"
+      - "traefik.http.routers.pulshealth-web.middlewares=secure-headers@file"
+      - "traefik.http.services.pulshealth-web.loadbalancer.server.port=3000"
     environment:
       DATABASE_URL: postgres://grafana:${GRAFANA_DB_PASSWORD}@db:5432/postgres?sslmode=disable
       PULS_USER_ID: ${PULS_USER_ID:-5ea4d000-0000-4000-8000-000000000001}
@@ -208,12 +237,9 @@ services:
       # startup log. scripts/bootstrap.sh generates one on a fresh install
       # and prints it. See web/README.md, "Access control".
       WEB_AUTH_PASSWORD: ${WEB_AUTH_PASSWORD:-}
-    ports:
-      # 3000 is Grafana. Default to loopback; to reach the viewer from other
-      # machines set WEB_BIND_ADDR to a private interface, e.g. the host's
-      # Tailscale IPv4, rather than 0.0.0.0 — WEB_AUTH_PASSWORD is a password
-      # prompt, not TLS, so the bind address still matters.
-      - "${WEB_BIND_ADDR:-127.0.0.1}:3001:3000"
+    # Host port is intentionally omitted: Traefik reaches the container on
+    # the external `proxy` network at port 3000. This avoids colliding with
+    # other homelab services using host port 3001.
     depends_on:
       db:
         condition: service_healthy
@@ -313,3 +339,8 @@ volumes:
   grafana_data:
   # Only created when the `backup` profile is used and PULS_BACKUP_DIR is unset.
   backups:
+
+networks:
+  proxy:
+    external: true
+    name: proxy
