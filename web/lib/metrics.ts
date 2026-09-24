@@ -60,8 +60,9 @@ export const RANGES: Record<RangeKey, RangeSpec> = {
   D: { key: "D", label: "Day", spanMs: DAY, bucket: "1 hour", bucketMs: HOUR },
   W: { key: "W", label: "Week", spanMs: 7 * DAY, bucket: "1 day", bucketMs: DAY },
   M: { key: "M", label: "Month", spanMs: 30 * DAY, bucket: "1 day", bucketMs: DAY },
-  "6M": { key: "6M", label: "6 Months", spanMs: 182 * DAY, bucket: "1 week", bucketMs: WEEK },
-  Y: { key: "Y", label: "Year", spanMs: 365 * DAY, bucket: "1 week", bucketMs: WEEK },
+  // Keep longer ranges at daily grain so client-side zoom can reveal individual days.
+  "6M": { key: "6M", label: "6 Months", spanMs: 182 * DAY, bucket: "1 day", bucketMs: DAY },
+  Y: { key: "Y", label: "Year", spanMs: 365 * DAY, bucket: "1 day", bucketMs: DAY },
 };
 
 export const RANGE_ORDER: RangeKey[] = ["D", "W", "M", "6M", "Y"];
