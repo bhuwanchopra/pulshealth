@@ -249,11 +249,10 @@ scripts/bootstrap.sh --time-zone Europe/Berlin`}</code>
           Self-hosting means self-securing
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          The database holds identifiable health data. Each phone can have its own bearer token,
-          bound to one user, stored only as a hash and revocable on its own. The shared token a new
-          install starts with still works until you switch it off, and whoever holds that one can
-          upload and delete for any user on the server. TLS, exposure and retention are yours to
-          arrange. The project documents its own limitations rather than glossing over them.
+          The database holds identifiable health data, and ingest currently accepts a single static
+          bearer token, so whoever holds it can upload and delete for any user on that server. TLS,
+          exposure and retention are yours to arrange. The project documents its own limitations
+          rather than glossing over them.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="bg-brand hover:bg-brand-dark text-brand-foreground">

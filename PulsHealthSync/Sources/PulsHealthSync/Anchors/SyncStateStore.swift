@@ -67,6 +67,9 @@ public struct AggregateSyncState: Codable, Sendable, Equatable {
     /// high-water mark during a monthly pass that restarts from the beginning.
     public var fullRecomputeStartedAt: Date?
     public var fullRecomputeThrough: Date?
+    /// While true, an initial backfill may skip leading empty (NULL-only) buckets.
+    /// Once the first non-NULL bucket is uploaded, this becomes false permanently.
+    public var leadingEmptyBackfill: Bool
     public var totalBucketsUploaded: Int
     public var totalBatchesUploaded: Int
     public var totalBytesUploaded: Int
@@ -80,11 +83,61 @@ public struct AggregateSyncState: Codable, Sendable, Equatable {
         self.lastFullRecomputeAt = nil
         self.fullRecomputeStartedAt = nil
         self.fullRecomputeThrough = nil
+        self.leadingEmptyBackfill = true
         self.totalBucketsUploaded = 0
         self.totalBatchesUploaded = 0
         self.totalBytesUploaded = 0
         self.lastError = nil
         self.lastErrorAt = nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case configID
+        case computedThrough
+        case lastComputedAt
+        case lastFullRecomputeAt
+        case fullRecomputeStartedAt
+        case fullRecomputeThrough
+        case leadingEmptyBackfill
+        case totalBucketsUploaded
+        case totalBatchesUploaded
+        case totalBytesUploaded
+        case lastError
+        case lastErrorAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+
+        self.configID = try c.decode(UUID.self, forKey: .configID)
+        self.computedThrough = try c.decodeIfPresent(
+            Date.self, forKey: .computedThrough)
+        self.lastComputedAt = try c.decodeIfPresent(
+            Date.self, forKey: .lastComputedAt)
+        self.lastFullRecomputeAt = try c.decodeIfPresent(
+            Date.self, forKey: .lastFullRecomputeAt)
+        self.fullRecomputeStartedAt = try c.decodeIfPresent(
+            Date.self, forKey: .fullRecomputeStartedAt)
+        self.fullRecomputeThrough = try c.decodeIfPresent(
+            Date.self, forKey: .fullRecomputeThrough)
+
+        // Older state files predate this flag. A non-nil watermark means
+        // buckets have already been materialized; nil means this is still
+        // the initial backfill.
+        self.leadingEmptyBackfill = try c.decodeIfPresent(
+            Bool.self, forKey: .leadingEmptyBackfill
+        ) ?? (self.computedThrough == nil)
+
+        self.totalBucketsUploaded = try c.decode(
+            Int.self, forKey: .totalBucketsUploaded)
+        self.totalBatchesUploaded = try c.decode(
+            Int.self, forKey: .totalBatchesUploaded)
+        self.totalBytesUploaded = try c.decode(
+            Int.self, forKey: .totalBytesUploaded)
+        self.lastError = try c.decodeIfPresent(
+            String.self, forKey: .lastError)
+        self.lastErrorAt = try c.decodeIfPresent(
+            Date.self, forKey: .lastErrorAt)
     }
 }
 
@@ -575,10 +628,30 @@ public actor SyncStateStore {
                 s.fullRecomputeThrough = max(
                     s.fullRecomputeThrough ?? .distantPast, newComputedThrough)
             }
+            s.leadingEmptyBackfill = false
             s.lastComputedAt = Date()
             s.totalBucketsUploaded += buckets
             s.totalBatchesUploaded += 1
             s.totalBytesUploaded += bytes
+            s.lastError = nil
+        }
+    }
+
+    /// Advance the aggregate watermark after intentionally skipping a chunk
+    /// containing only empty buckets during the leading portion of an initial
+    /// backfill. Nothing was uploaded, so upload counters remain unchanged.
+    public func recordAggregateSkippedEmptyChunk(
+        configID: UUID,
+        newComputedThrough: Date
+    ) {
+        updateAggregate(configID) { s in
+            s.computedThrough = max(
+                s.computedThrough ?? .distantPast, newComputedThrough)
+            if s.fullRecomputeStartedAt != nil {
+                s.fullRecomputeThrough = max(
+                    s.fullRecomputeThrough ?? .distantPast, newComputedThrough)
+            }
+            s.lastComputedAt = Date()
             s.lastError = nil
         }
     }
