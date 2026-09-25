@@ -424,16 +424,25 @@ extension HealthSyncEngine {
         chunk: DateInterval,
         pass: AggregatePass
     ) async throws -> Int {
+        let leadingEmptyBackfill = pass == .scheduled
+            ? await store.aggregateState(for: configID).leadingEmptyBackfill
+            : false
+
         do {
             let rows = try await computeBucketsOnce(
                 config: config, quantityType: quantityType, unit: unit,
                 queryAnchor: anchor, calendar: calendar, chunk: chunk
             )
-            try await uploadAggregateRows(
-                rows, config: config, configID: configID, reason: reason,
-                transport: transport, chunk: chunk, pass: pass
+            return try await prepareAndUploadAggregateRows(
+                rows,
+                leadingEmptyBackfill: leadingEmptyBackfill,
+                config: config,
+                configID: configID,
+                reason: reason,
+                transport: transport,
+                chunk: chunk,
+                pass: pass
             )
-            return rows.count
         } catch {
             guard Self.isHealthKitMissingDataSourceError(error) else { throw error }
             await eventLog.log(
@@ -448,7 +457,9 @@ extension HealthSyncEngine {
                 config: config, configID: configID, quantityType: quantityType,
                 unit: unit, reason: reason, transport: transport,
                 canonicalAnchor: anchor, bucketing: bucketing,
-                calendar: calendar, chunk: chunk, pass: pass, originalError: error
+                calendar: calendar, chunk: chunk, pass: pass,
+                leadingEmptyBackfill: leadingEmptyBackfill,
+                originalError: error
             )
         }
     }
@@ -465,6 +476,7 @@ extension HealthSyncEngine {
         calendar: Calendar,
         chunk: DateInterval,
         pass: AggregatePass,
+        leadingEmptyBackfill: Bool,
         originalError: Error
     ) async throws -> Int {
         do {
@@ -473,11 +485,16 @@ extension HealthSyncEngine {
                 queryAnchor: Self.retryAnchor(for: config, canonicalAnchor: canonicalAnchor, chunk: chunk),
                 calendar: calendar, chunk: chunk
             )
-            try await uploadAggregateRows(
-                rows, config: config, configID: configID, reason: reason,
-                transport: transport, chunk: chunk, pass: pass
+            return try await prepareAndUploadAggregateRows(
+                rows,
+                leadingEmptyBackfill: leadingEmptyBackfill,
+                config: config,
+                configID: configID,
+                reason: reason,
+                transport: transport,
+                chunk: chunk,
+                pass: pass
             )
-            return rows.count
         } catch {
             guard Self.isHealthKitMissingDataSourceError(error) else { throw error }
             guard let (left, right) = bucketing.split(chunk) else { throw originalError }
@@ -485,16 +502,68 @@ extension HealthSyncEngine {
                 config: config, configID: configID, quantityType: quantityType,
                 unit: unit, reason: reason, transport: transport,
                 canonicalAnchor: canonicalAnchor, bucketing: bucketing,
-                calendar: calendar, chunk: left, pass: pass, originalError: error
+                calendar: calendar, chunk: left, pass: pass,
+                leadingEmptyBackfill: leadingEmptyBackfill,
+                originalError: error
             )
+
+            let rightLeadingEmptyBackfill = pass == .scheduled
+                ? await store.aggregateState(for: configID).leadingEmptyBackfill
+                : false
+
             let rightCount = try await computeAndUploadRecoveringFromMissingDataSource(
                 config: config, configID: configID, quantityType: quantityType,
                 unit: unit, reason: reason, transport: transport,
                 canonicalAnchor: canonicalAnchor, bucketing: bucketing,
-                calendar: calendar, chunk: right, pass: pass, originalError: error
+                calendar: calendar, chunk: right, pass: pass,
+                leadingEmptyBackfill: rightLeadingEmptyBackfill,
+                originalError: error
             )
             return leftCount + rightCount
         }
+    }
+
+    /// Apply sparse storage only to the leading portion of an initial
+    /// scheduled backfill. Once the first real value is materialized, NULL
+    /// buckets remain meaningful and are uploaded normally so recomputations
+    /// and deletions can clear previously stored values.
+    private func prepareAndUploadAggregateRows(
+        _ rows: [AggregateSampleRow],
+        leadingEmptyBackfill: Bool,
+        config: AggregateConfig,
+        configID: UUID,
+        reason: SyncReason,
+        transport: any SyncTransport,
+        chunk: DateInterval,
+        pass: AggregatePass
+    ) async throws -> Int {
+        guard pass == .scheduled, leadingEmptyBackfill else {
+            try await uploadAggregateRows(
+                rows, config: config, configID: configID, reason: reason,
+                transport: transport, chunk: chunk, pass: pass
+            )
+            return rows.count
+        }
+
+        guard let firstValueIndex = rows.firstIndex(where: { $0.value != nil }) else {
+            await store.recordAggregateSkippedEmptyChunk(
+                configID: configID,
+                newComputedThrough: chunk.end
+            )
+            return 0
+        }
+
+        let materializedRows = Array(rows[firstValueIndex...])
+        try await uploadAggregateRows(
+            materializedRows,
+            config: config,
+            configID: configID,
+            reason: reason,
+            transport: transport,
+            chunk: chunk,
+            pass: pass
+        )
+        return materializedRows.count
     }
 
     private func uploadAggregateRows(

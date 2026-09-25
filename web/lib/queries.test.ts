@@ -105,6 +105,79 @@ describe("query semantics", () => {
     expect(yearSql).toContain("time_bucket($1::interval");
   });
 
+  it("propagates the dynamically selected bucket for custom ranges", async () => {
+    const { getSeries } = await import("./queries");
+    const { resolveCustomWindow } = await import("./metrics");
+
+    queryMock.mockImplementation((text: string) => {
+      if (text.includes("puls_time_zone()")) {
+        return Promise.resolve([{ zone: "America/Los_Angeles" }]);
+      }
+      if (text.includes("FROM aggregate_series")) {
+        return Promise.resolve([{
+          series_id: 7,
+          agg_func: "average",
+          interval_value: 1,
+          interval_unit: "day",
+        }]);
+      }
+      if (text.includes("FROM aggregate_samples")) {
+        return Promise.resolve([{
+          t: "1760000000000",
+          value: 60,
+          n: 1,
+        }]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const thirtyDayWindow = resolveCustomWindow("2026-01-01", "2026-01-30");
+    const thirtyDaySeries = await getSeries(
+      USER_ID,
+      "HKQuantityTypeIdentifierHeartRate",
+      "CUSTOM",
+      thirtyDayWindow,
+    );
+
+    const aggregateThirtyDay = queryMock.mock.calls.find(([sql]) =>
+      sql.includes("FROM aggregate_samples"),
+    );
+    expect(aggregateThirtyDay?.[1]?.[0]).toBe("1 day");
+    expect(thirtyDaySeries.bucketMs).toBe(86_400_000);
+
+    queryMock.mockClear();
+
+    const fiveYearWindow = resolveCustomWindow("2021-01-01", "2025-12-30");
+    const fiveYearSeries = await getSeries(
+      USER_ID,
+      "HKQuantityTypeIdentifierHeartRate",
+      "CUSTOM",
+      fiveYearWindow,
+    );
+
+    const aggregateFiveYear = queryMock.mock.calls.find(([sql]) =>
+      sql.includes("FROM aggregate_samples"),
+    );
+    expect(aggregateFiveYear?.[1]?.[0]).toBe("1 month");
+    expect(fiveYearSeries.bucketMs).toBe(30 * 86_400_000);
+  });
+
+  it("rejects invalid custom calendar dates", async () => {
+    const { resolveCustomWindow } = await import("./metrics");
+
+    expect(() =>
+      resolveCustomWindow("2026-02-30", "2026-03-01"),
+    ).toThrow("Invalid custom date range");
+
+    expect(() =>
+      resolveCustomWindow("2026-04-31", "2026-05-01"),
+    ).toThrow("Invalid custom date range");
+
+    expect(() =>
+      resolveCustomWindow("2026-03-01", "2026-02-28"),
+    ).toThrow("Invalid custom date range");
+  });
+
   it("aligns chart windows to the bucket grain in the viewer's zone", async () => {
     const { getSeries } = await import("./queries");
     await getSeries(USER_ID, "HKQuantityTypeIdentifierHeartRate", "W");
@@ -112,15 +185,21 @@ describe("query semantics", () => {
     await getSeries(USER_ID, "HKCategoryTypeIdentifierAppleStandHour", "M");
 
     const windows = queryMock.mock.calls
-      .map(([sql]) => sql as string)
-      .filter((sql) => /FROM (quantity|category)_samples/.test(sql));
+      .map(([sql, params]) => ({ sql: sql as string, params }))
+      .filter(({ sql }) => /FROM (quantity|category)_samples/.test(sql));
+
     expect(windows).toHaveLength(3);
-    for (const sql of windows) {
+
+    for (const { sql } of windows) {
       // Never a bare `start_ts >= $n`: that made the first day/week bucket a
       // partial slice from "now − span" to the next boundary.
-      expect(sql, sql).not.toMatch(/start_ts >= \$\d\b/);
-      expect(sql, sql).toMatch(/start_ts >= time_bucket\(\$1::interval, \$\d::timestamptz, \$\d::text\)/);
+      expect(sql).not.toMatch(/start_ts >= \$\d\b/);
+      expect(sql).toContain("start_ts >= time_bucket(");
     }
+
+    expect(windows[0].params).toContain("1 day");
+    expect(windows[1].params).toContain("1 week");
+    expect(windows[2].params).toContain("1 day");
   });
 
   it("attributes sleep to the wake day and dedups duration sources", async () => {
@@ -134,7 +213,7 @@ describe("query semantics", () => {
     // 6 PM boundary: samples are shifted forward before day-bucketing, and the
     // window is widened by the same amount so the first night is whole.
     expect(sleep).toContain("c.start_ts + interval '6 hours'");
-    expect(sleep).toContain("$5::text) - interval '6 hours'");
+    expect(sleep).toContain(") - interval '6 hours'");
     expect(sleep).toContain("GROUP BY 1, c.source_id");
     expect(sleep).toContain("max(value)::float8 AS value");
     // Other durations are not shifted.
