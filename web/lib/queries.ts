@@ -472,6 +472,8 @@ export async function getSeries(
     // metric_daily remains the fallback when no suitable aggregate exists.
     const mdTypes = await metricDailyTypes(userId);
     if (mdTypes.has(identifier) && bucketMs >= DAY_MS) {
+      const byId = new Map<string, number[]>();
+      const timeZone = configuredTimeZone();
       const rows = await query<{ t: string; value: number }>(
         `SELECT
            (extract(
@@ -633,14 +635,19 @@ export async function getLatestMany(userId: string, identifiers: string[]): Prom
 
   try {
     const rows = await query<{ identifier: string; value: number; t: string }>(
-      `SELECT DISTINCT ON (st.identifier)
-              st.identifier, q.value::float8 AS value,
-              (extract(epoch from q.start_ts) * 1000)::bigint AS t
-         FROM quantity_samples q
-         JOIN sample_types st ON st.type_id = q.type_id
-        WHERE st.identifier = ANY($1::text[])
-          AND q.user_id = $2::uuid
-        ORDER BY st.identifier, q.start_ts DESC`,
+      `SELECT st.identifier,
+              latest.value::float8 AS value,
+	      (extract(epoch from latest.start_ts) * 1000)::bigint AS t
+       FROM sample_types st
+       CROSS JOIN LATERAL(
+	   SELECT q.value, q.start_ts
+	   FROM quantity_samples q
+	   WHERE q.type_id = st.type_id
+	     AND q.user_id = $2::uuid
+	   ORDER BY q.start_ts DESC
+	   LIMIT 1
+       ) latest
+       WHERE st.identifier = ANY($1::text[])`,
       [identifiers, userId],
     );
     for (const r of rows) {
@@ -718,6 +725,8 @@ export async function getActivityRings(userId: string): Promise<ActivityRingsDat
   if (src !== "live") return notLive(src, () => demoActivityRings(), fallback);
 
   try {
+    const timeZone = configuredTimeZone();
+
     const rows = await query<{
       date: string;
       move_kcal: number | null;
@@ -795,16 +804,53 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
 
   try {
     const rows = await query<{ identifier: string; rows: string; earliest: string | null; latest: string | null }>(
-      `SELECT st.identifier,
+      `WITH quantity_stats AS (
+         SELECT r.type_id,
+                SUM(r.n)::bigint AS rows
+           FROM quantity_rollups r
+          WHERE r.user_id = $1::uuid
+          GROUP BY r.type_id
+       ),
+       quantity_times AS (
+         SELECT st.type_id,
+                first_sample.start_ts AS earliest,
+                latest_sample.start_ts AS latest
+           FROM sample_types st
+           JOIN quantity_stats qs ON qs.type_id = st.type_id
+           CROSS JOIN LATERAL (
+             SELECT q.start_ts
+               FROM quantity_samples q
+              WHERE q.type_id = st.type_id
+                AND q.user_id = $1::uuid
+              ORDER BY q.start_ts ASC
+              LIMIT 1
+           ) first_sample
+           CROSS JOIN LATERAL (
+             SELECT q.start_ts
+               FROM quantity_samples q
+              WHERE q.type_id = st.type_id
+                AND q.user_id = $1::uuid
+              ORDER BY q.start_ts DESC
+              LIMIT 1
+           ) latest_sample
+       )
+       SELECT st.identifier,
+              qs.rows,
+              (extract(epoch from qt.earliest) * 1000)::bigint AS earliest,
+              (extract(epoch from qt.latest) * 1000)::bigint AS latest
+         FROM quantity_stats qs
+         JOIN sample_types st ON st.type_id = qs.type_id
+         JOIN quantity_times qt ON qt.type_id = qs.type_id
+
+       UNION ALL
+
+       SELECT st.identifier,
               count(*)::bigint AS rows,
-              (extract(epoch from min(x.start_ts)) * 1000)::bigint AS earliest,
-              (extract(epoch from max(x.start_ts)) * 1000)::bigint AS latest
-         FROM (
-           SELECT type_id, start_ts FROM quantity_samples WHERE user_id = $1::uuid
-           UNION ALL
-           SELECT type_id, start_ts FROM category_samples WHERE user_id = $1::uuid
-         ) x
-         JOIN sample_types st ON st.type_id = x.type_id
+              (extract(epoch from min(c.start_ts)) * 1000)::bigint AS earliest,
+              (extract(epoch from max(c.start_ts)) * 1000)::bigint AS latest
+         FROM category_samples c
+         JOIN sample_types st ON st.type_id = c.type_id
+        WHERE c.user_id = $1::uuid
         GROUP BY st.identifier`,
       [userId],
     );
@@ -841,8 +887,11 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
   }
 }
 
-// ── batched daily sparklines for a set of quantity types (one round-trip) ──
-export async function getDailySparklines(userId: string, identifiers: string[], days = 21): Promise<Map<string, number[]>> {
+export async function getDailySparklines(
+  userId: string,
+  identifiers: string[],
+  days = 21,
+): Promise<Map<string, number[]>> {
   const out = new Map<string, number[]>();
   if (!identifiers.length) return out;
 
@@ -850,43 +899,151 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
   if (src !== "live") {
     if (src === "demo") {
       for (const id of identifiers) {
-        out.set(id, demoSeries(id, "M").points.slice(-days).map((p) => p.value));
+        out.set(
+          id,
+          demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+        );
       }
     }
     return out;
   }
 
   try {
-    const byId = new Map<string, number[]>();
-    const mdTypes = await metricDailyTypes(userId);
-    const mdIds = identifiers.filter((id) => mdTypes.has(id));
-    const rawIds = identifiers.filter((id) => !mdTypes.has(id));
-    const rawCumIds = rawIds.filter((id) => defaultAgg(id) === "sum");
-    const rawDiscIds = rawIds.filter((id) => defaultAgg(id) === "avg");
     const timeZone = configuredTimeZone();
 
-    // Covered types: daily best-guess-of-truth.
-    if (mdIds.length) {
-      const rows = await query<{ identifier: string; value: number }>(
-        `SELECT identifier,
-                (extract(epoch from (day::timestamp AT TIME ZONE $4::text)) * 1000)::bigint AS t,
-                value::float8 AS value
-           FROM metric_daily
-          WHERE identifier = ANY($1::text[])
-            AND user_id = $3::uuid
-            AND day >= (now() AT TIME ZONE $4::text)::date - $2::int
-          ORDER BY identifier, day`,
-        [mdIds, days, userId, timeZone],
+    // The optimized path uses canonical aggregate days together with the
+    // hourly raw-sample rollup fallback. Canonical days are only safe when
+    // the database and viewer use the same calendar timezone.
+    if (await metricDailyUsable()) {
+      const rows = await query<{
+        identifier: string;
+        value: number;
+      }>(
+        `WITH type_semantics AS (
+           SELECT a.type_id,
+                  CASE
+                    WHEN bool_or(a.agg_func = 'sum') THEN 'cumulative'
+                    WHEN bool_or(a.agg_func = 'average') THEN 'discrete'
+                  END AS semantic
+             FROM aggregate_series a
+             JOIN sample_types st ON st.type_id = a.type_id
+            WHERE st.identifier = ANY($1::text[])
+            GROUP BY a.type_id
+           HAVING bool_or(a.agg_func IN ('sum', 'average'))
+         ),
+         canonical_agg AS (
+           SELECT s.type_id,
+                  b.user_id,
+                  (b.bucket_start AT TIME ZONE $4::text)::date AS day,
+                  b.value,
+                  row_number() OVER (
+                    PARTITION BY s.type_id,
+                                 b.user_id,
+                                 (b.bucket_start AT TIME ZONE $4::text)::date
+                    ORDER BY b.updated_at DESC, b.bucket_start DESC
+                  ) AS preference
+             FROM aggregate_samples b
+             JOIN aggregate_series s USING (series_id)
+             JOIN type_semantics ts USING (type_id)
+            WHERE b.value IS NOT NULL
+              AND s.interval_value = 1
+              AND s.interval_unit = 'day'
+              AND s.device_filter = 'all'
+              AND (
+                (ts.semantic = 'cumulative' AND s.agg_func = 'sum')
+                OR
+                (ts.semantic = 'discrete' AND s.agg_func = 'average')
+              )
+              AND b.user_id = $3::uuid
+              AND b.bucket_start >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
+         ),
+         agg_daily AS (
+           SELECT type_id, user_id, day, value
+             FROM canonical_agg
+            WHERE preference = 1
+         ),
+         rollup_src AS (
+           SELECT r.type_id,
+                  r.user_id,
+                  r.source_id,
+                  ts.semantic,
+                  (r.bucket AT TIME ZONE $4::text)::date AS day,
+                  CASE
+                    WHEN ts.semantic = 'cumulative'
+                      THEN sum(r.sum_value)
+                    ELSE
+                      sum(r.avg_value * r.n)
+                      / NULLIF(sum(r.n), 0)
+                  END AS value,
+                  sum(r.n) AS n
+             FROM quantity_rollups r
+             JOIN type_semantics ts USING (type_id)
+            WHERE r.user_id = $3::uuid
+              AND r.bucket >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
+            GROUP BY r.type_id,
+                     r.user_id,
+                     r.source_id,
+                     ts.semantic,
+                     day
+         ),
+         rollup_daily AS (
+           SELECT type_id,
+                  user_id,
+                  day,
+                  CASE
+                    WHEN semantic = 'cumulative'
+                      THEN (array_agg(value ORDER BY value DESC))[1]
+                    ELSE
+                      sum(value * n) / NULLIF(sum(n), 0)
+                  END AS value
+             FROM rollup_src
+            GROUP BY type_id, user_id, day, semantic
+         ),
+         daily AS (
+           SELECT COALESCE(a.type_id, r.type_id) AS type_id,
+                  COALESCE(a.user_id, r.user_id) AS user_id,
+                  COALESCE(a.day, r.day) AS day,
+                  COALESCE(a.value, r.value) AS value
+             FROM agg_daily a
+             FULL JOIN rollup_daily r
+               ON a.type_id = r.type_id
+              AND a.user_id = r.user_id
+              AND a.day = r.day
+         )
+         SELECT st.identifier,
+                d.value::float8 AS value
+           FROM daily d
+           JOIN sample_types st ON st.type_id = d.type_id
+          ORDER BY st.identifier, d.day`,
+        [identifiers, days, userId, timeZone],
       );
+
+      const byId = new Map<string, number[]>();
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
         byId.set(r.identifier, arr);
       }
+
+      for (const id of identifiers) {
+        out.set(id, byId.get(id) ?? []);
+      }
+      return out;
     }
 
-    // Cumulative raw data: one source per local day to avoid Watch + phone
-    // double counts. Discrete readings remain a cross-source average.
+    // If the database timezone differs from the viewer timezone, do not use
+    // metric_daily/canonical aggregate days. Fall back to raw local buckets,
+    // preserving the original semantics.
+    const byId = new Map<string, number[]>();
+    const rawCumIds = identifiers.filter((id) => defaultAgg(id) === "sum");
+    const rawDiscIds = identifiers.filter((id) => defaultAgg(id) === "avg");
+
     if (rawCumIds.length) {
       const rows = await query<{ identifier: string; value: number }>(
         `WITH per_source AS (
@@ -898,7 +1055,10 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
              JOIN sample_types st ON st.type_id = q.type_id
             WHERE st.identifier = ANY($1::text[])
               AND q.user_id = $3::uuid
-              AND q.start_ts >= (((now() AT TIME ZONE $4::text)::date - $2::int) AT TIME ZONE $4::text)
+              AND q.start_ts >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
             GROUP BY st.identifier, day, q.source_id
          )
          SELECT identifier, max(value)::float8 AS value
@@ -907,6 +1067,7 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
           ORDER BY identifier, day`,
         [rawCumIds, days, userId, timeZone],
       );
+
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
@@ -916,16 +1077,23 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
 
     if (rawDiscIds.length) {
       const rows = await query<{ identifier: string; value: number }>(
-        `SELECT st.identifier, avg(q.value)::float8 AS value
+        `SELECT st.identifier,
+                avg(q.value)::float8 AS value
            FROM quantity_samples q
            JOIN sample_types st ON st.type_id = q.type_id
           WHERE st.identifier = ANY($1::text[])
             AND q.user_id = $3::uuid
-            AND q.start_ts >= (((now() AT TIME ZONE $4::text)::date - $2::int) AT TIME ZONE $4::text)
-          GROUP BY st.identifier, time_bucket('1 day', q.start_ts, $4::text)
-          ORDER BY st.identifier, time_bucket('1 day', q.start_ts, $4::text)`,
+            AND q.start_ts >= (
+              (((now() AT TIME ZONE $4::text)::date - $2::int)
+                AT TIME ZONE $4::text)
+            )
+          GROUP BY st.identifier,
+                   time_bucket('1 day', q.start_ts, $4::text)
+          ORDER BY st.identifier,
+                   time_bucket('1 day', q.start_ts, $4::text)`,
         [rawDiscIds, days, userId, timeZone],
       );
+
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
@@ -933,13 +1101,19 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
       }
     }
 
-    for (const id of identifiers) out.set(id, byId.get(id) ?? []);
+    for (const id of identifiers) {
+      out.set(id, byId.get(id) ?? []);
+    }
+
     return out;
   } catch (e) {
     console.error("[queries] getDailySparklines failed:", e);
     if (ALLOW_DEMO) {
       for (const id of identifiers) {
-        out.set(id, demoSeries(id, "M").points.slice(-days).map((p) => p.value));
+        out.set(
+          id,
+          demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+        );
       }
     }
     return out;
