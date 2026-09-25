@@ -291,14 +291,120 @@ func (st *Store) DailyMetrics(ctx context.Context, userID string, types []string
 	}
 
 	rows, err := st.pool.Query(ctx, `
-		SELECT md.identifier, st.unit, md.day::text, md.value::float8
-		FROM metric_daily md
-		JOIN sample_types st ON st.type_id = md.type_id
-		WHERE md.day >= $1::date
-		  AND md.day < $2::date
-		  AND md.user_id = $3
-		  AND md.identifier = ANY($4::text[])
-		ORDER BY md.identifier, md.day`, startDay, endDay, userID, types)
+                WITH requested_types AS (
+                        SELECT type_id, identifier, unit
+                        FROM sample_types
+                        WHERE identifier = ANY($4::text[])
+                ),
+                type_semantics AS (
+                        SELECT
+                                s.type_id,
+                                CASE
+                                        WHEN bool_or(s.agg_func = 'sum') THEN 'cumulative'
+                                        WHEN bool_or(s.agg_func = 'average') THEN 'discrete'
+                                END AS semantic
+                        FROM aggregate_series s
+                        JOIN requested_types rt USING (type_id)
+                        WHERE s.agg_func IN ('sum', 'average')
+                        GROUP BY s.type_id
+                ),
+                canonical_agg AS (
+                        SELECT
+                                s.type_id,
+                                b.user_id,
+                                (b.bucket_start AT TIME ZONE puls_time_zone())::date AS day,
+                                b.value,
+                                row_number() OVER (
+                                        PARTITION BY
+                                                s.type_id,
+                                                b.user_id,
+                                                (b.bucket_start AT TIME ZONE puls_time_zone())::date
+                                        ORDER BY b.updated_at DESC, b.bucket_start DESC
+                                ) AS preference
+                        FROM aggregate_samples b
+                        JOIN aggregate_series s USING (series_id)
+                        JOIN type_semantics ts USING (type_id)
+                        WHERE b.user_id = $3
+                          AND b.value IS NOT NULL
+                          AND s.interval_value = 1
+                          AND s.interval_unit = 'day'
+                          AND s.device_filter = 'all'
+                          AND (
+                                (ts.semantic = 'cumulative' AND s.agg_func = 'sum')
+                                OR
+                                (ts.semantic = 'discrete' AND s.agg_func = 'average')
+                          )
+                          AND b.bucket_start >= ($1::date AT TIME ZONE puls_time_zone())
+                          AND b.bucket_start < ($2::date AT TIME ZONE puls_time_zone())
+                ),
+                agg_daily AS (
+                        SELECT type_id, user_id, day, value
+                        FROM canonical_agg
+                        WHERE preference = 1
+                ),
+                rollup_src AS (
+                        SELECT
+                                r.type_id,
+                                r.user_id,
+                                r.source_id,
+                                ts.semantic,
+                                (r.bucket AT TIME ZONE puls_time_zone())::date AS day,
+                                CASE
+                                        WHEN ts.semantic = 'cumulative'
+                                                THEN sum(r.sum_value)
+                                        ELSE
+                                                sum(r.avg_value * r.n::double precision)
+                                                / NULLIF(sum(r.n), 0)::double precision
+                                END AS value,
+                                sum(r.n) AS n
+                        FROM quantity_rollups r
+                        JOIN type_semantics ts USING (type_id)
+                        WHERE r.user_id = $3
+                          AND r.bucket >= ($1::date AT TIME ZONE puls_time_zone())
+                          AND r.bucket < ($2::date AT TIME ZONE puls_time_zone())
+                        GROUP BY
+                                r.type_id,
+                                r.user_id,
+                                r.source_id,
+                                ts.semantic,
+                                (r.bucket AT TIME ZONE puls_time_zone())::date
+                ),
+                rollup_daily AS (
+                        SELECT
+                                type_id,
+                                user_id,
+                                day,
+                                CASE
+                                        WHEN semantic = 'cumulative'
+                                                THEN (array_agg(value ORDER BY value DESC))[1]
+                                        ELSE
+                                                sum(value * n)
+                                                / NULLIF(sum(n), 0)
+                                END AS value
+                        FROM rollup_src
+                        GROUP BY type_id, user_id, day, semantic
+                ),
+                resolved AS (
+                        SELECT
+                                COALESCE(a.type_id, r.type_id) AS type_id,
+                                COALESCE(a.user_id, r.user_id) AS user_id,
+                                COALESCE(a.day, r.day) AS day,
+                                COALESCE(a.value, r.value) AS value
+                        FROM agg_daily a
+                        FULL JOIN rollup_daily r
+                          ON a.type_id = r.type_id
+                         AND a.user_id = r.user_id
+                         AND a.day = r.day
+                )
+                SELECT
+                        rt.identifier,
+                        rt.unit,
+                        resolved.day::text,
+                        resolved.value::float8
+                FROM resolved
+                JOIN requested_types rt USING (type_id)
+                ORDER BY rt.identifier, resolved.day`,
+		startDay, endDay, userID, types)
 	if err != nil {
 		return nil, err
 	}
