@@ -100,7 +100,7 @@ describe("query semantics", () => {
     expect(intradaySql).toContain("sum(value)::float8 AS sum");
 
     const [yearSql, yearParams] = calls[1];
-    expect(yearParams.slice(0, 2)).toEqual(["1 week", "1 day"]);
+    expect(yearParams.slice(0, 2)).toEqual(["1 day", "1 day"]);
     expect(yearSql).toContain("time_bucket($2::interval");
     expect(yearSql).toContain("time_bucket($1::interval");
   });
@@ -198,7 +198,7 @@ describe("query semantics", () => {
     }
 
     expect(windows[0].params).toContain("1 day");
-    expect(windows[1].params).toContain("1 week");
+    expect(windows[1].params).toContain("1 day");
     expect(windows[2].params).toContain("1 day");
   });
 

@@ -310,7 +310,7 @@ export async function getSeries(
         // rather than summing everything.
         const rows = await query<{ t: string; value: number }>(
           `WITH per_source AS (
-             SELECT time_bucket($1::interval, c.start_ts${shift}, $5::text) AS t,
+             SELECT time_bucket($1::interval, c.start_ts${shift}, $6::text) AS t,
                     c.source_id,
                     (sum(extract(epoch from (c.end_ts - c.start_ts))) / ${divisor}.0)::float8 AS value
                FROM category_samples c
@@ -347,7 +347,7 @@ export async function getSeries(
       }
 
       const rows = await query<{ t: string; n: number }>(
-        `SELECT (extract(epoch from time_bucket($1::interval, c.start_ts, $5::text)) * 1000)::bigint AS t,
+        `SELECT (extract(epoch from time_bucket($1::interval, c.start_ts, $6::text)) * 1000)::bigint AS t,
                 count(*)::int AS n
            FROM category_samples c
            JOIN sample_types st ON st.type_id = c.type_id
