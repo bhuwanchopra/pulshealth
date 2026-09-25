@@ -6,7 +6,13 @@ import { TrendChart } from "@/components/TrendChart";
 import { ChevronRight } from "@/components/Icons";
 import { GROUP_LABELS, typeByIdentifier } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
-import { isCumulative, parseRange, RANGES } from "@/lib/metrics";
+import {
+  isCumulative,
+  parseRange,
+  RANGES,
+  resolveCustomWindow,
+  resolvePresetWindow,
+} from "@/lib/metrics";
 import { getLatestMany, getSeries, getStats, getTodayTotals } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 import { displayUnit, formatCompact, formatFull, formatValue, relativeTime } from "@/lib/format";
@@ -37,7 +43,7 @@ export default async function TypePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const { id } = await params;
   const type = typeByIdentifier(id);
@@ -45,17 +51,39 @@ export default async function TypePage({
   if (type.kind === "workout") redirect("/workouts");
   if (type.kind !== "quantity" && type.kind !== "category") notFound();
 
-  const range = parseRange((await searchParams).range);
+  const query = await searchParams;
+  const range = parseRange(query.range);
   const color = GROUP_COLOR[type.group];
   const cumulative = isCumulative(id);
 
   const user = await viewerUser();
-  const [series, latestMap, todays, stats] = await Promise.all([
-    getSeries(user, id, range),
+  const [latestMap, todays, stats] = await Promise.all([
     getLatestMany(user, [id]),
     cumulative ? getTodayTotals(user, [id]) : Promise.resolve(new Map<string, number>()),
     getStats(user),
   ]);
+
+  let seriesWindow;
+
+  if (range === "CUSTOM") {
+    if (!query.from || !query.to) {
+      redirect(`/type/${encodeURIComponent(id)}?range=7D`);
+    }
+
+    try {
+      seriesWindow = resolveCustomWindow(query.from, query.to);
+    } catch {
+      redirect(`/type/${encodeURIComponent(id)}?range=7D`);
+    }
+  } else {
+    seriesWindow = resolvePresetWindow(
+      range,
+      new Date(),
+      range === "ALL" ? stats.get(id)?.earliest : undefined,
+    );
+  }
+
+  const series = await getSeries(user, id, range, seriesWindow);
 
   const vals = series.points.map((p) => p.value).filter(Number.isFinite);
   const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
