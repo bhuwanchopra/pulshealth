@@ -142,6 +142,7 @@ $$;
 -- on its next migrate run, because this file runs every time.
 GRANT SELECT ON TABLE
   users,
+  batches,
   sources,
   sample_types,
   category_labels,
@@ -200,6 +201,7 @@ BEGIN
   IF EXISTS (
     WITH expected_public(nspname, relname, privilege_type, is_grantable) AS (VALUES
       ('public', 'users', 'SELECT', false),
+      ('public', 'batches', 'SELECT', false),
       ('public', 'sources', 'SELECT', false),
       ('public', 'sample_types', 'SELECT', false),
       ('public', 'category_labels', 'SELECT', false),

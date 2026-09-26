@@ -93,6 +93,23 @@ services:
     image: ghcr.io/pulshealth/ingest:${PULS_VERSION:-latest}
     restart: unless-stopped
     logging: *app-logging
+
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "proxy"
+      traefik.http.routers.pulshealth-ingest.rule: "Host(`health.database-dungeon.win`) && PathPrefix(`/ingest`)"
+      traefik.http.routers.pulshealth-ingest.entrypoints: "websecure"
+      traefik.http.routers.pulshealth-ingest.tls: "true"
+      traefik.http.routers.pulshealth-ingest.tls.certresolver: "cf"
+      traefik.http.routers.pulshealth-ingest.priority: "100"
+      traefik.http.routers.pulshealth-ingest.middlewares: "pulshealth-ingest-strip@docker,secure-headers@file"
+      traefik.http.middlewares.pulshealth-ingest-strip.stripprefix.prefixes: "/ingest"
+      traefik.http.services.pulshealth-ingest.loadbalancer.server.port: "8080"
+
+    networks:
+      - default
+      - proxy
+
     environment:
       # Connects as the scoped DML-only `ingest` role (created and kept
       # current by 099_read_roles.sh from INGEST_DB_PASSWORD) — the only
@@ -313,3 +330,8 @@ volumes:
   grafana_data:
   # Only created when the `backup` profile is used and PULS_BACKUP_DIR is unset.
   backups:
+
+networks:
+  proxy:
+    external: true
+    name: proxy

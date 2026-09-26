@@ -472,8 +472,6 @@ export async function getSeries(
     // metric_daily remains the fallback when no suitable aggregate exists.
     const mdTypes = await metricDailyTypes(userId);
     if (mdTypes.has(identifier) && bucketMs >= DAY_MS) {
-      const byId = new Map<string, number[]>();
-      const timeZone = configuredTimeZone();
       const rows = await query<{ t: string; value: number }>(
         `SELECT
            (extract(
@@ -725,7 +723,6 @@ export async function getActivityRings(userId: string): Promise<ActivityRingsDat
   if (src !== "live") return notLive(src, () => demoActivityRings(), fallback);
 
   try {
-    const timeZone = configuredTimeZone();
 
     const rows = await query<{
       date: string;
