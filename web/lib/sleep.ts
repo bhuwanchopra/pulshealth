@@ -30,6 +30,8 @@ export function sleepRangeDays(key: SleepRangeKey): number {
 
 export function sleepRangeBucket(key: SleepRangeKey): { interval: string; bucketMs: number } {
   switch (key) {
+    case "1Y":
+      return { interval: "7 days", bucketMs: 7 * 86_400_000 };
     case "2Y":
       return { interval: "14 days", bucketMs: 14 * 86_400_000 };
     case "5Y":
@@ -53,9 +55,9 @@ export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay
   const groups = new Map<string, SleepDay & { _count: number }>();
   const bucketKey = (date: string): string => {
     const d = new Date(date + "T12:00:00Z");
-    if (interval === "14 days") {
+    if (interval === "7 days" || interval === "14 days") {
       const dayIndex = Math.floor(d.getTime() / 86_400_000);
-      return String(Math.floor(dayIndex / 14) * 14);
+      return String(Math.floor(dayIndex / (interval === "7 days" ? 7 : 14)) * (interval === "7 days" ? 7 : 14));
     }
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth();
