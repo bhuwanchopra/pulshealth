@@ -2,13 +2,14 @@ import Link from "next/link";
 import { ActivityRings, type RingDatum } from "@/components/ActivityRings";
 import { Distance } from "@/components/Distance";
 import { MetricCard } from "@/components/MetricCard";
+import { SleepCard } from "@/components/SleepCard";
 import { PageHeader } from "@/components/PageHeader";
 import { GroupIcon, ChevronRight } from "@/components/Icons";
 import { GROUPS, GROUP_LABELS, typeByIdentifier, typesInGroup } from "@/lib/catalog";
 import { formatActivity } from "@/lib/activity";
 import { GROUP_COLOR } from "@/lib/colors";
 import { isCumulative } from "@/lib/metrics";
-import { getActivityRings, getLatestMany, getSeries, getStats, getTodayTotals, getWorkouts } from "@/lib/queries";
+import { getActivityRings, getLatestMany, getSeries, getSleepDays, getStats, getTodayTotals, getWorkouts } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 import { formatCompact, formatDuration, formatFull, formatToday } from "@/lib/format";
 import { greetingAt } from "@/lib/time";
@@ -38,12 +39,13 @@ const RING_TYPES = [
 export default async function Dashboard() {
   const now = new Date();
   const user = await viewerUser();
-  const [latest, todays, stats, workouts, activity] = await Promise.all([
+  const [latest, todays, stats, workouts, activity, sleepDays] = await Promise.all([
     getLatestMany(user, KEY_METRICS.filter((id) => !isCumulative(id))),
     getTodayTotals(user, [...new Set([...RING_TYPES, ...KEY_METRICS.filter(isCumulative)])]),
     getStats(user),
     getWorkouts(user, 3),
     getActivityRings(user),
+    getSleepDays(user, 14),
   ]);
 
   const seriesList = await Promise.all(KEY_METRICS.map((id) => getSeries(user, id, "M")));
@@ -115,16 +117,21 @@ export default async function Dashboard() {
         {KEY_METRICS.map((id, i) => {
           const type = typeByIdentifier(id);
           if (!type) return null;
+          if (id === "HKCategoryTypeIdentifierSleepAnalysis") {
+            return (
+              <div key={id} className="rise" style={{ animationDelay: "80ms" }}>
+                <SleepCard sleep={sleepDays[0] ?? null} compact />
+              </div>
+            );
+          }
           const s = seriesById.get(id);
           const spark = (s?.points ?? []).slice(-14).map((p) => p.value);
-          let value: number | null;
-          if (id === "HKCategoryTypeIdentifierSleepAnalysis") value = s?.points.at(-1)?.value ?? null;
-          else if (isCumulative(id)) value = todays.get(id) ?? null;
-          else value = latest.get(id)?.value ?? s?.points.at(-1)?.value ?? null;
-          const unit = id === "HKCategoryTypeIdentifierSleepAnalysis" ? "h" : type.unit;
+          const value = isCumulative(id)
+            ? todays.get(id) ?? null
+            : latest.get(id)?.value ?? s?.points.at(-1)?.value ?? null;
           return (
-            <div key={id} className="rise" style={{ animationDelay: `${80 + i * 30}ms` }}>
-              <MetricCard type={type} value={value} unit={unit} spark={spark} t={latest.get(id)?.t} />
+            <div key={id} className="rise" style={{ animationDelay: "80ms" }}>
+              <MetricCard type={type} value={value} unit={type.unit} spark={spark} t={latest.get(id)?.t} />
             </div>
           );
         })}
