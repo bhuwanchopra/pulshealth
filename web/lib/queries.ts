@@ -1142,7 +1142,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
       unspecified_minutes: number;
       awake_minutes: number;
     }>(
-      \`WITH per_source AS (
+      `WITH per_source AS (
          SELECT
            ((c.start_ts + interval '6 hours') AT TIME ZONE $2::text)::date AS day,
            COALESCE(c.source_id, 0) AS source_id,
@@ -1185,7 +1185,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
              awake_minutes::float8
         FROM ranked
        WHERE rn = 1
-       ORDER BY day DESC\`,
+       ORDER BY day DESC`,
       [userId, timeZone, days],
     );
 
