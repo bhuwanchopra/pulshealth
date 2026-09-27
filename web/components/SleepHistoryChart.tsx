@@ -1,4 +1,4 @@
-import type { SleepDay } from "@/lib/sleep";
+import { formatSleepPeriodLabel, type SleepDay } from "@/lib/sleep";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core", color: "rgb(96 165 250)" },
@@ -15,16 +15,13 @@ function hoursAndMinutes(minutes: number): string {
   return hours ? `${hours}h ${mins}m` : `${mins}m`;
 }
 
-function formatDate(date: string): string {
-  const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(parsed);
-}
-
-export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
+export function SleepHistoryChart({
+  nights,
+  interval,
+}: {
+  nights: SleepDay[];
+  interval: string;
+}) {
   // Keep the chart's time direction consistent with the other metric charts:
   // oldest on the left, latest on the right.
   const displayNights = [...nights].reverse();
@@ -140,7 +137,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                       borderRadius: "5px 5px 2px 2px",
                       background: "var(--border)",
                     }}
-                    title={`${formatDate(night.date)} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
+                    title={`${formatSleepPeriodLabel(night.date, interval)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
                   >
                     {STAGES.map((stage) => {
                       const minutes = Math.max(0, night[stage.key]);
@@ -154,7 +151,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                             background: stage.color,
                             flex: "0 0 auto",
                           }}
-                          title={`${formatDate(night.date)} — ${stage.label}: ${hoursAndMinutes(minutes)}`}
+                          title={`${formatSleepPeriodLabel(night.date, interval)} — ${stage.label}: ${hoursAndMinutes(minutes)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"}`}
                         />
                       );
                     })}
@@ -184,7 +181,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {labelIndexes.has(index) ? formatDate(night.date) : ""}
+                  {labelIndexes.has(index) ? formatSleepPeriodLabel(night.date, interval) : ""}
                 </div>
               ))}
             </div>
