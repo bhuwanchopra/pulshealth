@@ -46,6 +46,7 @@ import type {
   WorkoutEvent,
   WorkoutSeries,
   WorkoutStat,
+  SleepDay,
 } from "./types";
 
 // uuid v4-ish shape — guard before casting to ::uuid so a bad path segment
@@ -1114,6 +1115,90 @@ export async function getDailySparklines(
       }
     }
     return out;
+  }
+}
+
+// ── sleep stages ──────────────────────────────────────────────────────────
+// Sleep is category interval data, not a numeric quantity. Attribute each
+// sample to the local wake-up day (18:00 boundary), aggregate per source,
+// then choose one source per day so iPhone + Watch + third-party records are
+// not added together. This mirrors the server's /v1/sleep/daily semantics.
+export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
+  const empty: SleepDay[] = [];
+  if (days < 1) return empty;
+
+  const src = await source();
+  if (src !== "live") return empty;
+
+  try {
+    const timeZone = configuredTimeZone();
+    const rows = await query<{
+      date: string;
+      asleep_minutes: number;
+      in_bed_minutes: number;
+      core_minutes: number;
+      deep_minutes: number;
+      rem_minutes: number;
+      unspecified_minutes: number;
+      awake_minutes: number;
+    }>(
+      \`WITH per_source AS (
+         SELECT
+           ((c.start_ts + interval '6 hours') AT TIME ZONE $2::text)::date AS day,
+           COALESCE(c.source_id, 0) AS source_id,
+           sum(CASE WHEN c.value IN (1, 3, 4, 5) THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS asleep_minutes,
+           sum(CASE WHEN c.value = 0 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS in_bed_minutes,
+           sum(CASE WHEN c.value = 3 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS core_minutes,
+           sum(CASE WHEN c.value = 4 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
+           sum(CASE WHEN c.value = 5 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
+           sum(CASE WHEN c.value = 1 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
+           sum(CASE WHEN c.value = 2 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
+         FROM category_samples c
+         JOIN sample_types st ON st.type_id = c.type_id
+        WHERE st.identifier = 'HKCategoryTypeIdentifierSleepAnalysis'
+          AND c.user_id = $1::uuid
+          AND c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours')
+          AND c.start_ts < (((now() AT TIME ZONE $2::text)::date + 1)::timestamp AT TIME ZONE $2::text)
+        GROUP BY 1, 2
+      ),
+      ranked AS (
+        SELECT *,
+               row_number() OVER (
+                 PARTITION BY day
+                 ORDER BY asleep_minutes DESC,
+                          (core_minutes + deep_minutes + rem_minutes) DESC,
+                          source_id
+               ) AS rn,
+               max(in_bed_minutes) OVER (PARTITION BY day) AS max_in_bed
+          FROM per_source
+      )
+      SELECT day::text AS date,
+             asleep_minutes::float8,
+             max_in_bed::float8 AS in_bed_minutes,
+             core_minutes::float8,
+             deep_minutes::float8,
+             rem_minutes::float8,
+             unspecified_minutes::float8,
+             awake_minutes::float8
+        FROM ranked
+       WHERE rn = 1
+       ORDER BY day DESC\`,
+      [userId, timeZone, days],
+    );
+
+    return rows.map((r) => ({
+      date: r.date,
+      asleepMinutes: Number(r.asleep_minutes) || 0,
+      inBedMinutes: Number(r.in_bed_minutes) || 0,
+      coreMinutes: Number(r.core_minutes) || 0,
+      deepMinutes: Number(r.deep_minutes) || 0,
+      remMinutes: Number(r.rem_minutes) || 0,
+      unspecifiedMinutes: Number(r.unspecified_minutes) || 0,
+      awakeMinutes: Number(r.awake_minutes) || 0,
+    }));
+  } catch (e) {
+    console.error("[queries] getSleepDays failed:", e);
+    return empty;
   }
 }
 
