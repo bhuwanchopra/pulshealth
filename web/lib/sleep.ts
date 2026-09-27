@@ -9,4 +9,3 @@ export interface SleepDay {
   awakeMinutes: number;
 }
 
-export const SLEEP_IDENTIFIER = "HKCategoryTypeIdentifierSleepAnalysis";
