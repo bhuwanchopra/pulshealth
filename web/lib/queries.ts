@@ -46,8 +46,8 @@ import type {
   WorkoutEvent,
   WorkoutSeries,
   WorkoutStat,
-  SleepDay,
 } from "./types";
+import type { SleepDay } from "./sleep";
 
 // uuid v4-ish shape — guard before casting to ::uuid so a bad path segment
 // surfaces as "not found" instead of a 500 from a failed cast.
