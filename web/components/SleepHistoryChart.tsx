@@ -39,13 +39,15 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
       ),
     ),
   );
-
   const axisMax = Math.max(8 * 60, Math.ceil(maxMinutes / 60) * 60);
   const axisStep = axisMax >= 12 * 60 ? 3 * 60 : 2 * 60;
   const ticks = Array.from(
     { length: Math.floor(axisMax / axisStep) + 1 },
     (_, index) => index * axisStep,
   ).filter((minutes) => minutes <= axisMax);
+  const chartHeight = 260;
+  const barWidth = nights.length > 90 ? 12 : 22;
+  const gap = nights.length > 90 ? 3 : 7;
 
   return (
     <section className="panel" style={{ padding: 20 }}>
@@ -54,54 +56,23 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
           <div className="eyebrow" style={{ color: "var(--muted)" }}>History</div>
           <h2 style={{ margin: "5px 0 0", fontSize: 20 }}>Sleep stages</h2>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 5 }}>
-            Each bar is one night, with stages stacked by duration.
+            Each bar is one night, stacked by stage duration.
           </div>
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 12 }}>14 nights</div>
+        <div style={{ color: "var(--faint)", fontSize: 12 }}>{nights.length} nights</div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "8px 16px",
-          marginTop: 18,
-          color: "var(--muted)",
-          fontSize: 12,
-        }}
-      >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 18, color: "var(--muted)", fontSize: 12 }}>
         {STAGES.map((stage) => (
           <div key={stage.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              aria-hidden="true"
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 3,
-                background: stage.color,
-              }}
-            />
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 3, background: stage.color }} />
             {stage.label}
           </div>
         ))}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "34px minmax(0, 1fr)",
-          gap: 10,
-          marginTop: 18,
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            height: 260,
-            color: "var(--faint)",
-            fontSize: 10,
-          }}
-        >
+      <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0, 1fr)", gap: 10, marginTop: 18 }}>
+        <div style={{ position: "relative", height: chartHeight, color: "var(--faint)", fontSize: 10 }}>
           {ticks.map((minutes) => (
             <span
               key={minutes}
@@ -117,92 +88,92 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
           ))}
         </div>
 
-        <div style={{ position: "relative", minWidth: 0 }}>
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: 0,
-              pointerEvents: "none",
-              backgroundImage: `linear-gradient(to top, transparent calc(100% - 1px), var(--border) calc(100% - 1px))`,
-              backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
-              opacity: 0.65,
-            }}
-          />
+        <div style={{ minWidth: 0, overflowX: nights.length > 30 ? "auto" : "visible" }}>
+          <div style={{ minWidth: Math.max(0, nights.length * (barWidth + gap)), paddingBottom: 2 }}>
+            <div
+              style={{
+                position: "relative",
+                height: chartHeight,
+                display: "flex",
+                alignItems: "flex-end",
+                gap,
+                padding: "0 2px",
+                backgroundImage: `linear-gradient(to top, transparent calc(100% - 1px), var(--border) calc(100% - 1px))`,
+                backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
+              }}
+            >
+              {nights.map((night) => {
+                const inBed = Math.max(0, night.inBedMinutes);
+                const stageTotal =
+                  night.coreMinutes +
+                  night.deepMinutes +
+                  night.remMinutes +
+                  night.unspecifiedMinutes +
+                  night.awakeMinutes;
+                const total = Math.max(inBed, stageTotal);
+                const barHeight = (Math.min(axisMax, total) / axisMax) * chartHeight;
 
-          <div
-            style={{
-              position: "relative",
-              height: 260,
-              display: "grid",
-              gridTemplateColumns: `repeat(${nights.length}, minmax(14px, 1fr))`,
-              alignItems: "end",
-              gap: nights.length > 10 ? 5 : 8,
-              padding: "0 2px",
-            }}
-          >
-            {nights.map((night) => {
-              const segments = STAGES.map((stage) => ({
-                ...stage,
-                minutes: Math.max(0, night[stage.key]),
-              })).filter((stage) => stage.minutes > 0);
+                return (
+                  <div
+                    key={night.date}
+                    style={{
+                      width: barWidth,
+                      height: Math.max(2, barHeight),
+                      flex: `0 0 ${barWidth}px`,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "flex-end",
+                      overflow: "hidden",
+                      borderRadius: "5px 5px 2px 2px",
+                      background: "var(--border)",
+                    }}
+                    title={`${formatDate(night.date)} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
+                  >
+                    {STAGES.map((stage) => {
+                      const minutes = Math.max(0, night[stage.key]);
+                      if (!minutes) return null;
+                      return (
+                        <div
+                          key={stage.key}
+                          style={{
+                            height: `${Math.min(minutes, axisMax) / axisMax * chartHeight}px`,
+                            minHeight: 1,
+                            background: stage.color,
+                            flex: "0 0 auto",
+                          }}
+                          title={`${formatDate(night.date)} — ${stage.label}: ${hoursAndMinutes(minutes)}`}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
 
-              return (
+            <div
+              style={{
+                display: "flex",
+                gap,
+                padding: "8px 2px 0",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
+              {nights.map((night) => (
                 <div
                   key={night.date}
                   style={{
-                    height: `${(Math.min(axisMax, Math.max(0, night.inBedMinutes)) / axisMax) * 100}%`,
-                    minHeight: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "flex-start",
-                    overflow: "hidden",
-                    borderRadius: "5px 5px 2px 2px",
-                    background: "var(--border)",
+                    width: barWidth,
+                    flex: `0 0 ${barWidth}px`,
+                    textAlign: "center",
+                    color: "var(--muted)",
+                    fontSize: 10,
+                    whiteSpace: "nowrap",
                   }}
-                  title={`${formatDate(night.date)} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
                 >
-                  {segments.map((segment) => (
-                    <div
-                      key={segment.key}
-                      style={{
-                        height: `${(segment.minutes / Math.max(1, night.inBedMinutes)) * 100}%`,
-                        minHeight: segment.minutes > 0 ? 1 : 0,
-                        background: segment.color,
-                        flexShrink: 0,
-                      }}
-                      title={`${segment.label}: ${hoursAndMinutes(segment.minutes)}`}
-                    />
-                  ))}
+                  {formatDate(night.date)}
                 </div>
-              );
-            })}
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${nights.length}, minmax(14px, 1fr))`,
-              gap: nights.length > 10 ? 5 : 8,
-              padding: "8px 2px 0",
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            {nights.map((night) => (
-              <div
-                key={night.date}
-                style={{
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textAlign: "center",
-                  color: "var(--muted)",
-                  fontSize: 10,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {formatDate(night.date)}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
