@@ -48,6 +48,11 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
   const chartHeight = 260;
   const barWidth = nights.length > 90 ? 12 : 22;
   const gap = nights.length > 90 ? 3 : 7;
+  const labelCount = Math.min(6, nights.length);
+  const labelStep = Math.max(1, Math.ceil(Math.max(0, nights.length - 1) / Math.max(1, labelCount - 1)));
+  const labelIndexes = new Set<number>();
+  for (let i = 0; i < nights.length; i += labelStep) labelIndexes.add(i);
+  if (nights.length) labelIndexes.add(nights.length - 1);
 
   return (
     <section className="panel" style={{ padding: 20 }}>
@@ -56,10 +61,12 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
           <div className="eyebrow" style={{ color: "var(--muted)" }}>History</div>
           <h2 style={{ margin: "5px 0 0", fontSize: 20 }}>Sleep stages</h2>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 5 }}>
-            Each bar is one night, stacked by stage duration.
+            {nights.some((night) => (night.nights ?? 1) > 1)
+              ? "Each bar is the average night for its time bucket, stacked by stage duration."
+              : "Each bar is one night, stacked by stage duration."}
           </div>
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 12 }}>{nights.length} nights</div>
+        <div style={{ color: "var(--faint)", fontSize: 12 }}>{nights.reduce((sum, night) => sum + (night.nights ?? 1), 0)} nights</div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 18, color: "var(--muted)", fontSize: 12 }}>
@@ -158,7 +165,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                 borderTop: "1px solid var(--border)",
               }}
             >
-              {nights.map((night) => (
+              {nights.map((night, index) => (
                 <div
                   key={night.date}
                   style={{
@@ -170,7 +177,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {formatDate(night.date)}
+                  {labelIndexes.has(index) ? formatDate(night.date) : ""}
                 </div>
               ))}
             </div>
