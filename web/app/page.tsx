@@ -114,7 +114,7 @@ export default async function Dashboard() {
       {/* Highlights */}
       <h2 className="eyebrow" style={{ margin: "30px 0 14px" }}>Highlights</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
-        {KEY_METRICS.map((id, i) => {
+        {KEY_METRICS.map((id) => {
           const type = typeByIdentifier(id);
           if (!type) return null;
           if (id === "HKCategoryTypeIdentifierSleepAnalysis") {
