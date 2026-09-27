@@ -59,3 +59,51 @@ export function parseSleepRange(value: string | null | undefined): SleepRangeKey
     ? (value as SleepRangeKey)
     : "7D";
 }
+
+export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay[] {
+  if (interval === "1 day") return days.map((day) => ({ ...day, nights: day.nights ?? 1 }));
+
+  const groups = new Map<string, SleepDay & { _count: number }>();
+  const bucketKey = (date: string): string => {
+    const d = new Date(date + "T12:00:00Z");
+    if (interval === "14 days") {
+      const dayIndex = Math.floor(d.getTime() / 86_400_000);
+      return String(Math.floor(dayIndex / 14) * 14);
+    }
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    if (interval === "1 month") return `${year}-${String(month + 1).padStart(2, "0")}`;
+    return `${year}-${String(Math.floor(month / 3) * 3 + 1).padStart(2, "0")}`;
+  };
+
+  for (const day of days) {
+    const key = bucketKey(day.date);
+    const current = groups.get(key);
+    if (!current) {
+      groups.set(key, { ...day, nights: 1, _count: 1 });
+      continue;
+    }
+    current.asleepMinutes += day.asleepMinutes;
+    current.inBedMinutes += day.inBedMinutes;
+    current.coreMinutes += day.coreMinutes;
+    current.deepMinutes += day.deepMinutes;
+    current.remMinutes += day.remMinutes;
+    current.unspecifiedMinutes += day.unspecifiedMinutes;
+    current.awakeMinutes += day.awakeMinutes;
+    current.nights = (current.nights ?? 0) + 1;
+    current._count += 1;
+  }
+
+  return [...groups.values()]
+    .map(({ _count, ...day }) => ({
+      ...day,
+      asleepMinutes: day.asleepMinutes / _count,
+      inBedMinutes: day.inBedMinutes / _count,
+      coreMinutes: day.coreMinutes / _count,
+      deepMinutes: day.deepMinutes / _count,
+      remMinutes: day.remMinutes / _count,
+      unspecifiedMinutes: day.unspecifiedMinutes / _count,
+      awakeMinutes: day.awakeMinutes / _count,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
