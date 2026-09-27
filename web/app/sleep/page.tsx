@@ -41,7 +41,7 @@ export default async function SleepPage({
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
           <SleepCard sleep={latest[0] ?? null} />
-          <SleepHistoryChart nights={nights} />
+          <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
         </div>
       )}
     </>
