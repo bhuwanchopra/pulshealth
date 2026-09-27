@@ -1,11 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { MetricCard } from "@/components/MetricCard";
+import { SleepCard } from "@/components/SleepCard";
 import { PageHeader } from "@/components/PageHeader";
 import { GroupIcon } from "@/components/Icons";
 import { GROUP_LABELS, GROUPS, type Group, typesInGroup } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
 import { isCumulative } from "@/lib/metrics";
-import { getDailySparklines, getLatestMany, getSeries, getStats, getTodayTotals } from "@/lib/queries";
+import { getDailySparklines, getLatestMany, getSeries, getSleepDays, getStats, getTodayTotals } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 import { formatCompact } from "@/lib/format";
 
@@ -44,12 +45,13 @@ export default async function CategoryPage({ params }: { params: Promise<{ group
   const otherTypes = types.filter((t) => t.kind !== "quantity");
 
   const user = await viewerUser();
-  const [sparks, todays, latest, stats, otherSeries] = await Promise.all([
+  const [sparks, todays, latest, stats, otherSeries, sleepDays] = await Promise.all([
     getDailySparklines(user, quantityIds),
     getTodayTotals(user, cumIds),
     getLatestMany(user, discIds),
     getStats(user),
     Promise.all(otherTypes.map((t) => getSeries(user, t.identifier, "M"))),
+    g === "sleep" ? getSleepDays(user, 14) : Promise.resolve([]),
   ]);
   const otherById = new Map(otherSeries.map((s) => [s.identifier, s]));
 
@@ -79,8 +81,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ group
         }
       />
 
+      {g === "sleep" && (
+        <div style={{ marginBottom: 18 }}>
+          <SleepCard sleep={sleepDays[0] ?? null} />
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
-        {ordered.map((type, i) => {
+        {ordered.filter((type) => !(g === "sleep" && type.identifier === "HKCategoryTypeIdentifierSleepAnalysis")).map((type, i) => {
           const id = type.identifier;
           let value: number | null;
           let spark: number[];
