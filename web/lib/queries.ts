@@ -1125,13 +1125,17 @@ export async function getDailySparklines(
 // not added together. This mirrors the server's /v1/sleep/daily semantics.
 export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
   const empty: SleepDay[] = [];
-  if (days < 1) return empty;
+  if (days < 0) return empty;
 
   const src = await source();
   if (src !== "live") return empty;
 
   try {
     const timeZone = configuredTimeZone();
+    const dateFilter = days > 0
+      ? "AND c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours')"
+      : "";
+    const params = days > 0 ? [userId, timeZone, days] : [userId, timeZone];
     const rows = await query<{
       date: string;
       asleep_minutes: number;
@@ -1160,7 +1164,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
           AND cl.value = c.value
         WHERE st.identifier = 'HKCategoryTypeIdentifierSleepAnalysis'
           AND c.user_id = $1::uuid
-          AND c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours')
+          ${dateFilter}
           AND c.start_ts < (((now() AT TIME ZONE $2::text)::date + 1)::timestamp AT TIME ZONE $2::text)
         GROUP BY 1, 2
       ),
@@ -1186,7 +1190,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
         FROM ranked
        WHERE rn = 1
        ORDER BY day DESC`,
-      [userId, timeZone, days],
+      params,
     );
 
     return rows.map((r) => ({
