@@ -1123,7 +1123,11 @@ export async function getDailySparklines(
 // sample to the local wake-up day (18:00 boundary), aggregate per source,
 // then choose one source per day so iPhone + Watch + third-party records are
 // not added together. This mirrors the server's /v1/sleep/daily semantics.
-export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
+// ── sleep stages ──────────────────────────────────────────────────────────
+// Attribute each sleep sample to the local wake-up day (18:00 boundary),
+// choose one source per night, then average those nights into the requested
+// chart bucket. Long-range resolution matches the main metric charts.
+export async function getSleepHistory(userId: string, days = 14, bucket = "1 day"): Promise<SleepDay[]> {
   const empty: SleepDay[] = [];
   if (days < 0) return empty;
 
@@ -1135,7 +1139,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
     const dateFilter = days > 0
       ? "AND c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours')"
       : "";
-    const params = days > 0 ? [userId, timeZone, days] : [userId, timeZone];
+    const params = [userId, timeZone, days, bucket];
     const rows = await query<{
       date: string;
       asleep_minutes: number;
@@ -1145,6 +1149,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
       rem_minutes: number;
       unspecified_minutes: number;
       awake_minutes: number;
+      nights: number;
     }>(
       `WITH per_source AS (
          SELECT
@@ -1159,9 +1164,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
          FROM category_samples c
          JOIN sample_types st ON st.type_id = c.type_id
-         JOIN category_labels cl
-           ON cl.type_identifier = st.identifier
-          AND cl.value = c.value
+         JOIN category_labels cl ON cl.type_identifier = st.identifier AND cl.value = c.value
         WHERE st.identifier = 'HKCategoryTypeIdentifierSleepAnalysis'
           AND c.user_id = $1::uuid
           ${dateFilter}
@@ -1170,27 +1173,33 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
       ),
       ranked AS (
         SELECT *,
-               row_number() OVER (
-                 PARTITION BY day
-                 ORDER BY asleep_minutes DESC,
-                          (core_minutes + deep_minutes + rem_minutes) DESC,
-                          source_id
-               ) AS rn,
+               row_number() OVER (PARTITION BY day ORDER BY asleep_minutes DESC, (core_minutes + deep_minutes + rem_minutes) DESC, source_id) AS rn,
                max(in_bed_minutes) OVER (PARTITION BY day) AS max_in_bed
           FROM per_source
+      ),
+      daily AS (
+        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+          FROM ranked
+         WHERE rn = 1
+      ),
+      bucketed AS (
+        SELECT time_bucket($4::interval, day::timestamp)::date AS bucket_date,
+               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+          FROM daily
       )
-      SELECT day::text AS date,
-             asleep_minutes::float8,
-             max_in_bed::float8 AS in_bed_minutes,
-             core_minutes::float8,
-             deep_minutes::float8,
-             rem_minutes::float8,
-             unspecified_minutes::float8,
-             awake_minutes::float8
-        FROM ranked
-       WHERE rn = 1
-       ORDER BY day DESC`,
-      params,
+      SELECT bucket_date::text AS date,
+             avg(asleep_minutes)::float8 AS asleep_minutes,
+             avg(in_bed_minutes)::float8 AS in_bed_minutes,
+             avg(core_minutes)::float8 AS core_minutes,
+             avg(deep_minutes)::float8 AS deep_minutes,
+             avg(rem_minutes)::float8 AS rem_minutes,
+             avg(unspecified_minutes)::float8 AS unspecified_minutes,
+             avg(awake_minutes)::float8 AS awake_minutes,
+             count(*)::int AS nights
+        FROM bucketed
+       GROUP BY bucket_date
+       ORDER BY bucket_date DESC`
+      , params,
     );
 
     return rows.map((r) => ({
@@ -1202,13 +1211,17 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
       remMinutes: Number(r.rem_minutes) || 0,
       unspecifiedMinutes: Number(r.unspecified_minutes) || 0,
       awakeMinutes: Number(r.awake_minutes) || 0,
+      nights: Number(r.nights) || 1,
     }));
   } catch (e) {
-    console.error("[queries] getSleepDays failed:", e);
+    console.error("[queries] getSleepHistory failed:", e);
     return empty;
   }
 }
 
+export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
+  return getSleepHistory(userId, days, "1 day");
+}
 // ── workouts ─────────────────────────────────────────────────────────────
 export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]> {
   const src = await source();
