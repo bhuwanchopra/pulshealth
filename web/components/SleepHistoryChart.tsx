@@ -25,9 +25,13 @@ function formatDate(date: string): string {
 }
 
 export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
+  // Keep the chart's time direction consistent with the other metric charts:
+  // oldest on the left, latest on the right.
+  const displayNights = [...nights].reverse();
+
   const maxMinutes = Math.max(
     1,
-    ...nights.map((night) =>
+    ...displayNights.map((night) =>
       Math.max(
         night.inBedMinutes,
         night.asleepMinutes + night.awakeMinutes,
@@ -46,13 +50,13 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
     (_, index) => index * axisStep,
   ).filter((minutes) => minutes <= axisMax);
   const chartHeight = 260;
-  const barWidth = nights.length > 90 ? 12 : 22;
-  const gap = nights.length > 90 ? 3 : 7;
-  const labelCount = Math.min(6, nights.length);
-  const labelStep = Math.max(1, Math.ceil(Math.max(0, nights.length - 1) / Math.max(1, labelCount - 1)));
+  const barWidth = displayNights.length > 90 ? 12 : 22;
+  const gap = displayNights.length > 90 ? 3 : 7;
+  const labelCount = Math.min(6, displayNights.length);
+  const labelStep = Math.max(1, Math.ceil(Math.max(0, displayNights.length - 1) / Math.max(1, labelCount - 1)));
   const labelIndexes = new Set<number>();
-  for (let i = 0; i < nights.length; i += labelStep) labelIndexes.add(i);
-  if (nights.length) labelIndexes.add(nights.length - 1);
+  for (let i = 0; i < displayNights.length; i += labelStep) labelIndexes.add(i);
+  if (displayNights.length) labelIndexes.add(nights.length - 1);
 
   return (
     <section className="panel" style={{ padding: 20 }}>
@@ -66,7 +70,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
               : "Each bar is one night, stacked by stage duration."}
           </div>
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 12 }}>{nights.reduce((sum, night) => sum + (night.nights ?? 1), 0)} nights</div>
+        <div style={{ color: "var(--faint)", fontSize: 12 }}>{displayNights.reduce((sum, night) => sum + (night.nights ?? 1), 0)} nights</div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 18, color: "var(--muted)", fontSize: 12 }}>
@@ -95,8 +99,8 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
           ))}
         </div>
 
-        <div style={{ minWidth: 0, overflowX: nights.length > 30 ? "auto" : "visible" }}>
-          <div style={{ minWidth: Math.max(0, nights.length * (barWidth + gap)), paddingBottom: 2 }}>
+        <div style={{ minWidth: 0, overflowX: displayNights.length > 30 ? "auto" : "visible" }}>
+          <div style={{ minWidth: Math.max(0, displayNights.length * (barWidth + gap)), paddingBottom: 2 }}>
             <div
               style={{
                 position: "relative",
@@ -109,7 +113,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                 backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
               }}
             >
-              {nights.map((night) => {
+              {displayNights.map((night) => {
                 const inBed = Math.max(0, night.inBedMinutes);
                 const stageTotal =
                   night.coreMinutes +
@@ -165,7 +169,7 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                 borderTop: "1px solid var(--border)",
               }}
             >
-              {nights.map((night, index) => (
+              {displayNights.map((night, index) => (
                 <div
                   key={night.date}
                   style={{
