@@ -1,14 +1,21 @@
 import { PageHeader } from "@/components/PageHeader";
 import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
+import { SleepRangeSelector, parseSleepRange, sleepRangeDays } from "@/components/SleepRangeSelector";
 import { getSleepDays } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
-export default async function SleepPage() {
+export default async function SleepPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const user = await viewerUser();
-  const nights = await getSleepDays(user, 14);
+  const params = await searchParams;
+  const range = parseSleepRange(params.range);
+  const nights = await getSleepDays(user, sleepRangeDays(range));
 
   return (
     <>
@@ -16,6 +23,7 @@ export default async function SleepPage() {
         eyebrow="Sleep"
         title="Sleep stages"
         subtitle="SleepAnalysis intervals grouped by wake-up day. Stage durations are kept separate instead of collapsing the night into one number."
+        right={<SleepRangeSelector value={range} />}
       />
 
       {nights.length === 0 ? (
