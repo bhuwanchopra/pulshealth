@@ -50,13 +50,14 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
     (_, index) => index * axisStep,
   ).filter((minutes) => minutes <= axisMax);
   const chartHeight = 260;
-  const barWidth = displayNights.length > 90 ? 12 : 22;
-  const gap = displayNights.length > 90 ? 3 : 7;
+  // Match the other metric charts: bars always fill the available plot width.
+  // Do not introduce horizontal scrolling as the history range grows.
+  const gap = displayNights.length > 90 ? 2 : displayNights.length > 30 ? 4 : 7;
   const labelCount = Math.min(6, displayNights.length);
   const labelStep = Math.max(1, Math.ceil(Math.max(0, displayNights.length - 1) / Math.max(1, labelCount - 1)));
   const labelIndexes = new Set<number>();
   for (let i = 0; i < displayNights.length; i += labelStep) labelIndexes.add(i);
-  if (displayNights.length) labelIndexes.add(nights.length - 1);
+  if (displayNights.length) labelIndexes.add(displayNights.length - 1);
 
   return (
     <section className="panel" style={{ padding: 20 }}>
@@ -99,8 +100,8 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
           ))}
         </div>
 
-        <div style={{ minWidth: 0, overflowX: displayNights.length > 30 ? "auto" : "visible" }}>
-          <div style={{ minWidth: Math.max(0, displayNights.length * (barWidth + gap)), paddingBottom: 2 }}>
+        <div style={{ minWidth: 0, width: "100%" }}>
+          <div style={{ width: "100%", paddingBottom: 2 }}>
             <div
               style={{
                 position: "relative",
@@ -128,9 +129,10 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                   <div
                     key={night.date}
                     style={{
-                      width: barWidth,
+                      width: 0,
                       height: Math.max(2, barHeight),
-                      flex: `0 0 ${barWidth}px`,
+                      flex: "1 1 0",
+                      minWidth: 2,
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "flex-end",
@@ -173,8 +175,9 @@ export function SleepHistoryChart({ nights }: { nights: SleepDay[] }) {
                 <div
                   key={night.date}
                   style={{
-                    width: barWidth,
-                    flex: `0 0 ${barWidth}px`,
+                    width: 0,
+                    flex: "1 1 0",
+                    minWidth: 2,
                     textAlign: "center",
                     color: "var(--muted)",
                     fontSize: 10,
