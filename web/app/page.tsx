@@ -21,7 +21,6 @@ const KEY_METRICS = [
   "HKQuantityTypeIdentifierStepCount",
   "HKQuantityTypeIdentifierActiveEnergyBurned",
   "HKQuantityTypeIdentifierRestingHeartRate",
-  "HKCategoryTypeIdentifierSleepAnalysis",
   "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
   "HKQuantityTypeIdentifierDistanceWalkingRunning",
   "HKQuantityTypeIdentifierVO2Max",
@@ -111,19 +110,23 @@ export default async function Dashboard() {
         </div>
       </section>
 
+      {/* Sleep */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "30px 0 14px" }}>
+        <h2 className="eyebrow" style={{ margin: 0 }}>Sleep</h2>
+        <Link href="/sleep" style={{ fontSize: 13, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 2 }}>
+          View sleep <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="rise" style={{ animationDelay: "80ms", maxWidth: 520 }}>
+        <SleepCard sleep={sleepDays[0] ?? null} />
+      </div>
+
       {/* Highlights */}
-      <h2 className="eyebrow" style={{ margin: "30px 0 14px" }}>Highlights</h2>
+      <h2 className="eyebrow" style={{ margin: "34px 0 14px" }}>Highlights</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
         {KEY_METRICS.map((id) => {
           const type = typeByIdentifier(id);
           if (!type) return null;
-          if (id === "HKCategoryTypeIdentifierSleepAnalysis") {
-            return (
-              <div key={id} className="rise" style={{ animationDelay: "80ms" }}>
-                <SleepCard sleep={sleepDays[0] ?? null} compact />
-              </div>
-            );
-          }
           const s = seriesById.get(id);
           const spark = (s?.points ?? []).slice(-14).map((p) => p.value);
           const value = isCumulative(id)
