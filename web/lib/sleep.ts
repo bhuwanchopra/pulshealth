@@ -49,6 +49,45 @@ export function parseSleepRange(value: string | null | undefined): SleepRangeKey
     : "7D";
 }
 
+export function formatSleepPeriodLabel(date: string, interval: string): string {
+  const parsed = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return date;
+
+  const monthYear = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const monthDayYear = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const monthDay = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+  if (interval === "1 month") return monthYear.format(parsed);
+
+  if (interval === "3 months") {
+    const year = parsed.getUTCFullYear();
+    const month = parsed.getUTCMonth();
+    const end = new Date(Date.UTC(year, month + 3, 0));
+    return `${monthDay.format(parsed)}–${monthDay.format(end)}, ${year}`;
+  }
+
+  if (interval === "7 days" || interval === "14 days") {
+    const days = interval === "7 days" ? 7 : 14;
+    const end = new Date(parsed.getTime() + (days - 1) * 86_400_000);
+    return `${monthDay.format(parsed)}–${monthDay.format(end)}, ${end.getUTCFullYear()}`;
+  }
+
+  return monthDayYear.format(parsed);
+}
+
 export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay[] {
   if (interval === "1 day") return days.map((day) => ({ ...day, nights: day.nights ?? 1 }));
 
