@@ -41,19 +41,6 @@ export function sleepRangeBucket(key: SleepRangeKey): { interval: string; bucket
   }
 }
 
-export function sleepRangeBucket(key: SleepRangeKey): { interval: string; bucketMs: number } {
-  switch (key) {
-    case "2Y":
-      return { interval: "14 days", bucketMs: 14 * 86_400_000 };
-    case "5Y":
-      return { interval: "1 month", bucketMs: 30 * 86_400_000 };
-    case "ALL":
-      return { interval: "3 months", bucketMs: 90 * 86_400_000 };
-    default:
-      return { interval: "1 day", bucketMs: 86_400_000 };
-  }
-}
-
 export function parseSleepRange(value: string | null | undefined): SleepRangeKey {
   return SLEEP_RANGES.some((range) => range.key === value)
     ? (value as SleepRangeKey)
