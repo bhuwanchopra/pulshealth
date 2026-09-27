@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/PageHeader";
 import { SleepCard } from "@/components/SleepCard";
+import { SleepHistoryChart } from "@/components/SleepHistoryChart";
 import { getSleepDays } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 
@@ -26,9 +27,8 @@ export default async function SleepPage() {
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          {nights.map((night) => (
-            <SleepCard key={night.date} sleep={night} />
-          ))}
+          <SleepCard sleep={nights[0]} />
+          <SleepHistoryChart nights={nights} />
         </div>
       )}
     </>
