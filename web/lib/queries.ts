@@ -1146,15 +1146,18 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
          SELECT
            ((c.start_ts + interval '6 hours') AT TIME ZONE $2::text)::date AS day,
            COALESCE(c.source_id, 0) AS source_id,
-           sum(CASE WHEN c.value IN (1, 3, 4, 5) THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS asleep_minutes,
-           sum(CASE WHEN c.value = 0 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS in_bed_minutes,
-           sum(CASE WHEN c.value = 3 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS core_minutes,
-           sum(CASE WHEN c.value = 4 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
-           sum(CASE WHEN c.value = 5 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
-           sum(CASE WHEN c.value = 1 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
-           sum(CASE WHEN c.value = 2 THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
+           sum(CASE WHEN cl.enum_name IN ('HKCategoryValueSleepAnalysisAsleepUnspecified', 'HKCategoryValueSleepAnalysisAsleepCore', 'HKCategoryValueSleepAnalysisAsleepDeep', 'HKCategoryValueSleepAnalysisAsleepREM') THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS asleep_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisInBed' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS in_bed_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepCore' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS core_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepDeep' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepREM' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepUnspecified' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
          FROM category_samples c
          JOIN sample_types st ON st.type_id = c.type_id
+         JOIN category_labels cl
+           ON cl.type_identifier = st.identifier
+          AND cl.value = c.value
         WHERE st.identifier = 'HKCategoryTypeIdentifierSleepAnalysis'
           AND c.user_id = $1::uuid
           AND c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours')
