@@ -3,7 +3,7 @@ import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { getSleepDays } from "@/lib/queries";
-import { parseSleepRange, sleepRangeDays } from "@/lib/sleep";
+import { aggregateSleepDays, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,11 @@ export default async function SleepPage({
   const user = await viewerUser();
   const params = await searchParams;
   const range = parseSleepRange(params.range);
-  const nights = await getSleepDays(user, sleepRangeDays(range));
+  const [latest, rawNights] = await Promise.all([
+    getSleepDays(user, 1),
+    getSleepDays(user, sleepRangeDays(range)),
+  ]);
+  const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
   return (
     <>
@@ -36,7 +40,7 @@ export default async function SleepPage({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          <SleepCard sleep={nights[0]} />
+          <SleepCard sleep={latest[0] ?? null} />
           <SleepHistoryChart nights={nights} />
         </div>
       )}
