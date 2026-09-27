@@ -1,8 +1,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
-import { SleepRangeSelector, parseSleepRange, sleepRangeDays } from "@/components/SleepRangeSelector";
+import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { getSleepDays } from "@/lib/queries";
+import { parseSleepRange, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
