@@ -159,6 +159,19 @@ export function calculateSleepScore(night: SleepDay, recentNights: SleepDay[]): 
   };
 }
 
+/**
+ * Calculate scores for a chronological set of individual nights. Each night
+ * is scored against only the preceding 13 nights, so historical scores are
+ * reproducible and do not accidentally use future sleep data.
+ */
+export function calculateSleepScores(nights: SleepDay[]): Array<{ night: SleepDay; score: SleepScore }> {
+  const chronological = [...nights].sort((a, b) => a.date.localeCompare(b.date));
+  return chronological.map((night, index) => ({
+    night,
+    score: calculateSleepScore(night, chronological.slice(0, index).reverse()),
+  }));
+}
+
 export function sleepScoreClassification(score: number): string {
   if (score >= 96) return "Very High";
   if (score >= 81) return "High";
