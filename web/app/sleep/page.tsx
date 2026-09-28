@@ -16,10 +16,11 @@ export default async function SleepPage({
   const user = await viewerUser();
   const params = await searchParams;
   const range = parseSleepRange(params.range);
-  const [latest, rawNights] = await Promise.all([
-    getSleepDays(user, 1),
+  const [scoreNights, rawNights] = await Promise.all([
+    getSleepDays(user, 14),
     getSleepDays(user, sleepRangeDays(range)),
   ]);
+  const latest = scoreNights.slice(0, 1);
   const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
   return (
@@ -40,7 +41,7 @@ export default async function SleepPage({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          <SleepCard sleep={latest[0] ?? null} />
+          <SleepCard sleep={latest[0] ?? null} recentNights={scoreNights} />
           <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
         </div>
       )}
