@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateSleepScore, sleepScoreClassification, type SleepDay } from "./sleep";
+import { calculateSleepScore, calculateSleepScores, sleepScoreClassification, type SleepDay } from "./sleep";
 
 function night(overrides: Partial<SleepDay> = {}): SleepDay {
   return {
@@ -59,6 +59,35 @@ describe("sleep score", () => {
 
     expect(score.consistencyPoints).toBe(0);
     expect(score.baselineNights).toBe(0);
+  });
+
+  it("scores historical nights only against preceding nights", () => {
+    const nights = [
+      night({ date: "2026-09-26", bedtimeMinutes: 1380 }),
+      night({ date: "2026-09-27", bedtimeMinutes: 1380 }),
+      night({ date: "2026-09-28", bedtimeMinutes: 10 }),
+    ];
+
+    const scored = calculateSleepScores(nights);
+
+    expect(scored).toHaveLength(3);
+    expect(scored[0].score.baselineNights).toBe(0);
+    expect(scored[1].score.baselineNights).toBe(1);
+    expect(scored[2].score.baselineNights).toBe(2);
+    expect(scored[2].score.bedtimeDeviationMinutes).toBe(70);
+  });
+
+  it("uses at most the preceding 13 nights for consistency", () => {
+    const nights = Array.from({ length: 15 }, (_, index) =>
+      night({
+        date: `2026-09-${String(14 + index).padStart(2, "0")}`,
+        bedtimeMinutes: 1380,
+      }),
+    );
+    const scored = calculateSleepScores(nights);
+
+    expect(scored[13].score.baselineNights).toBe(13);
+    expect(scored[14].score.baselineNights).toBe(13);
   });
 
   it("matches the documented classification boundaries", () => {
