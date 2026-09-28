@@ -118,7 +118,7 @@ export default async function Dashboard() {
         </Link>
       </div>
       <div className="rise" style={{ animationDelay: "80ms" }}>
-        <SleepCard sleep={sleepDays[0] ?? null} />
+        <SleepCard sleep={sleepDays[0] ?? null} recentNights={sleepDays} />
       </div>
 
       {/* Highlights */}
