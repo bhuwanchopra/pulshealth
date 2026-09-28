@@ -117,10 +117,8 @@ export default async function Dashboard() {
           View sleep <ChevronRight size={14} />
         </Link>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-        <div className="rise" style={{ animationDelay: "80ms" }}>
-          <SleepCard sleep={sleepDays[0] ?? null} />
-        </div>
+      <div className="rise" style={{ animationDelay: "80ms" }}>
+        <SleepCard sleep={sleepDays[0] ?? null} />
       </div>
 
       {/* Highlights */}
