@@ -1147,6 +1147,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       rem_minutes: number;
       unspecified_minutes: number;
       awake_minutes: number;
+      bedtime_minutes: number | null;
+      awake_periods: number;
       nights: number;
     }>(
       `WITH per_source AS (
@@ -1159,7 +1161,24 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepDeep' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepREM' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepUnspecified' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
-           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes,
+           extract(epoch FROM ((min(c.start_ts) FILTER (
+             WHERE cl.enum_name IN (
+               'HKCategoryValueSleepAnalysisAsleepUnspecified',
+               'HKCategoryValueSleepAnalysisAsleepCore',
+               'HKCategoryValueSleepAnalysisAsleepDeep',
+               'HKCategoryValueSleepAnalysisAsleepREM'
+             )
+           ) AT TIME ZONE $2::text) -
+           date_trunc('day', min(c.start_ts) FILTER (
+             WHERE cl.enum_name IN (
+               'HKCategoryValueSleepAnalysisAsleepUnspecified',
+               'HKCategoryValueSleepAnalysisAsleepCore',
+               'HKCategoryValueSleepAnalysisAsleepDeep',
+               'HKCategoryValueSleepAnalysisAsleepREM'
+             )
+           ) AT TIME ZONE $2::text))) / 60.0 AS bedtime_minutes,
+           count(*) FILTER (WHERE cl.enum_name = 'HKCategoryValueSleepAnalysisAwake')::int AS awake_periods
          FROM category_samples c
          JOIN sample_types st ON st.type_id = c.type_id
          JOIN category_labels cl ON cl.type_identifier = st.identifier AND cl.value = c.value
@@ -1182,7 +1201,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       ),
       bucketed AS (
         SELECT time_bucket($4::interval, day::timestamp)::date AS bucket_date,
-               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes,
+               bedtime_minutes, awake_periods
           FROM daily
       )
       SELECT bucket_date::text AS date,
