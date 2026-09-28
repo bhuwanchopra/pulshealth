@@ -1195,7 +1195,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
           FROM per_source
       ),
       daily AS (
-        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes,
+               bedtime_minutes, awake_periods
           FROM ranked
          WHERE rn = 1
       ),
@@ -1213,6 +1214,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
              avg(rem_minutes)::float8 AS rem_minutes,
              avg(unspecified_minutes)::float8 AS unspecified_minutes,
              avg(awake_minutes)::float8 AS awake_minutes,
+             avg(bedtime_minutes)::float8 AS bedtime_minutes,
+             avg(awake_periods)::float8 AS awake_periods,
              count(*)::int AS nights
         FROM bucketed
        GROUP BY bucket_date
@@ -1229,6 +1232,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       remMinutes: Number(r.rem_minutes) || 0,
       unspecifiedMinutes: Number(r.unspecified_minutes) || 0,
       awakeMinutes: Number(r.awake_minutes) || 0,
+      bedtimeMinutes: r.bedtime_minutes == null ? null : Number(r.bedtime_minutes),
+      awakePeriods: Number(r.awake_periods) || 0,
       nights: Number(r.nights) || 1,
     }));
   } catch (e) {
