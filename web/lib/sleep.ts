@@ -127,7 +127,7 @@ export function calculateSleepScore(night: SleepDay, recentNights: SleepDay[]): 
   else durationPoints = clamp(50 - ((duration - 540) / 180) * 50, 0, 50);
 
   const baseline = recentNights
-    .filter((day) => day.bedtimeMinutes != null)
+    .filter((day) => day.date !== night.date && day.bedtimeMinutes != null)
     .slice(0, 13);
   let bedtimeDeviationMinutes: number | null = null;
   let consistencyPoints = 0;
