@@ -1,9 +1,10 @@
 import { PageHeader } from "@/components/PageHeader";
 import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
+import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { getSleepDays } from "@/lib/queries";
-import { aggregateSleepDays, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
+import { aggregateSleepDays, calculateSleepScores, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,18 @@ export default async function SleepPage({
   const user = await viewerUser();
   const params = await searchParams;
   const range = parseSleepRange(params.range);
-  const [scoreNights, rawNights] = await Promise.all([
-    getSleepDays(user, 14),
-    getSleepDays(user, sleepRangeDays(range)),
+  const rangeDays = sleepRangeDays(range);
+  // Fetch the selected range plus 13 earlier nights so the first visible
+  // night has the complete bedtime-consistency baseline.
+  const scoreWindowDays = rangeDays === 0 ? 0 : rangeDays + 13;
+  const [scoreWindowNights, rawNights] = await Promise.all([
+    getSleepDays(user, scoreWindowDays),
+    getSleepDays(user, rangeDays),
   ]);
-  const latest = scoreNights.slice(0, 1);
+  const scoredNights = calculateSleepScores(scoreWindowNights);
+  const visibleDates = new Set(rawNights.map((night) => night.date));
+  const historicalScores = scoredNights.filter(({ night }) => visibleDates.has(night.date));
+  const latest = scoreWindowNights.slice(0, 1);
   const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
   return (
@@ -41,7 +49,8 @@ export default async function SleepPage({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          <SleepCard sleep={latest[0] ?? null} recentNights={scoreNights} />
+          <SleepCard sleep={latest[0] ?? null} recentNights={scoreWindowNights} />
+          <SleepScoreHistoryChart scores={historicalScores} />
           <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
         </div>
       )}
