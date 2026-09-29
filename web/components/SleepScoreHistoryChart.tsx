@@ -6,7 +6,7 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
   const points = [...scores].sort((a, b) => a.night.date.localeCompare(b.night.date));
   if (!points.length) return null;
 
-  const width = 1000;
+  const width = Math.max(1000, points.length * 28);
   const height = 280;
   const left = 42;
   const right = 16;
@@ -16,7 +16,6 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
   const plotHeight = height - top - bottom;
   const x = (index: number) => left + (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
   const y = (score: number) => top + ((100 - Math.max(0, Math.min(100, score))) / 100) * plotHeight;
-  const polyline = points.map((point, index) => `${x(index)},${y(point.score.score)}`).join(" ");
   const labelIndexes = new Set<number>();
   const labelCount = Math.min(6, points.length);
   const step = Math.max(1, Math.ceil(Math.max(0, points.length - 1) / Math.max(1, labelCount - 1)));
@@ -39,7 +38,7 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
       <div style={{ marginTop: 18, overflow: "hidden" }}>
         <div style={{ overflowX: "auto", paddingBottom: 4 }}>
           <svg
-            viewBox={`0 0 ${Math.max(1000, points.length * 28)} ${height}`}
+            viewBox={`0 0 ${width} ${height}`}
             role="img"
             aria-label="Sleep Score history bar chart"
             style={{ display: "block", width: "100%", minWidth: points.length > 35 ? Math.max(700, points.length * 28) : "100%", height: "auto", minHeight: 180 }}
@@ -48,7 +47,7 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
               <g key={score}>
                 <line
                   x1={left}
-                  x2={Math.max(1000, points.length * 28) - right}
+                  x2={width - right}
                   y1={y(score)}
                   y2={y(score)}
                   stroke="var(--border)"
@@ -60,8 +59,7 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
             ))}
 
             {points.map((point, index) => {
-              const chartWidth = Math.max(1000, points.length * 28);
-              const barWidth = Math.max(5, Math.min(18, (chartWidth - left - right) / Math.max(points.length, 1) * 0.7));
+              const barWidth = Math.max(5, Math.min(18, (plotWidth / Math.max(points.length, 1)) * 0.7));
               const barX = x(index) - barWidth / 2;
               return (
                 <g key={point.night.date}>
