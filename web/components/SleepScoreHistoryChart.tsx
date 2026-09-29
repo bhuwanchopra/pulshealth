@@ -1,12 +1,51 @@
 import { formatSleepPeriodLabel, sleepScoreClassification, type SleepDay, type SleepScore } from "@/lib/sleep";
 
 type ScoredNight = { night: SleepDay; score: SleepScore };
+function aggregateScores(scores: ScoredNight[], interval: string): ScoredNight[] {
+  if (interval === "1 day") return [...scores].sort((a, b) => a.night.date.localeCompare(b.night.date));
+  const groups = new Map<string, ScoredNight[]>();
+  const keyFor = (date: string) => {
+    const d = new Date(date + "T12:00:00Z");
+    if (interval === "7 days" || interval === "14 days") {
+      const size = interval === "7 days" ? 7 : 14;
+      const day = Math.floor(d.getTime() / 86_400_000);
+      return String(Math.floor(day / size) * size);
+    }
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    if (interval === "1 month") return `${year}-${String(month + 1).padStart(2, "0")}`;
+    return `${year}-${String(Math.floor(month / 3) * 3 + 1).padStart(2, "0")}`;
+  };
+  for (const score of scores) {
+    const key = keyFor(score.night.date);
+    groups.set(key, [...(groups.get(key) ?? []), score]);
+  }
+  return [...groups.entries()].map(([date, group]) => {
+    const count = group.length;
+    const avg = (pick: (entry: ScoredNight) => number) => group.reduce((sum, entry) => sum + pick(entry), 0) / count;
+    const latest = [...group].sort((a, b) => b.night.date.localeCompare(a.night.date))[0];
+    const deviations = group.map((entry) => entry.score.bedtimeDeviationMinutes).filter((value): value is number => value != null);
+    return {
+      night: { ...latest.night, date, nights: count },
+      score: {
+        score: Math.round(avg((entry) => entry.score.score)),
+        durationPoints: Math.round(avg((entry) => entry.score.durationPoints) * 10) / 10,
+        consistencyPoints: Math.round(avg((entry) => entry.score.consistencyPoints) * 10) / 10,
+        interruptionPoints: Math.round(avg((entry) => entry.score.interruptionPoints) * 10) / 10,
+        bedtimeDeviationMinutes: deviations.length ? Math.round(deviations.reduce((sum, value) => sum + value, 0) / deviations.length) : null,
+        baselineNights: Math.round(avg((entry) => entry.score.baselineNights)),
+        awakeMinutes: Math.round(avg((entry) => entry.score.awakeMinutes)),
+        awakePeriods: Math.round(avg((entry) => entry.score.awakePeriods)),
+      },
+    };
+  }).sort((a, b) => a.night.date.localeCompare(b.night.date));
+}
 
-export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
-  const points = [...scores].sort((a, b) => a.night.date.localeCompare(b.night.date));
+export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNight[]; interval: string }) {
+  const points = aggregateScores(scores, interval);
   if (!points.length) return null;
 
-  const width = Math.max(1000, points.length * 28);
+  const width = 1000;
   const height = 280;
   const left = 42;
   const right = 16;
@@ -29,10 +68,10 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
           <div className="eyebrow" style={{ color: "var(--muted)" }}>History</div>
           <h2 style={{ margin: "5px 0 0", fontSize: 20 }}>Sleep Score</h2>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 5 }}>
-            Derived score for every available night using the preceding 13 nights for bedtime consistency.
+            Derived score for every available night using the preceding 13 nights for bedtime consistency. Longer ranges are aggregated like the sleep-stage history.
           </div>
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 12 }}>{points.length} scored nights</div>
+        <div style={{ color: "var(--faint)", fontSize: 12 }}>{points.reduce((sum, point) => sum + (point.night.nights ?? 1), 0)} scored nights</div>
       </div>
 
       <div style={{ marginTop: 18, overflow: "hidden" }}>
@@ -41,7 +80,7 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
             viewBox={`0 0 ${width} ${height}`}
             role="img"
             aria-label="Sleep Score history bar chart"
-            style={{ display: "block", width: "100%", minWidth: points.length > 35 ? Math.max(700, points.length * 28) : "100%", height: "auto", minHeight: 180 }}
+            style={{ display: "block", width: "100%", height: "auto", minHeight: 180 }}
           >
             {[40, 60, 80, 95, 100].map((score) => (
               <g key={score}>
