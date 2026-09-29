@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -69,7 +70,7 @@ export default async function CategoryPage({
   const ordered = [...types].sort((a, b) => (stats.get(b.identifier)?.rows ?? 0) - (stats.get(a.identifier)?.rows ?? 0));
   const totalRows = types.reduce((s, t) => s + (stats.get(t.identifier)?.rows ?? 0), 0);
 
-  const metricGrid = (
+  const renderMetricGrid = (extra?: ReactNode) => (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
       {ordered.map((type, i) => {
         const id = type.identifier;
@@ -95,6 +96,7 @@ export default async function CategoryPage({
           </div>
         );
       })}
+      {extra}
     </div>
   );
 
@@ -142,10 +144,7 @@ export default async function CategoryPage({
     return (
       <>
         {pageHeader}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
-          {metricGrid}
-          <SleepScoreCard score={latestSleep?.score ?? null} history={historicalScores} />
-        </div>
+        {renderMetricGrid(<SleepScoreCard score={latestSleep?.score ?? null} history={historicalScores} />)}
         <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <SleepRangeSelector value={range} />
@@ -172,7 +171,7 @@ export default async function CategoryPage({
   return (
     <>
       {pageHeader}
-      {metricGrid}
+      {renderMetricGrid()}
     </>
   );
 }
