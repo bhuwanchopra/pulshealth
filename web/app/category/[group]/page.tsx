@@ -158,7 +158,7 @@ export default async function CategoryPage({
             </div>
           ) : (
             <>
-              <SleepCard sleep={latestSleep?.night ?? null} sleepScore={latestSleep?.score ?? null} />
+              <SleepCard sleep={latestSleep?.night ?? null} />
               <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
               <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
             </>
