@@ -2,7 +2,7 @@
 -- The score is derived from HealthKit sleep samples using the scoring formula
 -- in web/lib/sleep.ts. It is deliberately separate from Apple's proprietary score.
 CREATE TABLE IF NOT EXISTS sleep_scores (
-  user_id uuid NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   sleep_date date NOT NULL,
   score smallint NOT NULL CHECK (score BETWEEN 0 AND 100),
   duration_points numeric(4,1) NOT NULL,
