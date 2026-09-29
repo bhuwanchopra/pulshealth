@@ -1136,7 +1136,7 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
 
   try {
     const timeZone = configuredTimeZone();
-    const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
+    const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - GREATEST($3::int - 1, 0))::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
     const params = [userId, timeZone, days, bucket];
     const rows = await query<{
       date: string;
