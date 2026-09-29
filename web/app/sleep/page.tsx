@@ -3,8 +3,8 @@ import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
 import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
-import { getSleepDays } from "@/lib/queries";
-import { aggregateSleepDays, calculateSleepScores, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
+import { getOrCreateSleepScores, getSleepDays } from "@/lib/queries";
+import { aggregateSleepDays, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +25,11 @@ export default async function SleepPage({
     getSleepDays(user, scoreWindowDays),
     getSleepDays(user, rangeDays),
   ]);
-  const scoredNights = calculateSleepScores(scoreWindowNights);
-  const visibleDates = new Set(rawNights.map((night) => night.date));
-  const historicalScores = scoredNights.filter(({ night }) => visibleDates.has(night.date));
-  const latest = scoreWindowNights.slice(0, 1);
+  const historicalScores = await getOrCreateSleepScores(
+    scoreWindowNights,
+    rawNights.map((night) => night.date),
+  );
+  const latest = historicalScores[historicalScores.length - 1];
   const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
   return (
@@ -49,7 +50,7 @@ export default async function SleepPage({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
-          <SleepCard sleep={latest[0] ?? null} recentNights={scoreWindowNights} />
+          <SleepCard sleep={latest?.night ?? null} recentNights={scoreWindowNights} />
           <SleepScoreHistoryChart scores={historicalScores} />
           <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
         </div>
