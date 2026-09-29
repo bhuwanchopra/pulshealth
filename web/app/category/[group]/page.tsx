@@ -5,6 +5,7 @@ import { GroupIcon } from "@/components/Icons";
 import { SleepCard } from "@/components/SleepCard";
 import { SleepHistoryChart } from "@/components/SleepHistoryChart";
 import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
+import { SleepScoreCard } from "@/components/SleepScoreCard";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { GROUP_LABELS, GROUPS, type Group, typesInGroup } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
@@ -141,7 +142,10 @@ export default async function CategoryPage({
     return (
       <>
         {pageHeader}
-        {metricGrid}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(232px, 1fr))", gap: 14 }}>
+          {metricGrid}
+          <SleepScoreCard score={latestSleep?.score ?? null} history={historicalScores} />
+        </div>
         <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <SleepRangeSelector value={range} />
