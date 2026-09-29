@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { calculateSleepScore, sleepScoreClassification, type SleepDay } from "@/lib/sleep";
+import { sleepScoreClassification, type SleepDay, type SleepScore } from "@/lib/sleep";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core" },
@@ -28,11 +28,11 @@ function sleepScoreColor(score: number): string {
 export function SleepCard({
   sleep,
   compact = false,
-  recentNights = [],
+  sleepScore = null,
 }: {
   sleep: SleepDay | null;
   compact?: boolean;
-  recentNights?: SleepDay[];
+  sleepScore?: SleepScore | null;
 }) {
   if (!sleep) {
     return (
@@ -46,7 +46,7 @@ export function SleepCard({
   }
 
   const asleep = sleep.asleepMinutes;
-  const score = recentNights.length > 0 ? calculateSleepScore(sleep, recentNights) : null;
+  const score = sleepScore;
   const rows = STAGES.map((stage) => ({
     ...stage,
     minutes: sleep[stage.key],
