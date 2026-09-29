@@ -112,7 +112,7 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
                     fill={point.score.score >= 81 ? "#166534" : point.score.score >= 61 ? "#22c55e" : point.score.score >= 41 ? "#eab308" : "#ef4444"}
                   >
                     <title>
-                      {formatSleepPeriodLabel(point.night.date, "1 day")} · {point.score.score}/100 · {sleepScoreClassification(point.score.score)} · Duration {Math.round(point.score.durationPoints)}/50 · Consistency {Math.round(point.score.consistencyPoints)}/30 · Interruptions {Math.round(point.score.interruptionPoints)}/20
+                      {formatSleepPeriodLabel(point.night.date, interval)} · {point.score.score}/100 · {sleepScoreClassification(point.score.score)} · Duration {Math.round(point.score.durationPoints)}/50 · Consistency {Math.round(point.score.consistencyPoints)}/30 · Interruptions {Math.round(point.score.interruptionPoints)}/20
                     </title>
                   </rect>
                 </g>
@@ -129,7 +129,7 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
                   fill="var(--muted)"
                   fontSize="11"
                 >
-                  {formatSleepPeriodLabel(point.night.date, "1 day")}
+                  {formatSleepPeriodLabel(point.night.date, interval)}
                 </text>
               ) : null,
             )}
