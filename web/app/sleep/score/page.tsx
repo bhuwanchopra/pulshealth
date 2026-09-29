@@ -56,7 +56,6 @@ export default async function SleepScorePage({
   const min = values.length ? Math.min(...values) : null;
   const max = values.length ? Math.max(...values) : null;
 
-
   const color = GROUP_COLOR.sleep;
   const interval = sleepRangeBucket(range).interval;
 
