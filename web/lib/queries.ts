@@ -47,7 +47,7 @@ import type {
   WorkoutSeries,
   WorkoutStat,
 } from "./types";
-import type { SleepDay } from "./sleep";
+import { calculateSleepScore, type SleepDay, type SleepScore } from "./sleep";
 
 // uuid v4-ish shape — guard before casting to ::uuid so a bad path segment
 // surfaces as "not found" instead of a 500 from a failed cast.
@@ -1244,6 +1244,141 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
 
 export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
   return getSleepHistory(userId, days, "1 day");
+}
+
+/**
+ * Return persisted Sleep Scores for the requested nights, calculating and
+ * persisting only dates that have never been scored before.
+ *
+ * A score is immutable once created for a date: later page loads read the
+ * stored value rather than recalculating it. This gives historical scores a
+ * stable snapshot while keeping the source sleep samples unchanged.
+ */
+export async function getOrCreateSleepScores(
+  userId: string,
+  nights: SleepDay[],
+): Promise<Array<{ night: SleepDay; score: SleepScore }>> {
+  const src = await source();
+  if (src !== "live") {
+    return nights.map((night, index) => ({
+      night,
+      score: calculateSleepScore(night, nights.slice(index + 1)),
+    }));
+  }
+
+  if (!nights.length) return [];
+
+  try {
+    const dates = nights.map((night) => night.date);
+    const existing = await query<{
+      sleep_date: string;
+      score: number;
+      duration_points: number;
+      consistency_points: number;
+      interruption_points: number;
+      bedtime_deviation_minutes: number | null;
+      baseline_nights: number;
+      awake_minutes: number;
+      awake_periods: number;
+    }>(
+      `SELECT sleep_date::text,
+              score,
+              duration_points::float8,
+              consistency_points::float8,
+              interruption_points::float8,
+              bedtime_deviation_minutes,
+              baseline_nights,
+              awake_minutes,
+              awake_periods
+         FROM sleep_scores
+        WHERE user_id = $1::uuid
+          AND sleep_date = ANY($2::date[])`,
+      [userId, dates],
+    );
+
+    const cached = new Map(existing.map((row) => [row.sleep_date, row]));
+    const chronological = [...nights].sort((a, b) => a.date.localeCompare(b.date));
+
+    // Only the first load of a date reaches the scoring function and INSERT.
+    // The preceding nights are raw sleep data because consistency depends on
+    // bedtime history, not on the previous scores themselves.
+    for (const night of chronological) {
+      if (cached.has(night.date)) continue;
+      const index = chronological.findIndex((candidate) => candidate.date === night.date);
+      const derived = calculateSleepScore(night, chronological.slice(0, index).reverse());
+      const inserted = await query<{
+        sleep_date: string;
+        score: number;
+        duration_points: number;
+        consistency_points: number;
+        interruption_points: number;
+        bedtime_deviation_minutes: number | null;
+        baseline_nights: number;
+        awake_minutes: number;
+        awake_periods: number;
+      }>(
+        `INSERT INTO sleep_scores (
+           user_id, sleep_date, score, duration_points, consistency_points,
+           interruption_points, bedtime_deviation_minutes, baseline_nights,
+           awake_minutes, awake_periods
+         )
+         VALUES (
+           $1::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9, $10
+         )
+         ON CONFLICT (user_id, sleep_date) DO NOTHING
+         RETURNING sleep_date::text,
+                   score,
+                   duration_points::float8,
+                   consistency_points::float8,
+                   interruption_points::float8,
+                   bedtime_deviation_minutes,
+                   baseline_nights,
+                   awake_minutes,
+                   awake_periods`,
+        [
+          userId,
+          night.date,
+          derived.score,
+          derived.durationPoints,
+          derived.consistencyPoints,
+          derived.interruptionPoints,
+          derived.bedtimeDeviationMinutes,
+          derived.baselineNights,
+          derived.awakeMinutes,
+          derived.awakePeriods,
+        ],
+      );
+      const row = inserted[0];
+      if (row) cached.set(night.date, row);
+    }
+
+    return nights
+      .map((night) => {
+        const row = cached.get(night.date);
+        if (!row) return null;
+        return {
+          night,
+          score: {
+            score: Number(row.score),
+            durationPoints: Number(row.duration_points),
+            consistencyPoints: Number(row.consistency_points),
+            interruptionPoints: Number(row.interruption_points),
+            bedtimeDeviationMinutes:
+              row.bedtime_deviation_minutes == null ? null : Number(row.bedtime_deviation_minutes),
+            baselineNights: Number(row.baseline_nights),
+            awakeMinutes: Number(row.awake_minutes),
+            awakePeriods: Number(row.awake_periods),
+          },
+        };
+      })
+      .filter((value): value is { night: SleepDay; score: SleepScore } => value !== null);
+  } catch (e) {
+    console.error("[queries] getOrCreateSleepScores failed:", e);
+    return nights.map((night, index) => ({
+      night,
+      score: calculateSleepScore(night, nights.slice(index + 1)),
+    }));
+  }
 }
 // ── workouts ─────────────────────────────────────────────────────────────
 export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]> {
