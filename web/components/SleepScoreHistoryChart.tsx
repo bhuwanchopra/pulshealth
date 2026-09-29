@@ -42,6 +42,22 @@ function aggregateScores(scores: ScoredNight[], interval: string): ScoredNight[]
   }).sort((a, b) => a.night.date.localeCompare(b.night.date));
 }
 
+const scoreColors = {
+  veryLow: "#ef4444",
+  low: "#f59e0b",
+  ok: "#22c55e",
+  high: "#16a34a",
+  veryHigh: "#0ea5e9",
+} as const;
+
+function scoreColor(score: number): string {
+  if (score >= 96) return scoreColors.veryHigh;
+  if (score >= 81) return scoreColors.high;
+  if (score >= 61) return scoreColors.ok;
+  if (score >= 41) return scoreColors.low;
+  return scoreColors.veryLow;
+}
+
 export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNight[]; interval: string }) {
   const points = aggregateScores(scores, interval);
   if (!points.length) return null;
@@ -109,7 +125,7 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
                     width={barWidth}
                     height={Math.max(0, y(0) - y(point.score.score))}
                     rx="2"
-                    fill={point.score.score >= 81 ? "#166534" : point.score.score >= 61 ? "#22c55e" : point.score.score >= 41 ? "#eab308" : "#ef4444"}
+                    fill={scoreColor(point.score.score)}
                   >
                     <title>
                       {formatSleepPeriodLabel(point.night.date, interval)} · {point.score.score}/100 · {sleepScoreClassification(point.score.score)} · Duration {Math.round(point.score.durationPoints)}/50 · Consistency {Math.round(point.score.consistencyPoints)}/30 · Interruptions {Math.round(point.score.interruptionPoints)}/20
@@ -138,11 +154,11 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 4, color: "var(--faint)", fontSize: 11 }}>
-        <span style={{ color: "#ef4444" }}>0–40 Very Low</span>
-        <span style={{ color: "#eab308" }}>41–60 Low</span>
-        <span style={{ color: "#22c55e" }}>61–80 OK</span>
-        <span style={{ color: "#166534" }}>81–95 High</span>
-        <span style={{ color: "#166534" }}>96–100 Very High</span>
+        <span style={{ color: scoreColors.veryLow }}>0–40 Very Low</span>
+        <span style={{ color: scoreColors.low }}>41–60 Low</span>
+        <span style={{ color: scoreColors.ok }}>61–80 OK</span>
+        <span style={{ color: scoreColors.high }}>81–95 High</span>
+        <span style={{ color: scoreColors.veryHigh }}>96–100 Very High</span>
       </div>
     </section>
   );
