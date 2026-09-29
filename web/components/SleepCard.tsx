@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { type SleepDay, type SleepScore } from "@/lib/sleep";
+import { type SleepDay } from "@/lib/sleep";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core" },
