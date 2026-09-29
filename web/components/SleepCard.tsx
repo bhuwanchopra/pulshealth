@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { sleepScoreClassification, type SleepDay, type SleepScore } from "@/lib/sleep";
+import { type SleepDay, type SleepScore } from "@/lib/sleep";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core" },
@@ -18,21 +18,12 @@ function pct(value: number, total: number): number {
   return total > 0 ? Math.max(0, Math.min(100, (value / total) * 100)) : 0;
 }
 
-function sleepScoreColor(score: number): string {
-  if (score >= 81) return "#166534";
-  if (score >= 61) return "#22c55e";
-  if (score >= 41) return "#eab308";
-  return "#ef4444";
-}
-
 export function SleepCard({
   sleep,
   compact = false,
-  sleepScore = null,
 }: {
   sleep: SleepDay | null;
   compact?: boolean;
-  sleepScore?: SleepScore | null;
 }) {
   if (!sleep) {
     return (
@@ -46,7 +37,6 @@ export function SleepCard({
   }
 
   const asleep = sleep.asleepMinutes;
-  const score = sleepScore;
   const rows = STAGES.map((stage) => ({
     ...stage,
     minutes: sleep[stage.key],
@@ -61,38 +51,6 @@ export function SleepCard({
             {hoursAndMinutes(asleep)}
           </div>
         </div>
-        {score && (
-          <div style={{ textAlign: "right", flex: "none" }}>
-            <div className="eyebrow" style={{ color: "var(--muted)" }}>Sleep score</div>
-            <div className="metric-num" style={{ fontSize: compact ? 28 : 34, fontWeight: 650, lineHeight: 1, marginTop: 6 }}>
-              {score.score}
-              <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 400 }}> / 100</span>
-            </div>
-            <div style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 5 }}>
-              {sleepScoreClassification(score.score)}
-            </div>
-            <div
-              aria-label={"Sleep score " + score.score + " out of 100"}
-              style={{
-                width: 120,
-                height: 7,
-                marginTop: 8,
-                borderRadius: 999,
-                background: "var(--border)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: score.score + "%",
-                  borderRadius: 999,
-                  background: sleepScoreColor(score.score),
-                }}
-              />
-            </div>
-          </div>
-        )}
         <div style={{ color: "var(--faint)", fontSize: 12, textAlign: "right" }}>
           {sleep.date}
           <br />
@@ -128,27 +86,6 @@ export function SleepCard({
           </div>
         )}
       </div>
-
-      {!compact && score && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 16 }}>
-          {[
-            ["Duration", score.durationPoints, 50],
-            ["Consistency", score.consistencyPoints, 30],
-            ["Interruptions", score.interruptionPoints, 20],
-          ].map(([label, value, max]) => (
-            <div key={String(label)} style={{ padding: "9px 10px", borderRadius: 10, background: "var(--bg-soft)", border: "1px solid var(--border)" }}>
-              <div style={{ color: "var(--faint)", fontSize: 10.5 }}>{label}</div>
-              <div className="mono" style={{ fontSize: 13, marginTop: 3 }}>{Math.round(Number(value))}<span style={{ color: "var(--faint)" }}>/{max}</span></div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!compact && score && (
-        <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 10 }}>
-          Derived from duration, bedtime consistency, and awake interruptions. Not Apple’s proprietary score.
-        </div>
-      )}
 
       {!compact && sleep.unspecifiedMinutes > 0 && (
         <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 12 }}>
