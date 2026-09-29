@@ -9,7 +9,8 @@ function aggregateScores(scores: ScoredNight[], interval: string): ScoredNight[]
     if (interval === "7 days" || interval === "14 days") {
       const size = interval === "7 days" ? 7 : 14;
       const day = Math.floor(d.getTime() / 86_400_000);
-      return String(Math.floor(day / size) * size);
+      const bucketDay = Math.floor(day / size) * size;
+      return new Date(bucketDay * 86_400_000).toISOString().slice(0, 10);
     }
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth();
