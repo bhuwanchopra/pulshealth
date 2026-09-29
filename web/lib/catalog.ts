@@ -43,7 +43,7 @@ export interface HealthType {
  * Web-only overrides by identifier. A `name` here replaces the app's display
  * name in the viewer; everything else always comes from the generated core.
  */
-const OVERLAY: Partial<Record<string, { name?: string }>> = {};
+const OVERLAY: Partial<Record<string, { name?: string }>> = {\n  HKCategoryTypeIdentifierSleepAnalysis: { name: "Sleep Duration" },\n};
 
 /** Every type the app can sync, sorted by identifier (the vocabulary's order). */
 export const CATALOG: HealthType[] = GENERATED_CATALOG.map((t) => ({
