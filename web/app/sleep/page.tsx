@@ -29,7 +29,7 @@ export default async function SleepPage({
     scoreWindowNights,
     rawNights.map((night) => night.date),
   );
-  const latest = historicalScores[historicalScores.length - 1];
+  const latest = historicalScores[0];
   const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
   return (
