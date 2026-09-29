@@ -25,11 +25,15 @@ export default async function SleepPage({
     getSleepDays(user, scoreWindowDays),
     getSleepDays(user, rangeDays),
   ]);
-  const historicalScores = await getOrCreateSleepScores(
+  const scoredWindow = await getOrCreateSleepScores(
     user,
     scoreWindowNights,
     rawNights.map((night) => night.date),
   );
+  // scoreWindowNights includes 13 preceding nights only for the consistency
+  // baseline. The charts and headline must contain exactly the selected range.
+  const visibleDates = new Set(rawNights.map((night) => night.date));
+  const historicalScores = scoredWindow.filter((entry) => visibleDates.has(entry.night.date));
   const latest = historicalScores[0];
   const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
 
