@@ -61,7 +61,6 @@ export default async function SleepScorePage({
   );
   const visibleDates = new Set(visibleNights.map((night) => night.date));
   const scores = scoredWindow.filter((entry) => visibleDates.has(entry.night.date));
-  const latest = scores.at(-1) ?? null;
 
   // The score list is chronological, while the sleep category page keeps its
   // latest night first. The detail page uses the chronological list for the
