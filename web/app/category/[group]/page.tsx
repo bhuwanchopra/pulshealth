@@ -34,11 +34,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ group
   const { group } = await params;
   if (!(GROUPS as string[]).includes(group)) notFound();
 
-  // Sleep has a dedicated detail page with range selection, sleep stages,
-  // derived Sleep Score history, and the latest-night summary. Keep a single
-  // canonical sleep view instead of maintaining two overlapping pages.
-  if (group === "sleep") redirect("/sleep");
-
   const g = group as Group;
   if (g === "workouts") redirect("/workouts");
   const types = typesInGroup(g);
