@@ -32,7 +32,7 @@ const GROUP_BLURB: Record<Group, string> = {
 export async function generateMetadata({ params }: { params: Promise<{ group: string }> }) {
   const { group } = await params;
   const g = group as Group;
-  return { title: GROUP_LABELS[g] ? \`\${GROUP_LABELS[g]} — PulsHealth\` : "PulsHealth" };
+  return { title: GROUP_LABELS[g] ? `${GROUP_LABELS[g]} — PulsHealth` : "PulsHealth" };
 }
 
 export default async function CategoryPage({
@@ -89,7 +89,7 @@ export default async function CategoryPage({
         }
 
         return (
-          <div key={id} className="rise" style={{ animationDelay: \`\${Math.min(i, 16) * 28}ms\` }}>
+          <div key={id} className="rise" style={{ animationDelay: `${Math.min(i, 16) * 28}ms` }}>
             <MetricCard type={type} value={value} unit={unit} spark={spark} t={t} />
           </div>
         );
@@ -103,7 +103,7 @@ export default async function CategoryPage({
       accent={color}
       title={
         <span style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
-          <span style={{ width: 44, height: 44, borderRadius: 13, display: "grid", placeItems: "center", background: \`\${color}1a\`, color }}>
+          <span style={{ width: 44, height: 44, borderRadius: 13, display: "grid", placeItems: "center", background: `${color}1a`, color }}>
             <GroupIcon group={g} size={24} />
           </span>
           {GROUP_LABELS[g]}
