@@ -81,15 +81,24 @@ export default async function SleepScorePage({
         right={<SleepRangeSelector value={range} />}
       />
 
-      <div className="rise" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, animationDelay: "80ms" }}>
-        <Stat label="Average" value={avg == null ? "—" : avg.toFixed(1)} sub={range} />
+      <div style={{ marginTop: 18 }}>
+        <SleepScoreHistoryChart scores={scores} interval={interval} />
+      </div>
+
+      <div
+        className="rise"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 12,
+          marginTop: 18,
+          animationDelay: "80ms",
+        }}
+      >
+        <Stat label={`Average · ${range}`} value={avg == null ? "—" : avg.toFixed(1)} />
         <Stat label="Minimum" value={min == null ? "—" : String(min)} />
         <Stat label="Maximum" value={max == null ? "—" : String(max)} />
         <Stat label="Scored nights" value={String(values.length)} />
-      </div>
-
-      <div style={{ marginTop: 18 }}>
-        <SleepScoreHistoryChart scores={scores} interval={interval} />
       </div>
     </>
   );
