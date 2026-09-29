@@ -18,6 +18,13 @@ function pct(value: number, total: number): number {
   return total > 0 ? Math.max(0, Math.min(100, (value / total) * 100)) : 0;
 }
 
+function sleepScoreColor(score: number): string {
+  if (score >= 81) return "#166534";
+  if (score >= 61) return "#22c55e";
+  if (score >= 41) return "#eab308";
+  return "#ef4444";
+}
+
 export function SleepCard({
   sleep,
   compact = false,
@@ -63,6 +70,26 @@ export function SleepCard({
             </div>
             <div style={{ color: "var(--faint)", fontSize: 11.5, marginTop: 5 }}>
               {sleepScoreClassification(score.score)}
+            </div>
+            <div
+              aria-label={"Sleep score " + score.score + " out of 100"}
+              style={{
+                width: 120,
+                height: 7,
+                marginTop: 8,
+                borderRadius: 999,
+                background: "var(--border)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: score.score + "%",
+                  borderRadius: 999,
+                  background: sleepScoreColor(score.score),
+                }}
+              />
             </div>
           </div>
         )}
