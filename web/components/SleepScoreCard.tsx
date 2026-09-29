@@ -19,7 +19,7 @@ export function SleepScoreCard({
     .map((entry) => entry.score.score);
 
   return (
-    <Link href="/sleep" className="card" style={{ padding: 18 }}>
+    <Link href="/sleep/score" className="card" style={{ padding: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <span className="dot" style={{ background: color }} />
