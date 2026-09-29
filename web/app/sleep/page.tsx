@@ -26,6 +26,7 @@ export default async function SleepPage({
     getSleepDays(user, rangeDays),
   ]);
   const historicalScores = await getOrCreateSleepScores(
+    user,
     scoreWindowNights,
     rawNights.map((night) => night.date),
   );
