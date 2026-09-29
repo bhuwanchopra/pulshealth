@@ -1354,7 +1354,11 @@ export async function getOrCreateSleepScores(
       if (row) cached.set(night.date, row);
     }
 
+    // The caller may provide extra preceding nights solely to calculate
+    // bedtime-consistency baselines. They must not leak into the visible
+    // history or "scored nights" count.
     return nights
+      .filter((night) => datesToPersist.has(night.date))
       .map((night) => {
         const row = cached.get(night.date);
         if (!row) return null;
