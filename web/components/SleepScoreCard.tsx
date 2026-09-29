@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { sleepScoreClassification, type SleepScore } from "@/lib/sleep";
+
+type ScoredNight = { night: { date: string }; score: SleepScore };
 import { GROUP_COLOR } from "@/lib/colors";
 import { Sparkline } from "./Sparkline";
 
@@ -7,14 +9,14 @@ export function SleepScoreCard({
   score,
   history,
 }: {
-  score: SleepScore | null;
-  history: SleepScore[];
+  score: ScoredNight["score"] | null;
+  history: ScoredNight[];
 }) {
   const color = GROUP_COLOR.sleep;
   const spark = history
     .slice()
     .reverse()
-    .map((entry) => entry.score);
+    .map((entry) => entry.score.score);
 
   return (
     <Link href="/sleep" className="card" style={{ padding: 18 }}>
@@ -25,7 +27,7 @@ export function SleepScoreCard({
         </div>
         {score && (
           <span style={{ color: "var(--faint)", fontSize: 11.5 }}>
-            {score.night.date}
+            {score && "Latest"}
           </span>
         )}
       </div>
