@@ -1257,6 +1257,7 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
 export async function getOrCreateSleepScores(
   userId: string,
   nights: SleepDay[],
+  persistDates: string[] = nights.map((night) => night.date),
 ): Promise<Array<{ night: SleepDay; score: SleepScore }>> {
   const src = await source();
   if (src !== "live") {
@@ -1269,7 +1270,7 @@ export async function getOrCreateSleepScores(
   if (!nights.length) return [];
 
   try {
-    const dates = nights.map((night) => night.date);
+    const dates = persistDates;
     const existing = await query<{
       sleep_date: string;
       score: number;
@@ -1302,8 +1303,9 @@ export async function getOrCreateSleepScores(
     // Only the first load of a date reaches the scoring function and INSERT.
     // The preceding nights are raw sleep data because consistency depends on
     // bedtime history, not on the previous scores themselves.
+    const datesToPersist = new Set(persistDates);
     for (const night of chronological) {
-      if (cached.has(night.date)) continue;
+      if (!datesToPersist.has(night.date) || cached.has(night.date)) continue;
       const index = chronological.findIndex((candidate) => candidate.date === night.date);
       const derived = calculateSleepScore(night, chronological.slice(0, index).reverse());
       const inserted = await query<{
