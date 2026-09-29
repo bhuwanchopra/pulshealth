@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
@@ -71,9 +70,6 @@ export default async function SleepScorePage({
   const min = values.length ? Math.min(...values) : null;
   const max = values.length ? Math.max(...values) : null;
 
-  if (!scores.length && !visibleNights.length) {
-    notFound();
-  }
 
   const color = GROUP_COLOR.sleep;
   const interval = sleepRangeBucket(range).interval;
