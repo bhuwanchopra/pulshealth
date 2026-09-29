@@ -2,14 +2,6 @@ import { formatSleepPeriodLabel, sleepScoreClassification, type SleepDay, type S
 
 type ScoredNight = { night: SleepDay; score: SleepScore };
 
-function scoreColor(score: number): string {
-  if (score >= 96) return "var(--success, var(--accent))";
-  if (score >= 81) return "var(--accent)";
-  if (score >= 61) return "var(--fg-soft)";
-  if (score >= 41) return "var(--muted)";
-  return "var(--faint)";
-}
-
 export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
   const points = [...scores].sort((a, b) => a.night.date.localeCompare(b.night.date));
   if (!points.length) return null;
@@ -45,77 +37,74 @@ export function SleepScoreHistoryChart({ scores }: { scores: ScoredNight[] }) {
       </div>
 
       <div style={{ marginTop: 18, overflow: "hidden" }}>
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          role="img"
-          aria-label="Sleep Score history"
-          style={{ display: "block", width: "100%", height: "auto", minHeight: 180 }}
-        >
-          {[40, 60, 80, 95, 100].map((score) => (
-            <g key={score}>
-              <line
-                x1={left}
-                x2={width - right}
-                y1={y(score)}
-                y2={y(score)}
-                stroke="var(--border)"
-                strokeWidth="1"
-                strokeDasharray={score === 100 ? undefined : "4 5"}
-              />
-              <text x={left - 8} y={y(score) + 4} textAnchor="end" fill="var(--faint)" fontSize="11">
-                {score}
-              </text>
-            </g>
-          ))}
+        <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+          <svg
+            viewBox={`0 0 ${Math.max(1000, points.length * 28)} ${height}`}
+            role="img"
+            aria-label="Sleep Score history bar chart"
+            style={{ display: "block", width: "100%", minWidth: points.length > 35 ? Math.max(700, points.length * 28) : "100%", height: "auto", minHeight: 180 }}
+          >
+            {[40, 60, 80, 95, 100].map((score) => (
+              <g key={score}>
+                <line
+                  x1={left}
+                  x2={Math.max(1000, points.length * 28) - right}
+                  y1={y(score)}
+                  y2={y(score)}
+                  stroke="var(--border)"
+                  strokeWidth="1"
+                  strokeDasharray={score === 100 ? undefined : "4 5"}
+                />
+                <text x={left - 8} y={y(score) + 4} textAnchor="end" fill="var(--faint)" fontSize="11">{score}</text>
+              </g>
+            ))}
 
-          <polyline
-            points={polyline}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="3"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+            {points.map((point, index) => {
+              const chartWidth = Math.max(1000, points.length * 28);
+              const barWidth = Math.max(5, Math.min(18, (chartWidth - left - right) / Math.max(points.length, 1) * 0.7));
+              const barX = x(index) - barWidth / 2;
+              return (
+                <g key={point.night.date}>
+                  <rect
+                    x={barX}
+                    y={y(point.score.score)}
+                    width={barWidth}
+                    height={Math.max(0, y(0) - y(point.score.score))}
+                    rx="2"
+                    fill={point.score.score >= 81 ? "#166534" : point.score.score >= 61 ? "#22c55e" : point.score.score >= 41 ? "#eab308" : "#ef4444"}
+                  >
+                    <title>
+                      {\`${formatSleepPeriodLabel(point.night.date, "1 day")} · ${point.score.score}/100 · ${sleepScoreClassification(point.score.score)} · Duration ${Math.round(point.score.durationPoints)}/50 · Consistency ${Math.round(point.score.consistencyPoints)}/30 · Interruptions ${Math.round(point.score.interruptionPoints)}/20\`}
+                    </title>
+                  </rect>
+                </g>
+              );
+            })}
 
-          {points.map((point, index) => (
-            <circle
-              key={point.night.date}
-              cx={x(index)}
-              cy={y(point.score.score)}
-              r={points.length > 180 ? 2 : 3.5}
-              fill={scoreColor(point.score.score)}
-              stroke="var(--bg)"
-              strokeWidth="1.5"
-            >
-              <title>
-                {`${formatSleepPeriodLabel(point.night.date, "1 day")} · ${point.score.score}/100 · ${sleepScoreClassification(point.score.score)} · Duration ${Math.round(point.score.durationPoints)}/50 · Consistency ${Math.round(point.score.consistencyPoints)}/30 · Interruptions ${Math.round(point.score.interruptionPoints)}/20`}
-              </title>
-            </circle>
-          ))}
-
-          {points.map((point, index) =>
-            labelIndexes.has(index) ? (
-              <text
-                key={`label-${point.night.date}`}
-                x={x(index)}
-                y={height - 14}
-                textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}
-                fill="var(--muted)"
-                fontSize="11"
-              >
-                {formatSleepPeriodLabel(point.night.date, "1 day")}
-              </text>
-            ) : null,
-          )}
-        </svg>
+            {points.map((point, index) =>
+              labelIndexes.has(index) ? (
+                <text
+                  key={`label-${point.night.date}`}
+                  x={x(index)}
+                  y={height - 14}
+                  textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}
+                  fill="var(--muted)"
+                  fontSize="11"
+                >
+                  {formatSleepPeriodLabel(point.night.date, "1 day")}
+                </text>
+              ) : null,
+            )}
+          </svg>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 4, color: "var(--faint)", fontSize: 11 }}>
-        <span>0–40 Very Low</span>
-        <span>41–60 Low</span>
-        <span>61–80 OK</span>
-        <span>81–95 High</span>
-        <span>96–100 Very High</span>
+        <span style={{ color: "#ef4444" }}>0–40 Very Low</span>
+        <span style={{ color: "#eab308" }}>41–60 Low</span>
+        <span style={{ color: "#22c55e" }}>61–80 OK</span>
+        <span style={{ color: "#166534" }}>81–95 High</span>
+        <span style={{ color: "#166534" }}>96–100 Very High</span>
       </div>
     </section>
   );
