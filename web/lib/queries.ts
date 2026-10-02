@@ -15,6 +15,7 @@ import { cache } from "react";
 import { query, scoped, type QueryFn } from "./db";
 import { typeByIdentifier } from "./catalog";
 import { configuredTimeZone } from "./config";
+import { viewerMode } from "./mode";
 import { defaultAgg, RANGES, resolvePresetWindow } from "./metrics";
 import type { ResolvedSeriesWindow } from "./metrics";
 import {
@@ -410,7 +411,7 @@ export async function getSeries(
     // aggregate_series. Day-or-coarser charts can use metric_daily instead;
     // skip the shared aggregate catalog in that case and fall through to the
     // existing metric_daily path below.
-    if (!(dailyUsable && bucketMs >= DAY_MS)) {
+    if (!(viewerMode() === "accounts" && dailyUsable && bucketMs >= DAY_MS)) {
       aggregateSeries = await q<{
       series_id: number;
       agg_func: string;
