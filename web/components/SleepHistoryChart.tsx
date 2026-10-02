@@ -137,9 +137,14 @@ export function SleepHistoryChart({
                     points={displayNights
                       .map((night, index) => {
                         const x = index + 0.5;
+                        const totalSleep =
+                          night.coreMinutes +
+                          night.deepMinutes +
+                          night.remMinutes +
+                          night.unspecifiedMinutes;
                         const y =
                           chartHeight -
-                          (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) *
+                          (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
                             chartHeight;
                         return `${x},${y}`;
                       })
