@@ -54,6 +54,8 @@ export default async function TypePage({
   if (type.kind === "workout") redirect("/workouts");
   if (type.kind !== "quantity" && type.kind !== "category") notFound();
 
+  const color = GROUP_COLOR[type.group];
+
   // Sleep Analysis is a category-type detail page. Keep the category page
   // focused on summary metrics and render the detailed stage history here.
   if (id === "HKCategoryTypeIdentifierSleepAnalysis") {
@@ -104,7 +106,6 @@ export default async function TypePage({
 
   const query = await searchParams;
   const range = parseRange(query.range);
-  const color = GROUP_COLOR[type.group];
   const cumulative = isCumulative(id);
 
   const user = await viewerUser();
