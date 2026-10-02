@@ -134,7 +134,8 @@ export function SleepHistoryChart({
                   <polyline
                     fill="none"
                     stroke="var(--fg)"
-                    strokeWidth="1.75"
+                    strokeWidth="1.5"
+                    vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={displayNights
@@ -157,7 +158,8 @@ export function SleepHistoryChart({
                         key={night.date}
                         cx={x}
                         cy={y}
-                        r="1.5"
+                        r="2"
+                        vectorEffect="non-scaling-stroke"
                         fill="var(--fg)"
                       />
                     );
