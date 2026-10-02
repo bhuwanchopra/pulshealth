@@ -125,6 +125,7 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'api_reader') THEN
     GRANT SELECT ON metric_daily TO api_reader;
+    GRANT SELECT ON quantity_rollups TO api_reader;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'grafana') THEN
     GRANT SELECT ON metric_daily TO grafana;

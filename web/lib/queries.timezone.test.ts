@@ -47,6 +47,26 @@ describe("metric_daily zone guard", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it("uses the filtered aggregate/rollup path for sparklines when zones match", async () => {
+    mockDatabase(() => Promise.resolve([{ zone: "Europe/Berlin" }]));
+    const { getDailySparklines } = await import("./queries");
+
+    await getDailySparklines(USER_ID, [STEPS]);
+
+    const calls = sqlCalls();
+
+    expect(calls.some((sql) => sql.includes("FROM aggregate_samples"))).toBe(true);
+    expect(calls.some((sql) => sql.includes("FROM quantity_rollups"))).toBe(true);
+    expect(calls.some((sql) => sql.includes("FROM metric_daily"))).toBe(false);
+    expect(calls.some((sql) => sql.includes("metric_daily"))).toBe(false);
+
+    const sparkSql = calls.find((sql) => sql.includes("FROM aggregate_samples"));
+    expect(sparkSql).toBeTruthy();
+    expect(sparkSql).toContain("now() AT TIME ZONE $4::text");
+    expect(sparkSql).not.toContain("($4::text)::date");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it("falls back to raw local buckets and warns once on a zone mismatch", async () => {
     mockDatabase(() => Promise.resolve([{ zone: "UTC" }]));
     const { getDailySparklines, getSeries } = await import("./queries");

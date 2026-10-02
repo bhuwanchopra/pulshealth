@@ -150,7 +150,8 @@ export function demoSeries(identifier: string, range: RangeKey): Series {
     return { identifier, unit: t?.unit ?? null, agg: cum ? "sum" : "avg", bucketMs: spec.bucketMs, points: points.filter((p) => !Number.isNaN(p.value)) };
   }
 
-  const buckets = Math.round(spec.spanMs / spec.bucketMs);
+  const demoSpanMs = spec.spanMs ?? 5 * 365 * 86_400_000;
+  const buckets = Math.round(demoSpanMs / spec.bucketMs);
   for (let i = buckets - 1; i >= 0; i--) {
     const tms = now - i * spec.bucketMs;
     if (spec.bucketMs === DAY) {

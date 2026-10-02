@@ -477,32 +477,90 @@ extension HealthSyncEngine {
     /// uploaded and acked here, so the watermark advances subwindow by
     /// subwindow and an interrupted recovery resumes from the last ack.
     private func computeAndUploadAggregateChunk(
+    config: AggregateConfig,
+    configID: UUID,
+    unit: HKUnit?,
+    reason: SyncReason,
+    transport: any SyncTransport,
+    calendar: Calendar,
+    anchor: Date,
+    chunk: DateInterval,
+    pass: AggregatePass
+) async throws -> Int {
+    try await AggregateQuery.bucketsRecovering(
+        for: config,
+        unit: unit,
+        canonicalAnchor: anchor,
+        calendar: calendar,
+        chunk: chunk,
+        healthStore: healthStore,
+        onRecoveryStart: { _ in
+            await self.eventLog.log(
+                .warn,
+                type: config.typeIdentifier,
+                "Aggregate \(config.summaryLabel): HealthKit statistics data-source cache unavailable — retrying with smaller HealthKit statistics windows"
+            )
+        },
+        onChunk: { rows, window in
+            let leadingEmptyBackfill = pass == .scheduled
+                ? await self.store.aggregateState(for: configID).leadingEmptyBackfill
+                : false
+
+            _ = try await self.prepareAndUploadAggregateRows(
+                rows,
+                leadingEmptyBackfill: leadingEmptyBackfill,
+                config: config,
+                configID: configID,
+                reason: reason,
+                transport: transport,
+                chunk: window,
+                pass: pass
+            )
+        }
+    )
+}
+
+/// Apply sparse storage only to the leading portion of an initial
+    /// scheduled backfill. Once the first real value is materialized, NULL
+    /// buckets remain meaningful and are uploaded normally so recomputations
+    /// and deletions can clear previously stored values.
+    private func prepareAndUploadAggregateRows(
+        _ rows: [AggregateSampleRow],
+        leadingEmptyBackfill: Bool,
         config: AggregateConfig,
         configID: UUID,
-        unit: HKUnit?,
         reason: SyncReason,
         transport: any SyncTransport,
-        calendar: Calendar,
-        anchor: Date,
         chunk: DateInterval,
         pass: AggregatePass
     ) async throws -> Int {
-        try await AggregateQuery.bucketsRecovering(
-            for: config, unit: unit, canonicalAnchor: anchor, calendar: calendar,
-            chunk: chunk, healthStore: healthStore,
-            onRecoveryStart: { _ in
-                await self.eventLog.log(
-                    .warn, type: config.typeIdentifier,
-                    "Aggregate \(config.summaryLabel): HealthKit statistics data-source cache unavailable — retrying with smaller HealthKit statistics windows"
-                )
-            },
-            onChunk: { rows, window in
-                try await self.uploadAggregateRows(
-                    rows, config: config, configID: configID, reason: reason,
-                    transport: transport, chunk: window, pass: pass
-                )
-            }
+        guard pass == .scheduled, leadingEmptyBackfill else {
+            try await uploadAggregateRows(
+                rows, config: config, configID: configID, reason: reason,
+                transport: transport, chunk: chunk, pass: pass
+            )
+            return rows.count
+        }
+
+        guard let firstValueIndex = rows.firstIndex(where: { $0.value != nil }) else {
+            await store.recordAggregateSkippedEmptyChunk(
+                configID: configID,
+                newComputedThrough: chunk.end
+            )
+            return 0
+        }
+
+        let materializedRows = Array(rows[firstValueIndex...])
+        try await uploadAggregateRows(
+            materializedRows,
+            config: config,
+            configID: configID,
+            reason: reason,
+            transport: transport,
+            chunk: chunk,
+            pass: pass
         )
+        return materializedRows.count
     }
 
     private func uploadAggregateRows(

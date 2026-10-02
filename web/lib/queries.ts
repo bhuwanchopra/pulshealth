@@ -16,6 +16,7 @@ import { query } from "./db";
 import { typeByIdentifier } from "./catalog";
 import { configuredTimeZone } from "./config";
 import { defaultAgg, RANGES } from "./metrics";
+import type { ResolvedSeriesWindow } from "./metrics";
 import {
   demoActivityRings,
   demoLatest,
@@ -46,6 +47,7 @@ import type {
   WorkoutSeries,
   WorkoutStat,
 } from "./types";
+import type { SleepDay } from "./sleep";
 
 // uuid v4-ish shape — guard before casting to ::uuid so a bad path segment
 // surfaces as "not found" instead of a 500 from a failed cast.
@@ -239,10 +241,16 @@ export function categoryAggregation(identifier: string): CategoryAggregation {
   return { mode: "count", unit: "count" };
 }
 
-export async function getSeries(userId: string, identifier: string, range: RangeKey): Promise<Series> {
+export async function getSeries(
+  userId: string,
+  identifier: string,
+  range: RangeKey,
+  window?: ResolvedSeriesWindow,
+): Promise<Series> {
   const spec = RANGES[range];
   const type = typeByIdentifier(identifier);
   const agg = defaultAgg(identifier);
+  const aggregateFunc = agg === "avg" ? "average" : "sum";
   const empty: Series = { identifier, unit: type?.unit ?? null, agg, bucketMs: spec.bucketMs, points: [] };
 
   const src = await source();
@@ -254,15 +262,43 @@ export async function getSeries(userId: string, identifier: string, range: Range
     // time_bucket($1, $from, $tz): otherwise the first day/week bucket held a
     // partial slice (10:37 → midnight), rendered as a low bar, and became the
     // range's "Minimum".
-    const from = new Date(Date.now() - spec.spanMs);
+    const resolvedWindow: ResolvedSeriesWindow =
+      window ??
+      (() => {
+        const end = new Date();
+        const start = new Date(
+          end.getTime() - (spec.spanMs ?? 5 * 365 * DAY_MS),
+        );
+        return {
+          range: range as Exclude<RangeKey, "CUSTOM">,
+          start,
+          end,
+          bucket: spec.bucket,
+          bucketMs: spec.bucketMs,
+        };
+      })();
+
+    const isCustom = resolvedWindow.range === "CUSTOM";
+    const bucket = resolvedWindow.bucket;
+    const bucketMs = resolvedWindow.bucketMs;
     const timeZone = configuredTimeZone();
+
+    // Presets use exact instants. Custom ranges are calendar dates in the
+    // viewer's configured timezone and use an inclusive start / exclusive end.
+    const from = isCustom
+      ? resolvedWindow.fromDate
+      : resolvedWindow.start;
+
+    const endExclusive = isCustom
+      ? resolvedWindow.endExclusive
+      : resolvedWindow.end;
 
     if (type?.kind === "category") {
       const category = categoryAggregation(identifier);
-      const valueFilter = category.values ? "AND c.value = ANY($6::int[])" : "";
+      const valueFilter = category.values ? "AND c.value = ANY($7::int[])" : "";
       const params = category.values
-        ? [spec.bucket, identifier, from, userId, timeZone, category.values]
-        : [spec.bucket, identifier, from, userId, timeZone];
+        ? [bucket, identifier, from, endExclusive, userId, timeZone, category.values]
+        : [bucket, identifier, from, endExclusive, userId, timeZone];
 
       if (category.mode === "duration") {
         const divisor = category.unit === "h" ? 3600 : 60;
@@ -275,14 +311,27 @@ export async function getSeries(userId: string, identifier: string, range: Range
         // rather than summing everything.
         const rows = await query<{ t: string; value: number }>(
           `WITH per_source AS (
-             SELECT time_bucket($1::interval, c.start_ts${shift}, $5::text) AS t,
+             SELECT time_bucket($1::interval, c.start_ts${shift}, $6::text) AS t,
                     c.source_id,
                     (sum(extract(epoch from (c.end_ts - c.start_ts))) / ${divisor}.0)::float8 AS value
                FROM category_samples c
                JOIN sample_types st ON st.type_id = c.type_id
               WHERE st.identifier = $2
-                AND c.start_ts >= time_bucket($1::interval, $3::timestamptz, $5::text)${unshift}
-                AND c.user_id = $4::uuid
+                AND c.start_ts >= time_bucket(
+                  $1::interval,
+                  CASE
+                    WHEN $3::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                      THEN ($3::date::timestamp AT TIME ZONE $6::text)
+                    ELSE $3::timestamptz
+                  END,
+                  $6::text
+                )${unshift}
+                AND c.start_ts < CASE
+                  WHEN $4::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                    THEN ($4::date::timestamp AT TIME ZONE $6::text)
+                  ELSE $4::timestamptz
+                END
+                AND c.user_id = $5::uuid
                 ${valueFilter}
               GROUP BY 1, c.source_id
            )
@@ -295,17 +344,30 @@ export async function getSeries(userId: string, identifier: string, range: Range
         const points: SeriesPoint[] = rows.map((r) => ({
           t: Number(r.t), value: Number(r.value), min: null, max: null, count: 0,
         }));
-        return { identifier, unit: category.unit, agg: "sum", bucketMs: spec.bucketMs, points };
+        return { identifier, unit: category.unit, agg: "sum", bucketMs, points };
       }
 
       const rows = await query<{ t: string; n: number }>(
-        `SELECT (extract(epoch from time_bucket($1::interval, c.start_ts, $5::text)) * 1000)::bigint AS t,
+        `SELECT (extract(epoch from time_bucket($1::interval, c.start_ts, $6::text)) * 1000)::bigint AS t,
                 count(*)::int AS n
            FROM category_samples c
            JOIN sample_types st ON st.type_id = c.type_id
           WHERE st.identifier = $2
-            AND c.start_ts >= time_bucket($1::interval, $3::timestamptz, $5::text)
-            AND c.user_id = $4::uuid
+            AND c.start_ts >= time_bucket(
+              $1::interval,
+              CASE
+                WHEN $3::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                  THEN ($3::date::timestamp AT TIME ZONE $6::text)
+                ELSE $3::timestamptz
+              END,
+              $6::text
+            )
+            AND c.start_ts < CASE
+              WHEN $4::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                THEN ($4::date::timestamp AT TIME ZONE $6::text)
+              ELSE $4::timestamptz
+            END
+            AND c.user_id = $5::uuid
             ${valueFilter}
           GROUP BY 1 ORDER BY 1`,
         params,
@@ -313,24 +375,144 @@ export async function getSeries(userId: string, identifier: string, range: Range
       const points: SeriesPoint[] = rows.map((r) => ({
         t: Number(r.t), value: Number(r.n), min: null, max: null, count: Number(r.n),
       }));
-      return { identifier, unit: category.unit, agg: "sum", bucketMs: spec.bucketMs, points };
+      return { identifier, unit: category.unit, agg: "sum", bucketMs, points };
     }
 
-    // Best-guess-of-truth view for covered types (steps/energy/distance/…) at
-    // day-or-coarser buckets. metric_daily is daily-grain, so the intraday (Day)
-    // view falls through to raw samples below.
-    const mdTypes = await metricDailyTypes(userId);
-    if (mdTypes.has(identifier) && spec.bucketMs >= DAY_MS) {
-      const rows = await query<{ t: string; value: number }>(
-        `SELECT (extract(epoch from time_bucket($1::interval, day::timestamp AT TIME ZONE $5::text, $5::text)) * 1000)::bigint AS t,
-                ${agg === "sum" ? "sum(value)" : "avg(value)"}::float8 AS value
-           FROM metric_daily
-          WHERE identifier = $2
-            AND day >= (time_bucket($1::interval, $3::timestamptz, $5::text) AT TIME ZONE $5::text)::date
-            AND user_id = $4::uuid
-          GROUP BY 1 ORDER BY 1`,
-        [spec.bucket, identifier, from, userId, timeZone],
+    // Prefer pre-aggregated data whenever an appropriate aggregate exists.
+    //
+    // Day charts use hourly aggregates when available.
+    // Week/Month/6M/Year charts use daily aggregates when available and
+    // re-bucket those rows to the requested chart interval.
+    //
+    // This keeps large charts away from quantity_samples, which can contain
+    // millions of raw HealthKit samples.
+    const aggregateInterval = bucketMs < DAY_MS ? "hour" : "day";
+
+    const aggregateSeries = await query<{
+      series_id: number;
+      agg_func: string;
+      interval_value: number;
+      interval_unit: string;
+    }>(
+      `SELECT s.series_id,
+              s.agg_func,
+              s.interval_value,
+              s.interval_unit
+         FROM aggregate_series s
+         JOIN sample_types st ON st.type_id = s.type_id
+        WHERE st.identifier = $1
+          AND s.agg_func = $2
+          AND s.interval_value = 1
+          AND s.interval_unit = $3
+          AND s.device_filter = 'all'
+        ORDER BY s.series_id
+        LIMIT 1`,
+      [identifier, aggregateFunc, aggregateInterval],
+    );
+
+    if (aggregateSeries.length) {
+      const seriesId = aggregateSeries[0].series_id;
+
+      const rows = await query<{ t: string; value: number; n: number }>(
+        `SELECT
+           (extract(
+              epoch from time_bucket(
+                $1::interval,
+                a.bucket_start,
+                $5::text
+              )
+            ) * 1000)::bigint AS t,
+           ${agg === "sum"
+             ? "sum(a.value)"
+             : "avg(a.value)"}::float8 AS value,
+           count(*)::int AS n
+         FROM aggregate_samples a
+        WHERE a.series_id = $2
+          AND a.user_id = $3::uuid
+          AND a.bucket_start >= time_bucket(
+                $1::interval,
+                CASE
+                  WHEN $4::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                    THEN ($4::date::timestamp AT TIME ZONE $5::text)
+                  ELSE $4::timestamptz
+                END,
+                $5::text
+              )
+          ${
+            isCustom
+              ? `AND a.bucket_start < (($6::date)::timestamp AT TIME ZONE $5::text)`
+              : ""
+          }
+        GROUP BY 1
+        ORDER BY 1`,
+        isCustom
+          ? [bucket, seriesId, userId, from, timeZone, endExclusive]
+          : [bucket, seriesId, userId, from, timeZone],
       );
+
+      if (rows.length) {
+        const points: SeriesPoint[] = rows.map((r) => ({
+          t: Number(r.t),
+          value: Number(r.value) || 0,
+          min: null,
+          max: null,
+          count: Number(r.n),
+        }));
+
+        return {
+          identifier,
+          unit: type?.unit ?? null,
+          agg,
+          bucketMs,
+          points,
+        };
+      }
+    }
+
+    // Best-guess-of-truth view for covered types at day-or-coarser buckets.
+    // metric_daily remains the fallback when no suitable aggregate exists.
+    const mdTypes = await metricDailyTypes(userId);
+    if (mdTypes.has(identifier) && bucketMs >= DAY_MS) {
+      const rows = await query<{ t: string; value: number }>(
+        `SELECT
+           (extract(
+              epoch from time_bucket(
+                $1::interval,
+                day::timestamp AT TIME ZONE $5::text,
+                $5::text
+              )
+            ) * 1000)::bigint AS t,
+           ${agg === "sum" ? "sum(value)" : "avg(value)"}::float8 AS value
+         FROM metric_daily
+        WHERE identifier = $2
+          AND day >= (
+            time_bucket(
+              $1::interval,
+              CASE
+                WHEN $3::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                  THEN ($3::date::timestamp AT TIME ZONE $5::text)
+                ELSE $3::timestamptz
+              END,
+              $5::text
+            ) AT TIME ZONE $5::text
+          )::date
+          AND (
+            NOT $6::boolean
+            OR day < $7::date
+          )
+          AND user_id = $4::uuid
+        GROUP BY 1 ORDER BY 1`,
+        [
+          bucket,
+          identifier,
+          from,
+          userId,
+          timeZone,
+          isCustom,
+          endExclusive,
+        ],
+      );
+
       const points: SeriesPoint[] = rows.map((r) => ({
         t: Number(r.t),
         value: Number(r.value) || 0,
@@ -338,15 +520,23 @@ export async function getSeries(userId: string, identifier: string, range: Range
         max: null,
         count: 0,
       }));
-      return { identifier, unit: type?.unit ?? null, agg, bucketMs: spec.bucketMs, points };
+
+      return {
+        identifier,
+        unit: type?.unit ?? null,
+        agg,
+        bucketMs,
+        points,
+      };
     }
+
 
     // Raw cumulative samples often overlap across iPhone and Watch. Establish
     // truth at the requested intraday grain, or at local-day grain for longer
     // charts, by choosing the highest source total. Only then roll those truth
     // values into the requested bucket, so a week can use a different winning
     // source on each day.
-    const truthBucket = spec.bucketMs < DAY_MS ? spec.bucket : "1 day";
+    const truthBucket = bucketMs < DAY_MS ? bucket : "1 day";
     const rows = agg === "sum"
       ? await query<SeriesRow>(
         `WITH per_source AS (
@@ -356,8 +546,17 @@ export async function getSeries(userId: string, identifier: string, range: Range
              FROM quantity_samples q
              JOIN sample_types st ON st.type_id = q.type_id
             WHERE st.identifier = $3
-              AND q.start_ts >= time_bucket($1::interval, $4::timestamptz, $6::text)
+              AND q.start_ts >= time_bucket(
+                $1::interval,
+                CASE
+                  WHEN $4::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                    THEN ($4::date::timestamp AT TIME ZONE $6::text)
+                  ELSE $4::timestamptz
+                END,
+                $6::text
+              )
               AND q.user_id = $5::uuid
+	      ${isCustom ? `AND q.start_ts < (($7::date)::timestamp AT TIME ZONE $6::text)` : ""}
             GROUP BY 1, q.source_id
          ), truth AS (
            SELECT truth_bucket, max(value)::float8 AS value
@@ -373,7 +572,9 @@ export async function getSeries(userId: string, identifier: string, range: Range
            FROM truth
           GROUP BY time_bucket($1::interval, truth_bucket, $6::text)
           ORDER BY time_bucket($1::interval, truth_bucket, $6::text)`,
-        [spec.bucket, truthBucket, identifier, from, userId, timeZone],
+	isCustom
+	  ? [bucket, truthBucket, identifier, from, userId, timeZone, endExclusive]
+	    : [bucket, truthBucket, identifier, from, userId, timeZone],
       )
       : await query<SeriesRow>(
         `SELECT (extract(epoch from time_bucket($1::interval, q.start_ts, $5::text)) * 1000)::bigint AS t,
@@ -385,11 +586,20 @@ export async function getSeries(userId: string, identifier: string, range: Range
            FROM quantity_samples q
            JOIN sample_types st ON st.type_id = q.type_id
           WHERE st.identifier = $2
-            AND q.start_ts >= time_bucket($1::interval, $3::timestamptz, $5::text)
+            AND q.start_ts >= time_bucket($1::interval, CASE
+                  WHEN $3::text ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                    THEN ($3::date::timestamp AT TIME ZONE $5::text)
+                  ELSE $3::timestamptz
+                END,
+                $5::text)
             AND q.user_id = $4::uuid
+	    ${isCustom ? `AND q.start_ts < (($6::date)::timestamp AT TIME ZONE $5::text)` : ""}
           GROUP BY 1 ORDER BY 1`,
-        [spec.bucket, identifier, from, userId, timeZone],
+	  isCustom
+	    ? [bucket, identifier, from, userId, timeZone, endExclusive]
+	      : [bucket, identifier, from, userId, timeZone],
       );
+
     const points: SeriesPoint[] = rows.map((r) => ({
       t: Number(r.t),
       value: Number(agg === "sum" ? r.sum : r.avg) || 0,
@@ -397,7 +607,14 @@ export async function getSeries(userId: string, identifier: string, range: Range
       max: r.max == null ? null : Number(r.max),
       count: Number(r.n),
     }));
-    return { identifier, unit: type?.unit ?? null, agg, bucketMs: spec.bucketMs, points };
+
+    return {
+      identifier,
+      unit: type?.unit ?? null,
+      agg,
+      bucketMs,
+      points,
+    };
   } catch (e) {
     console.error("[queries] getSeries failed:", e);
     return ALLOW_DEMO ? demoSeries(identifier, range) : empty;
@@ -417,14 +634,19 @@ export async function getLatestMany(userId: string, identifiers: string[]): Prom
 
   try {
     const rows = await query<{ identifier: string; value: number; t: string }>(
-      `SELECT DISTINCT ON (st.identifier)
-              st.identifier, q.value::float8 AS value,
-              (extract(epoch from q.start_ts) * 1000)::bigint AS t
-         FROM quantity_samples q
-         JOIN sample_types st ON st.type_id = q.type_id
-        WHERE st.identifier = ANY($1::text[])
-          AND q.user_id = $2::uuid
-        ORDER BY st.identifier, q.start_ts DESC`,
+      `SELECT st.identifier,
+              latest.value::float8 AS value,
+	      (extract(epoch from latest.start_ts) * 1000)::bigint AS t
+       FROM sample_types st
+       CROSS JOIN LATERAL(
+	   SELECT q.value, q.start_ts
+	   FROM quantity_samples q
+	   WHERE q.type_id = st.type_id
+	     AND q.user_id = $2::uuid
+	   ORDER BY q.start_ts DESC
+	   LIMIT 1
+       ) latest
+       WHERE st.identifier = ANY($1::text[])`,
       [identifiers, userId],
     );
     for (const r of rows) {
@@ -502,6 +724,7 @@ export async function getActivityRings(userId: string): Promise<ActivityRingsDat
   if (src !== "live") return notLive(src, () => demoActivityRings(), fallback);
 
   try {
+
     const rows = await query<{
       date: string;
       move_kcal: number | null;
@@ -579,16 +802,53 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
 
   try {
     const rows = await query<{ identifier: string; rows: string; earliest: string | null; latest: string | null }>(
-      `SELECT st.identifier,
+      `WITH quantity_stats AS (
+         SELECT r.type_id,
+                SUM(r.n)::bigint AS rows
+           FROM quantity_rollups r
+          WHERE r.user_id = $1::uuid
+          GROUP BY r.type_id
+       ),
+       quantity_times AS (
+         SELECT st.type_id,
+                first_sample.start_ts AS earliest,
+                latest_sample.start_ts AS latest
+           FROM sample_types st
+           JOIN quantity_stats qs ON qs.type_id = st.type_id
+           CROSS JOIN LATERAL (
+             SELECT q.start_ts
+               FROM quantity_samples q
+              WHERE q.type_id = st.type_id
+                AND q.user_id = $1::uuid
+              ORDER BY q.start_ts ASC
+              LIMIT 1
+           ) first_sample
+           CROSS JOIN LATERAL (
+             SELECT q.start_ts
+               FROM quantity_samples q
+              WHERE q.type_id = st.type_id
+                AND q.user_id = $1::uuid
+              ORDER BY q.start_ts DESC
+              LIMIT 1
+           ) latest_sample
+       )
+       SELECT st.identifier,
+              qs.rows,
+              (extract(epoch from qt.earliest) * 1000)::bigint AS earliest,
+              (extract(epoch from qt.latest) * 1000)::bigint AS latest
+         FROM quantity_stats qs
+         JOIN sample_types st ON st.type_id = qs.type_id
+         JOIN quantity_times qt ON qt.type_id = qs.type_id
+
+       UNION ALL
+
+       SELECT st.identifier,
               count(*)::bigint AS rows,
-              (extract(epoch from min(x.start_ts)) * 1000)::bigint AS earliest,
-              (extract(epoch from max(x.start_ts)) * 1000)::bigint AS latest
-         FROM (
-           SELECT type_id, start_ts FROM quantity_samples WHERE user_id = $1::uuid
-           UNION ALL
-           SELECT type_id, start_ts FROM category_samples WHERE user_id = $1::uuid
-         ) x
-         JOIN sample_types st ON st.type_id = x.type_id
+              (extract(epoch from min(c.start_ts)) * 1000)::bigint AS earliest,
+              (extract(epoch from max(c.start_ts)) * 1000)::bigint AS latest
+         FROM category_samples c
+         JOIN sample_types st ON st.type_id = c.type_id
+        WHERE c.user_id = $1::uuid
         GROUP BY st.identifier`,
       [userId],
     );
@@ -625,8 +885,11 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
   }
 }
 
-// ── batched daily sparklines for a set of quantity types (one round-trip) ──
-export async function getDailySparklines(userId: string, identifiers: string[], days = 21): Promise<Map<string, number[]>> {
+export async function getDailySparklines(
+  userId: string,
+  identifiers: string[],
+  days = 21,
+): Promise<Map<string, number[]>> {
   const out = new Map<string, number[]>();
   if (!identifiers.length) return out;
 
@@ -634,43 +897,151 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
   if (src !== "live") {
     if (src === "demo") {
       for (const id of identifiers) {
-        out.set(id, demoSeries(id, "M").points.slice(-days).map((p) => p.value));
+        out.set(
+          id,
+          demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+        );
       }
     }
     return out;
   }
 
   try {
-    const byId = new Map<string, number[]>();
-    const mdTypes = await metricDailyTypes(userId);
-    const mdIds = identifiers.filter((id) => mdTypes.has(id));
-    const rawIds = identifiers.filter((id) => !mdTypes.has(id));
-    const rawCumIds = rawIds.filter((id) => defaultAgg(id) === "sum");
-    const rawDiscIds = rawIds.filter((id) => defaultAgg(id) === "avg");
     const timeZone = configuredTimeZone();
 
-    // Covered types: daily best-guess-of-truth.
-    if (mdIds.length) {
-      const rows = await query<{ identifier: string; value: number }>(
-        `SELECT identifier,
-                (extract(epoch from (day::timestamp AT TIME ZONE $4::text)) * 1000)::bigint AS t,
-                value::float8 AS value
-           FROM metric_daily
-          WHERE identifier = ANY($1::text[])
-            AND user_id = $3::uuid
-            AND day >= (now() AT TIME ZONE $4::text)::date - $2::int
-          ORDER BY identifier, day`,
-        [mdIds, days, userId, timeZone],
+    // The optimized path uses canonical aggregate days together with the
+    // hourly raw-sample rollup fallback. Canonical days are only safe when
+    // the database and viewer use the same calendar timezone.
+    if (await metricDailyUsable()) {
+      const rows = await query<{
+        identifier: string;
+        value: number;
+      }>(
+        `WITH type_semantics AS (
+           SELECT a.type_id,
+                  CASE
+                    WHEN bool_or(a.agg_func = 'sum') THEN 'cumulative'
+                    WHEN bool_or(a.agg_func = 'average') THEN 'discrete'
+                  END AS semantic
+             FROM aggregate_series a
+             JOIN sample_types st ON st.type_id = a.type_id
+            WHERE st.identifier = ANY($1::text[])
+            GROUP BY a.type_id
+           HAVING bool_or(a.agg_func IN ('sum', 'average'))
+         ),
+         canonical_agg AS (
+           SELECT s.type_id,
+                  b.user_id,
+                  (b.bucket_start AT TIME ZONE $4::text)::date AS day,
+                  b.value,
+                  row_number() OVER (
+                    PARTITION BY s.type_id,
+                                 b.user_id,
+                                 (b.bucket_start AT TIME ZONE $4::text)::date
+                    ORDER BY b.updated_at DESC, b.bucket_start DESC
+                  ) AS preference
+             FROM aggregate_samples b
+             JOIN aggregate_series s USING (series_id)
+             JOIN type_semantics ts USING (type_id)
+            WHERE b.value IS NOT NULL
+              AND s.interval_value = 1
+              AND s.interval_unit = 'day'
+              AND s.device_filter = 'all'
+              AND (
+                (ts.semantic = 'cumulative' AND s.agg_func = 'sum')
+                OR
+                (ts.semantic = 'discrete' AND s.agg_func = 'average')
+              )
+              AND b.user_id = $3::uuid
+              AND b.bucket_start >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
+         ),
+         agg_daily AS (
+           SELECT type_id, user_id, day, value
+             FROM canonical_agg
+            WHERE preference = 1
+         ),
+         rollup_src AS (
+           SELECT r.type_id,
+                  r.user_id,
+                  r.source_id,
+                  ts.semantic,
+                  (r.bucket AT TIME ZONE $4::text)::date AS day,
+                  CASE
+                    WHEN ts.semantic = 'cumulative'
+                      THEN sum(r.sum_value)
+                    ELSE
+                      sum(r.avg_value * r.n)
+                      / NULLIF(sum(r.n), 0)
+                  END AS value,
+                  sum(r.n) AS n
+             FROM quantity_rollups r
+             JOIN type_semantics ts USING (type_id)
+            WHERE r.user_id = $3::uuid
+              AND r.bucket >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
+            GROUP BY r.type_id,
+                     r.user_id,
+                     r.source_id,
+                     ts.semantic,
+                     day
+         ),
+         rollup_daily AS (
+           SELECT type_id,
+                  user_id,
+                  day,
+                  CASE
+                    WHEN semantic = 'cumulative'
+                      THEN (array_agg(value ORDER BY value DESC))[1]
+                    ELSE
+                      sum(value * n) / NULLIF(sum(n), 0)
+                  END AS value
+             FROM rollup_src
+            GROUP BY type_id, user_id, day, semantic
+         ),
+         daily AS (
+           SELECT COALESCE(a.type_id, r.type_id) AS type_id,
+                  COALESCE(a.user_id, r.user_id) AS user_id,
+                  COALESCE(a.day, r.day) AS day,
+                  COALESCE(a.value, r.value) AS value
+             FROM agg_daily a
+             FULL JOIN rollup_daily r
+               ON a.type_id = r.type_id
+              AND a.user_id = r.user_id
+              AND a.day = r.day
+         )
+         SELECT st.identifier,
+                d.value::float8 AS value
+           FROM daily d
+           JOIN sample_types st ON st.type_id = d.type_id
+          ORDER BY st.identifier, d.day`,
+        [identifiers, days, userId, timeZone],
       );
+
+      const byId = new Map<string, number[]>();
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
         byId.set(r.identifier, arr);
       }
+
+      for (const id of identifiers) {
+        out.set(id, byId.get(id) ?? []);
+      }
+      return out;
     }
 
-    // Cumulative raw data: one source per local day to avoid Watch + phone
-    // double counts. Discrete readings remain a cross-source average.
+    // If the database timezone differs from the viewer timezone, do not use
+    // metric_daily/canonical aggregate days. Fall back to raw local buckets,
+    // preserving the original semantics.
+    const byId = new Map<string, number[]>();
+    const rawCumIds = identifiers.filter((id) => defaultAgg(id) === "sum");
+    const rawDiscIds = identifiers.filter((id) => defaultAgg(id) === "avg");
+
     if (rawCumIds.length) {
       const rows = await query<{ identifier: string; value: number }>(
         `WITH per_source AS (
@@ -682,7 +1053,10 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
              JOIN sample_types st ON st.type_id = q.type_id
             WHERE st.identifier = ANY($1::text[])
               AND q.user_id = $3::uuid
-              AND q.start_ts >= (((now() AT TIME ZONE $4::text)::date - $2::int) AT TIME ZONE $4::text)
+              AND q.start_ts >= (
+                (((now() AT TIME ZONE $4::text)::date - $2::int)
+                  AT TIME ZONE $4::text)
+              )
             GROUP BY st.identifier, day, q.source_id
          )
          SELECT identifier, max(value)::float8 AS value
@@ -691,6 +1065,7 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
           ORDER BY identifier, day`,
         [rawCumIds, days, userId, timeZone],
       );
+
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
@@ -700,16 +1075,23 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
 
     if (rawDiscIds.length) {
       const rows = await query<{ identifier: string; value: number }>(
-        `SELECT st.identifier, avg(q.value)::float8 AS value
+        `SELECT st.identifier,
+                avg(q.value)::float8 AS value
            FROM quantity_samples q
            JOIN sample_types st ON st.type_id = q.type_id
           WHERE st.identifier = ANY($1::text[])
             AND q.user_id = $3::uuid
-            AND q.start_ts >= (((now() AT TIME ZONE $4::text)::date - $2::int) AT TIME ZONE $4::text)
-          GROUP BY st.identifier, time_bucket('1 day', q.start_ts, $4::text)
-          ORDER BY st.identifier, time_bucket('1 day', q.start_ts, $4::text)`,
+            AND q.start_ts >= (
+              (((now() AT TIME ZONE $4::text)::date - $2::int)
+                AT TIME ZONE $4::text)
+            )
+          GROUP BY st.identifier,
+                   time_bucket('1 day', q.start_ts, $4::text)
+          ORDER BY st.identifier,
+                   time_bucket('1 day', q.start_ts, $4::text)`,
         [rawDiscIds, days, userId, timeZone],
       );
+
       for (const r of rows) {
         const arr = byId.get(r.identifier) ?? [];
         arr.push(Number(r.value) || 0);
@@ -717,19 +1099,127 @@ export async function getDailySparklines(userId: string, identifiers: string[], 
       }
     }
 
-    for (const id of identifiers) out.set(id, byId.get(id) ?? []);
+    for (const id of identifiers) {
+      out.set(id, byId.get(id) ?? []);
+    }
+
     return out;
   } catch (e) {
     console.error("[queries] getDailySparklines failed:", e);
     if (ALLOW_DEMO) {
       for (const id of identifiers) {
-        out.set(id, demoSeries(id, "M").points.slice(-days).map((p) => p.value));
+        out.set(
+          id,
+          demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+        );
       }
     }
     return out;
   }
 }
 
+// ── sleep stages ──────────────────────────────────────────────────────────
+// Sleep is category interval data, not a numeric quantity. Attribute each
+// sample to the local wake-up day (18:00 boundary), aggregate per source,
+// then choose one source per day so iPhone + Watch + third-party records are
+// not added together. This mirrors the server's /v1/sleep/daily semantics.
+// ── sleep stages ──────────────────────────────────────────────────────────
+// Attribute each sleep sample to the local wake-up day (18:00 boundary),
+// choose one source per night, then average those nights into the requested
+// chart bucket. Long-range resolution matches the main metric charts.
+export async function getSleepHistory(userId: string, days = 14, bucket = "1 day"): Promise<SleepDay[]> {
+  const empty: SleepDay[] = [];
+  if (days < 0) return empty;
+
+  const src = await source();
+  if (src !== "live") return empty;
+
+  try {
+    const timeZone = configuredTimeZone();
+    const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
+    const params = [userId, timeZone, days, bucket];
+    const rows = await query<{
+      date: string;
+      asleep_minutes: number;
+      in_bed_minutes: number;
+      core_minutes: number;
+      deep_minutes: number;
+      rem_minutes: number;
+      unspecified_minutes: number;
+      awake_minutes: number;
+      nights: number;
+    }>(
+      `WITH per_source AS (
+         SELECT
+           ((c.start_ts + interval '6 hours') AT TIME ZONE $2::text)::date AS day,
+           COALESCE(c.source_id, 0) AS source_id,
+           sum(CASE WHEN cl.enum_name IN ('HKCategoryValueSleepAnalysisAsleepUnspecified', 'HKCategoryValueSleepAnalysisAsleepCore', 'HKCategoryValueSleepAnalysisAsleepDeep', 'HKCategoryValueSleepAnalysisAsleepREM') THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS asleep_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisInBed' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS in_bed_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepCore' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS core_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepDeep' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepREM' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepUnspecified' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
+         FROM category_samples c
+         JOIN sample_types st ON st.type_id = c.type_id
+         JOIN category_labels cl ON cl.type_identifier = st.identifier AND cl.value = c.value
+        WHERE st.identifier = 'HKCategoryTypeIdentifierSleepAnalysis'
+          AND c.user_id = $1::uuid
+          ${dateFilter}
+          AND c.start_ts < (((now() AT TIME ZONE $2::text)::date + 1)::timestamp AT TIME ZONE $2::text)
+        GROUP BY 1, 2
+      ),
+      ranked AS (
+        SELECT *,
+               row_number() OVER (PARTITION BY day ORDER BY asleep_minutes DESC, (core_minutes + deep_minutes + rem_minutes) DESC, source_id) AS rn,
+               max(in_bed_minutes) OVER (PARTITION BY day) AS max_in_bed
+          FROM per_source
+      ),
+      daily AS (
+        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+          FROM ranked
+         WHERE rn = 1
+      ),
+      bucketed AS (
+        SELECT time_bucket($4::interval, day::timestamp)::date AS bucket_date,
+               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+          FROM daily
+      )
+      SELECT bucket_date::text AS date,
+             avg(asleep_minutes)::float8 AS asleep_minutes,
+             avg(in_bed_minutes)::float8 AS in_bed_minutes,
+             avg(core_minutes)::float8 AS core_minutes,
+             avg(deep_minutes)::float8 AS deep_minutes,
+             avg(rem_minutes)::float8 AS rem_minutes,
+             avg(unspecified_minutes)::float8 AS unspecified_minutes,
+             avg(awake_minutes)::float8 AS awake_minutes,
+             count(*)::int AS nights
+        FROM bucketed
+       GROUP BY bucket_date
+       ORDER BY bucket_date DESC`
+      , params,
+    );
+
+    return rows.map((r) => ({
+      date: r.date,
+      asleepMinutes: Number(r.asleep_minutes) || 0,
+      inBedMinutes: Number(r.in_bed_minutes) || 0,
+      coreMinutes: Number(r.core_minutes) || 0,
+      deepMinutes: Number(r.deep_minutes) || 0,
+      remMinutes: Number(r.rem_minutes) || 0,
+      unspecifiedMinutes: Number(r.unspecified_minutes) || 0,
+      awakeMinutes: Number(r.awake_minutes) || 0,
+      nights: Number(r.nights) || 1,
+    }));
+  } catch (e) {
+    console.error("[queries] getSleepHistory failed:", e);
+    return empty;
+  }
+}
+
+export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
+  return getSleepHistory(userId, days, "1 day");
+}
 // ── workouts ─────────────────────────────────────────────────────────────
 export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]> {
   const src = await source();
