@@ -822,42 +822,20 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
     try {
       const rows = await q<{ identifier: string; rows: string; earliest: string | null; latest: string | null }>(
       `WITH quantity_stats AS (
-         SELECT r.type_id,
-                SUM(r.n)::bigint AS rows
-           FROM quantity_rollups r
-          WHERE r.user_id = $1::uuid
-          GROUP BY r.type_id
-       ),
-       quantity_times AS (
-         SELECT st.type_id,
-                first_sample.start_ts AS earliest,
-                latest_sample.start_ts AS latest
-           FROM sample_types st
-           JOIN quantity_stats qs ON qs.type_id = st.type_id
-           CROSS JOIN LATERAL (
-             SELECT q.start_ts
-               FROM quantity_samples q
-              WHERE q.type_id = st.type_id
-                AND q.user_id = $1::uuid
-              ORDER BY q.start_ts ASC
-              LIMIT 1
-           ) first_sample
-           CROSS JOIN LATERAL (
-             SELECT q.start_ts
-               FROM quantity_samples q
-              WHERE q.type_id = st.type_id
-                AND q.user_id = $1::uuid
-              ORDER BY q.start_ts DESC
-              LIMIT 1
-           ) latest_sample
+         SELECT q.type_id,
+                count(*)::bigint AS rows,
+                (extract(epoch from min(q.start_ts)) * 1000)::bigint AS earliest,
+                (extract(epoch from max(q.start_ts)) * 1000)::bigint AS latest
+           FROM quantity_samples q
+          WHERE q.user_id = $1::uuid
+          GROUP BY q.type_id
        )
        SELECT st.identifier,
               qs.rows,
-              (extract(epoch from qt.earliest) * 1000)::bigint AS earliest,
-              (extract(epoch from qt.latest) * 1000)::bigint AS latest
+              qs.earliest,
+              qs.latest
          FROM quantity_stats qs
          JOIN sample_types st ON st.type_id = qs.type_id
-         JOIN quantity_times qt ON qt.type_id = qs.type_id
 
        UNION ALL
 
