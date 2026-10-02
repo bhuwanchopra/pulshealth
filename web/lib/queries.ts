@@ -399,7 +399,19 @@ export async function getSeries(
     // millions of raw HealthKit samples.
     const aggregateInterval = bucketMs < DAY_MS ? "hour" : "day";
 
-    const aggregateSeries = await q<{
+    let aggregateSeries: {
+      series_id: number;
+      agg_func: string;
+      interval_value: number;
+      interval_unit: string;
+    }[] = [];
+
+    // In accounts mode, the web_app role intentionally has no direct grant on
+    // aggregate_series. Day-or-coarser charts can use metric_daily instead;
+    // skip the shared aggregate catalog in that case and fall through to the
+    // existing metric_daily path below.
+    if (!(dailyUsable && bucketMs >= DAY_MS)) {
+      aggregateSeries = await q<{
       series_id: number;
       agg_func: string;
       interval_value: number;
@@ -420,6 +432,7 @@ export async function getSeries(
         LIMIT 1`,
       [identifier, aggregateFunc, aggregateInterval],
     );
+    }
 
     if (aggregateSeries.length) {
       const seriesId = aggregateSeries[0].series_id;
