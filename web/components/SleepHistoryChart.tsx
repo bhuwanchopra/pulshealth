@@ -8,6 +8,14 @@ const STAGES = [
   { key: "awakeMinutes", label: "Awake", color: "rgb(251 191 36)" },
 ] as const;
 
+const STACKED_STAGES = [
+  STAGES[0],
+  STAGES[1],
+  STAGES[2],
+  STAGES[3],
+  STAGES[4],
+] as const;
+
 function hoursAndMinutes(minutes: number): string {
   const total = Math.max(0, Math.round(minutes));
   const hours = Math.floor(total / 60);
@@ -22,8 +30,6 @@ export function SleepHistoryChart({
   nights: SleepDay[];
   interval: string;
 }) {
-  // Keep the chart's time direction consistent with the other metric charts:
-  // oldest on the left, latest on the right.
   const displayNights = [...nights].reverse();
 
   const maxMinutes = Math.max(
@@ -47,9 +53,9 @@ export function SleepHistoryChart({
     (_, index) => index * axisStep,
   ).filter((minutes) => minutes <= axisMax);
   const chartHeight = 260;
-  // Match the other metric charts: bars always fill the available plot width.
-  // Do not introduce horizontal scrolling as the history range grows.
-  const gap = displayNights.length > 90 ? 2 : displayNights.length > 30 ? 4 : 7;
+  // Bars use equal-width slots. Visual spacing is implemented inside each slot
+  // so the total-sleep line can use the exact same centers at every range.
+  const barInset = displayNights.length > 90 ? 1 : displayNights.length > 30 ? 2 : 3;
   const labelCount = Math.min(6, displayNights.length);
   const labelStep = Math.max(1, Math.ceil(Math.max(0, displayNights.length - 1) / Math.max(1, labelCount - 1)));
   const labelIndexes = new Set<number>();
@@ -78,6 +84,10 @@ export function SleepHistoryChart({
             {stage.label}
           </div>
         ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden="true" style={{ width: 14, height: 2, borderRadius: 2, background: "var(--fg)" }} />
+          Total sleep
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0, 1fr)", gap: 10, marginTop: 18 }}>
@@ -105,12 +115,76 @@ export function SleepHistoryChart({
                 height: chartHeight,
                 display: "flex",
                 alignItems: "flex-end",
-                gap,
                 padding: "0 2px",
                 backgroundImage: `linear-gradient(to top, transparent calc(100% - 1px), var(--border) calc(100% - 1px))`,
                 backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
               }}
             >
+              {displayNights.length > 0 && (
+                <svg
+                  aria-label="Total sleep duration"
+                  role="img"
+                  viewBox={`0 0 ${displayNights.length} ${chartHeight}`}
+                  preserveAspectRatio="none"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                    overflow: "visible",
+                  }}
+                >
+                  <polyline
+                    fill="none"
+                    stroke="var(--fg)"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points={displayNights
+                      .map((night, index) => {
+                        const x = index + 0.5;
+                        const totalSleep =
+                          night.coreMinutes +
+                          night.deepMinutes +
+                          night.remMinutes +
+                          night.unspecifiedMinutes;
+                        const y =
+                          chartHeight -
+                          (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                            chartHeight;
+                        return `${x},${y}`;
+                      })
+                      .join(" ")}
+                  />
+                  {displayNights.map((night, index) => {
+                    const x = index + 0.5;
+                    const totalSleep =
+                      night.coreMinutes +
+                      night.deepMinutes +
+                      night.remMinutes +
+                      night.unspecifiedMinutes;
+                    const y =
+                      chartHeight -
+                      (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                        chartHeight;
+                    return (
+                      <circle
+                        key={night.date}
+                        cx={x}
+                        cy={y}
+                        r="2.5"
+                        fill="var(--fg)"
+                        stroke="var(--bg)"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    );
+                  })}
+                </svg>
+              )}
+
               {displayNights.map((night) => {
                 const inBed = Math.max(0, night.inBedMinutes);
                 const stageTotal =
@@ -130,31 +204,44 @@ export function SleepHistoryChart({
                       height: Math.max(2, barHeight),
                       flex: "1 1 0",
                       minWidth: 2,
+                      padding: `0 ${barInset}px`,
+                      boxSizing: "border-box",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "flex-end",
-                      overflow: "hidden",
-                      borderRadius: "5px 5px 2px 2px",
-                      background: "var(--border)",
+                      overflow: "visible",
                     }}
-                    title={`${formatSleepPeriodLabel(night.date, interval)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
                   >
-                    {STAGES.map((stage) => {
-                      const minutes = Math.max(0, night[stage.key]);
-                      if (!minutes) return null;
-                      return (
-                        <div
-                          key={stage.key}
-                          style={{
-                            height: `${Math.min(minutes, axisMax) / axisMax * chartHeight}px`,
-                            minHeight: 1,
-                            background: stage.color,
-                            flex: "0 0 auto",
-                          }}
-                          title={`${formatSleepPeriodLabel(night.date, interval)} — ${stage.label}: ${hoursAndMinutes(minutes)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"}`}
-                        />
-                      );
-                    })}
+                    <div
+                      title={`${formatSleepPeriodLabel(night.date, interval)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"} · ${hoursAndMinutes(night.asleepMinutes)} asleep · ${hoursAndMinutes(night.inBedMinutes)} in bed`}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-end",
+                        overflow: "hidden",
+                        borderRadius: "5px 5px 2px 2px",
+                        background: "var(--border)",
+                      }}
+                    >
+                      {STACKED_STAGES.map((stage) => {
+                        const minutes = Math.max(0, night[stage.key]);
+                        if (!minutes) return null;
+                        return (
+                          <div
+                            key={stage.key}
+                            style={{
+                              height: `${Math.min(minutes, axisMax) / axisMax * chartHeight}px`,
+                              minHeight: 1,
+                              background: stage.color,
+                              flex: "0 0 auto",
+                            }}
+                            title={`${formatSleepPeriodLabel(night.date, interval)} — ${stage.label}: ${hoursAndMinutes(minutes)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"}`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
@@ -163,7 +250,6 @@ export function SleepHistoryChart({
             <div
               style={{
                 display: "flex",
-                gap,
                 padding: "8px 2px 0",
                 borderTop: "1px solid var(--border)",
               }}
@@ -175,6 +261,8 @@ export function SleepHistoryChart({
                     width: 0,
                     flex: "1 1 0",
                     minWidth: 2,
+                    padding: `0 ${barInset}px`,
+                    boxSizing: "border-box",
                     textAlign: "center",
                     color: "var(--muted)",
                     fontSize: 10,
