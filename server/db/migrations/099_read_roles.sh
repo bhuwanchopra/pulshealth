@@ -1107,6 +1107,7 @@ BEGIN
     FROM pg_class c
     WHERE c.relnamespace = 'web'::regnamespace
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND c.relname <> 'aggregate_series'
       AND (c.relkind <> 'v'
            OR NOT coalesce(c.reloptions @> ARRAY['security_barrier=true'], false)
            OR pg_get_viewdef(c.oid) NOT LIKE '%puls_viewer_user()%')
