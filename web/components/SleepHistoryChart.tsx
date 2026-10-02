@@ -115,17 +115,19 @@ export function SleepHistoryChart({
                 backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
               }}
             >
-
               {displayNights.length > 0 && (
                 <svg
                   aria-label="Total sleep duration"
                   role="img"
-                  viewBox={`0 0 100 ${chartHeight}`}
+                  viewBox={`0 0 ${displayNights.length} ${chartHeight}`}
                   preserveAspectRatio="none"
                   style={{
                     position: "absolute",
-                    inset: 0,
-                    width: "100%",
+                    top: 0,
+                    bottom: 0,
+                    left: 2,
+                    right: 2,
+                    width: "auto",
                     height: "100%",
                     pointerEvents: "none",
                     overflow: "visible",
@@ -134,36 +136,23 @@ export function SleepHistoryChart({
                   <polyline
                     fill="none"
                     stroke="var(--fg)"
-                    strokeWidth="1.5"
+                    strokeWidth="1"
                     vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={displayNights
                       .map((night, index) => {
-                        const x = displayNights.length === 1
-                          ? 50
-                          : (index / (displayNights.length - 1)) * 100;
-                        const y = chartHeight - (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) * chartHeight;
+                        // The SVG uses one unit per bar slot, so x=index+0.5
+                        // is the actual center of that bar, including flex gaps.
+                        const x = index + 0.5;
+                        const y =
+                          chartHeight -
+                          (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) *
+                            chartHeight;
                         return `${x},${y}`;
                       })
                       .join(" ")}
                   />
-                  {displayNights.length <= 90 && displayNights.map((night, index) => {
-                    const x = displayNights.length === 1
-                      ? 50
-                      : (index / (displayNights.length - 1)) * 100;
-                    const y = chartHeight - (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) * chartHeight;
-                    return (
-                      <circle
-                        key={night.date}
-                        cx={x}
-                        cy={y}
-                        r="2"
-                        vectorEffect="non-scaling-stroke"
-                        fill="var(--fg)"
-                      />
-                    );
-                  })}
                 </svg>
               )}
 
