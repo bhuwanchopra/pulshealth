@@ -78,6 +78,10 @@ export function SleepHistoryChart({
             {stage.label}
           </div>
         ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden="true" style={{ width: 14, height: 2, borderRadius: 2, background: "var(--fg)" }} />
+          Total sleep
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0, 1fr)", gap: 10, marginTop: 18 }}>
@@ -111,6 +115,56 @@ export function SleepHistoryChart({
                 backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
               }}
             >
+
+              {displayNights.length > 0 && (
+                <svg
+                  aria-label="Total sleep duration"
+                  role="img"
+                  viewBox={`0 0 100 ${chartHeight}`}
+                  preserveAspectRatio="none"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                    overflow: "visible",
+                  }}
+                >
+                  <polyline
+                    fill="none"
+                    stroke="var(--fg)"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points={displayNights
+                      .map((night, index) => {
+                        const x = displayNights.length === 1
+                          ? 50
+                          : (index / (displayNights.length - 1)) * 100;
+                        const y = chartHeight - (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) * chartHeight;
+                        return `${x},${y}`;
+                      })
+                      .join(" ")}
+                  />
+                  {displayNights.length <= 90 && displayNights.map((night, index) => {
+                    const x = displayNights.length === 1
+                      ? 50
+                      : (index / (displayNights.length - 1)) * 100;
+                    const y = chartHeight - (Math.min(axisMax, Math.max(0, night.asleepMinutes)) / axisMax) * chartHeight;
+                    return (
+                      <circle
+                        key={night.date}
+                        cx={x}
+                        cy={y}
+                        r="1.5"
+                        fill="var(--fg)"
+                      />
+                    );
+                  })}
+                </svg>
+              )}
+
               {displayNights.map((night) => {
                 const inBed = Math.max(0, night.inBedMinutes);
                 const stageTotal =
