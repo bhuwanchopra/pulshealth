@@ -104,7 +104,7 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: site
         run: |
-          # site/ ships js-yaml as a production dependency — it parses all 177
+          # site/ ships js-yaml as a production dependency — it parses all 178
           # knowledge-base files — and was previously audited nowhere.
           bun install --frozen-lockfile
           bun audit --audit-level=high

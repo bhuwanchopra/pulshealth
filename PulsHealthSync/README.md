@@ -115,7 +115,7 @@ Sources/PulsHealthSync/
 │   │                                detail structs), SyncDeletion, RoutePayload,
 │   │                                AggregateSampleRow, ActivitySummaryRow, SyncBatch,
 │   │                                SyncReason.
-│   └── HealthTypeCatalog.swift      Registry of 80 HealthKit types: display name, kind,
+│   └── HealthTypeCatalog.swift      Registry of 81 HealthKit types: display name, kind,
 │                                    canonical unit, group, est. samples/day (for ETA),
 │                                    minimum iOS. `definitions` is the full list on any
 │                                    runtime; `all` is what this OS exposes. The source
@@ -453,7 +453,7 @@ Function legality is the sharp edge: HealthKit raises an uncatchable
 NSInvalidArgumentException at query *execution* for illegal option×type combos.
 `HealthTypeCatalog.allowedAggregateFunctions(for:)` (cumulative → sum/mostRecent/
 duration; any discrete style → average/min/max/mostRecent/duration) is enforced
-in the UI and re-checked in the engine, and verified against all 372 combos by
+in the UI and re-checked in the engine, and verified against all 378 combos by
 the app-hosted `AggregateMatrixTests`.
 
 ## Limited history access (iOS 27)

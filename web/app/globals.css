@@ -377,6 +377,9 @@ button {
 /* ── range selector / segmented control ────────────────────────────────── */
 .segmented {
   display: inline-flex;
+  /* Nine ranges do not fit a phone's width in one row. */
+  flex-wrap: wrap;
+  max-width: 100%;
   padding: 3px;
   gap: 2px;
   border-radius: 11px;

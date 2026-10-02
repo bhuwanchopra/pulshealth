@@ -41,6 +41,7 @@ export function RouteMap({
       subdomains: spec.subdomains ?? "abc",
       attribution: spec.attribution,
       maxZoom: spec.maxZoom,
+      maxNativeZoom: spec.maxNativeZoom,
     }).addTo(map);
     tileRef.current.bringToBack();
   }, []);

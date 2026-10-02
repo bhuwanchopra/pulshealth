@@ -8,12 +8,12 @@ import { KnowledgeBaseSearch } from "@/components/knowledge-base-search";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "HealthKit Knowledge Base - 177 Apple Health Data Types",
-  description: "The missing manual for Apple Health data. Comprehensive reference for all 177 HealthKit data types with clinical ranges, sampling rates, and technical details. Built for AI agents, developers, and researchers.",
+  title: "HealthKit Knowledge Base - 178 Apple Health Data Types",
+  description: "The missing manual for Apple Health data. Comprehensive reference for all 178 HealthKit data types with clinical ranges, sampling rates, and technical details. Built for AI agents, developers, and researchers.",
   robots: "index, follow, noai, noimageai",
   openGraph: {
-    title: "HealthKit Knowledge Base - 177 Apple Health Data Types",
-    description: "The missing manual for Apple Health data. Comprehensive reference for all 177 HealthKit data types with clinical ranges, sampling rates, and technical details.",
+    title: "HealthKit Knowledge Base - 178 Apple Health Data Types",
+    description: "The missing manual for Apple Health data. Comprehensive reference for all 178 HealthKit data types with clinical ranges, sampling rates, and technical details.",
     images: [{ url: '/og-default.png', width: 1200, height: 600 }],
   },
   alternates: {
@@ -50,7 +50,7 @@ export default async function KnowledgeBasePage() {
           </h1>
 
           <p className="text-lg md:text-xl text-zinc-500 max-w-2xl leading-relaxed">
-            A comprehensive reference for all 177 HealthKit data types — sampling rates, typical ranges, cross-device comparisons, compaction policies.
+            A comprehensive reference for all 178 HealthKit data types — sampling rates, typical ranges, cross-device comparisons, compaction policies.
             Designed for AI agents, developers, clinicians, and researchers.
           </p>
 

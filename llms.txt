@@ -41,7 +41,7 @@ Dates on the wire are epoch milliseconds; every quantity type has one canonical 
 - [PulsHealthSync/README.md](PulsHealthSync/README.md): the Swift sync package — architecture, wire format and performance numbers.
 - [PulsHealth/README.md](PulsHealth/README.md): the iOS app.
 - [site/README.md](site/README.md): the marketing site behind pulshealth.com — a Next.js static export built with bun, distinct from the self-hosted viewer in `web/`.
-- [knowledge-base/README.md](knowledge-base/README.md): the 177 YAML files behind the site's HealthKit type pages — clinical prose, ranges and sources, one per type.
+- [knowledge-base/README.md](knowledge-base/README.md): the 178 YAML files behind the site's HealthKit type pages — clinical prose, ranges and sources, one per type.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability, which versions are supported, and the design properties to know about.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each release of the server stack, and which versions are tracked elsewhere.
 - [docs/roadmap.md](docs/roadmap.md): what is still outstanding, in the order worth doing it, with the requirement IDs from the plan behind it, and what was decided against.

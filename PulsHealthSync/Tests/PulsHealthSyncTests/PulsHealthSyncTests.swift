@@ -32,7 +32,7 @@ import Testing
             #expect(descriptor.sampleType == nil)
         }
         #expect(HealthTypeCatalog.definitions.filter { $0.minimumIOS < .baseline }.isEmpty)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 27.0, *) {
             #expect(HealthTypeCatalog.all.count == HealthTypeCatalog.definitions.count)
         }
     }
@@ -47,10 +47,17 @@ import Testing
             #expect(HKCategoryTypeIdentifier.sleepApneaEvent.rawValue
                 == HealthTypeCatalog.sleepApneaEventIdentifier)
         }
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            #expect(HKQuantityTypeIdentifier.heartRateVariabilityRMSSD.rawValue
+                == HealthTypeCatalog.heartRateVariabilityRMSSDIdentifier)
+        }
+        #endif
         for descriptor in HealthTypeCatalog.definitions where descriptor.minimumIOS > .baseline {
             #expect(
                 [HealthTypeCatalog.sleepApneaEventIdentifier, HealthTypeCatalog.stateOfMindIdentifier,
-                 HealthTypeCatalog.medicationDoseIdentifier].contains(descriptor.identifier),
+                 HealthTypeCatalog.medicationDoseIdentifier,
+                 HealthTypeCatalog.heartRateVariabilityRMSSDIdentifier].contains(descriptor.identifier),
                 "\(descriptor.identifier) is gated above iOS \(HealthTypeDescriptor.IOSVersion.baseline); pin it here")
         }
     }

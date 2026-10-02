@@ -9,7 +9,6 @@ export type MapStyleId =
   | "auto"
   | "dark"
   | "light"
-  | "voyager"
   | "osm"
   | "satellite"
   | "terrain";
@@ -19,6 +18,9 @@ export interface TileSpec {
   subdomains?: string;
   attribution: string;
   maxZoom: number;
+  // The deepest level the server has real tiles for, when that is short of
+  // maxZoom; Leaflet scales those tiles up for the levels beyond.
+  maxNativeZoom?: number;
 }
 
 export interface MapStyle {
@@ -33,27 +35,24 @@ export interface MapStyle {
 
 const OSM_ATTR =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const CARTO_ATTR = `${OSM_ATTR} &copy; <a href="https://carto.com/attributions">CARTO</a>`;
+const ESRI_CANVAS_ATTR = `Tiles &copy; Esri — Esri, HERE, Garmin, ${OSM_ATTR}`;
 
-const CARTO_DARK: TileSpec = {
-  url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  subdomains: "abcd",
-  attribution: CARTO_ATTR,
-  maxZoom: 20,
+// Esri's Canvas basemaps: muted greys, so the route line carries the colour.
+// They replace CARTO's Dark Matter and Positron, which have answered every
+// keyless request with an "API KEY REQUIRED" tile since September 2026. Real
+// tiles stop at level 16 (deeper ones read "Map data not yet available").
+const ESRI_DARK_GRAY: TileSpec = {
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  attribution: ESRI_CANVAS_ATTR,
+  maxZoom: 19,
+  maxNativeZoom: 16,
 };
 
-const CARTO_LIGHT: TileSpec = {
-  url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  subdomains: "abcd",
-  attribution: CARTO_ATTR,
-  maxZoom: 20,
-};
-
-const CARTO_VOYAGER: TileSpec = {
-  url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  subdomains: "abcd",
-  attribution: CARTO_ATTR,
-  maxZoom: 20,
+const ESRI_LIGHT_GRAY: TileSpec = {
+  url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+  attribution: ESRI_CANVAS_ATTR,
+  maxZoom: 19,
+  maxNativeZoom: 16,
 };
 
 const OSM: TileSpec = {
@@ -76,35 +75,29 @@ const TERRAIN: TileSpec = {
   maxZoom: 17,
 };
 
-// Display order in the settings picker.
+// Display order in the settings picker. CARTO Voyager ("voyager") left with
+// CARTO's keyless tiles; a browser that saved it reads back as the default.
 export const MAP_STYLES: MapStyle[] = [
   {
     id: "auto",
     label: "Auto",
     description: "Matches the app theme — dark map in dark mode, light in light mode.",
     spec: null,
-    swatch: "linear-gradient(135deg, #14161b 0 50%, #e9ebee 50% 100%)",
+    swatch: "linear-gradient(135deg, #4d4d4f 0 50%, #ebebeb 50% 100%)",
   },
   {
     id: "dark",
     label: "Dark",
-    description: "CARTO Dark Matter — minimal, low-glare basemap.",
-    spec: CARTO_DARK,
-    swatch: "#14161b",
+    description: "Esri Dark Gray Canvas — minimal, low-glare basemap.",
+    spec: ESRI_DARK_GRAY,
+    swatch: "#4d4d4f",
   },
   {
     id: "light",
     label: "Light",
-    description: "CARTO Positron — clean, pale basemap.",
-    spec: CARTO_LIGHT,
-    swatch: "#e9ebee",
-  },
-  {
-    id: "voyager",
-    label: "Voyager",
-    description: "CARTO Voyager — subtle color with street detail.",
-    spec: CARTO_VOYAGER,
-    swatch: "linear-gradient(135deg, #eae5dd, #cfe0d6)",
+    description: "Esri Light Gray Canvas — clean, pale basemap.",
+    spec: ESRI_LIGHT_GRAY,
+    swatch: "#ebebeb",
   },
   {
     id: "osm",
@@ -136,9 +129,9 @@ export const MAP_STYLE_EVENT = "puls-mapstylechange";
 
 // Resolve a style id to concrete tiles, picking dark/light for "auto".
 export function getTileSpec(id: MapStyleId, isDark: boolean): TileSpec {
-  if (id === "auto") return isDark ? CARTO_DARK : CARTO_LIGHT;
+  if (id === "auto") return isDark ? ESRI_DARK_GRAY : ESRI_LIGHT_GRAY;
   const found = MAP_STYLES.find((s) => s.id === id);
-  return found?.spec ?? (isDark ? CARTO_DARK : CARTO_LIGHT);
+  return found?.spec ?? (isDark ? ESRI_DARK_GRAY : ESRI_LIGHT_GRAY);
 }
 
 export function readMapStyle(): MapStyleId {

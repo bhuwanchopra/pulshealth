@@ -102,7 +102,7 @@ ones:
 | ActiveEnergyBurned, BasalEnergyBurned, DietaryEnergyConsumed | `kcal` |
 | AppleExerciseTime, AppleStandTime, AppleMoveTime, TimeInDaylight | `min` |
 | BodyMass, LeanBodyMass | `kg` |
-| HeartRateVariabilitySDNN, RunningGroundContactTime | `ms` |
+| HeartRateVariabilitySDNN, HeartRateVariabilityRMSSD, RunningGroundContactTime | `ms` |
 | OxygenSaturation, BodyFatPercentage, WalkingAsymmetryPercentage | `%` — **a fraction**: 0.97 means 97 % |
 | VO2Max | `ml/kg*min` |
 | BodyTemperature, AppleSleepingWristTemperature | `degC` |

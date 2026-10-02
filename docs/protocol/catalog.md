@@ -53,9 +53,12 @@ The rendering runtime matters in one way. `aggregationStyle` and
 `allowedAggregateFunctions` are read from HealthKit at render time (the app
 derives the legal function set from `HKQuantityType.aggregationStyle` — see the
 gotchas in `CLAUDE.md`), so a **quantity** type gated above the simulator that
-renders the file cannot be published until the test runs on that iOS; the
-test says so. Every other fact, including `minimumIOS`, is declared in the
-catalog and renders identically on any runtime.
+renders the file cannot be published until the test runs on that iOS. Today
+that is HRV RMSSD (iOS 27): regenerate on an iOS 27 simulator. On an older
+runtime the three rendering tests are skipped (CI's Xcode 27 job runs them),
+and a `PULS_WRITE_CATALOG=1` run fails naming the runtime it needs. Every
+other fact, including `minimumIOS`, is declared in the catalog and renders
+identically on any runtime.
 
 ## Layout
 

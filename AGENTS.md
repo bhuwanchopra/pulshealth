@@ -34,7 +34,7 @@ the self-hosted backend is pre-release.
 | `server/backup/` | The opt-in `backup` Compose profile: scheduled `pg_dump`s and the restore drill | `server/README.md` |
 | `web/` | Next.js viewer, reads Postgres directly. **Not** `site/` | `web/README.md` |
 | `site/` | Next.js static export behind **pulshealth.com**: marketing pages, blog, knowledge-base viewer. Built with **bun**, not npm | `site/README.md` |
-| `knowledge-base/`, `blog/` | The site's content: 177 YAML HealthKit type files and the MDX posts with their images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
+| `knowledge-base/`, `blog/` | The site's content: 178 YAML HealthKit type files and the MDX posts with their images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
 | `docs/protocol/` | The Puls Sync Protocol v1 spec, JSON Schemas, fixtures | `docs/protocol/README.md` |
 | `tools/protocol-check/` | Validates a batch against the schemas | `docs/protocol/README.md` |
 | `tools/puls-export/` | CLI for `GET /v1/export` | `docs/export.md` |

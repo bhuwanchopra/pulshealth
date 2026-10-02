@@ -2646,6 +2646,19 @@
       "unit": "count/min"
     }
   },
+  "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD": {
+    "category_values": null,
+    "default_unit": "ms",
+    "human_readable_name": "Heart Rate Variability (RMSSD)",
+    "identifier": "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD",
+    "short_description": "Measures the root mean square of successive differences between normal heartbeat intervals (RMSSD), a short-term heart rate variability metric that mainly reflects vagal (parasympathetic) activity; the Health app calls it Recovery HRV.",
+    "typical_range": {
+      "max": 100,
+      "min": 10,
+      "notes": "Covers most healthy adults at rest in short recordings: 5-minute resting means fall from about 40 ms at 25-34 to about 19 ms at 65-74 (Voss 2015), and pooled studies report a mean of 42 ms (Nunan 2010). Higher values are common in young and endurance-trained people. Values depend heavily on age, posture, time of day and breathing, so compare against the person's own baseline.",
+      "unit": "ms"
+    }
+  },
   "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": {
     "category_values": null,
     "default_unit": "ms",

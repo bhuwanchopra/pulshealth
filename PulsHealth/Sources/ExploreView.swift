@@ -24,6 +24,7 @@ enum ExploreRoute: Hashable {
 struct ExploreView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     /// Collapsed categories, by raw name, comma-joined.
     @AppStorage("explore.collapsedGroups") private var collapsedGroups = ""
     @AppStorage("explore.hidesEmptyTypes") private var hidesEmptyTypes = false
@@ -31,6 +32,7 @@ struct ExploreView: View {
 
     var body: some View {
         List {
+            searchField
             if searchText.isEmpty {
                 accessCards
                 catalog
@@ -38,10 +40,8 @@ struct ExploreView: View {
                 searchResults
             }
         }
+        .scrollDismissesKeyboard(.immediately)
         .navigationTitle("Explore")
-        .searchable(
-            text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search data types")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { optionsMenu }
         }
@@ -58,6 +58,42 @@ struct ExploreView: View {
         // The facts are read once per session; pulling re-reads them, so the
         // data-first order, Most Recent and the hidden types catch up.
         .refreshable { await model.explore.reloadQuickFacts() }
+    }
+
+    // MARK: - Search
+
+    /// The list's first row, not `.searchable`: it sits under the large title
+    /// and scrolls away with the content. A `.navigationBarDrawer` field can't
+    /// do both on iOS 27 — `.automatic` starts collapsed until a pull down,
+    /// and `.always` pins it and drops the large title — and the default
+    /// placement is the bottom toolbar.
+    private var searchField: some View {
+        Section {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField("Search data types", text: $searchText)
+                    .focused($searchFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                if !searchText.isEmpty {
+                    Button("Clear Search", systemImage: "xmark.circle.fill") { searchText = "" }
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+            .contentShape(Capsule())
+            .onTapGesture { searchFocused = true }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        }
+        .listSectionSpacing(.compact)
     }
 
     // MARK: - Cards

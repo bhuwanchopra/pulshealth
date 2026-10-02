@@ -454,7 +454,7 @@ unit; `catalog.json` is the copy to trust.
 | `WalkingSpeed`, `RunningSpeed`, `CyclingSpeed` | `m/s` |
 | `WalkingDoubleSupportPercentage`, `WalkingAsymmetryPercentage`, `AtrialFibrillationBurden`, `PeripheralPerfusionIndex`, `BodyFatPercentage`, `OxygenSaturation`, `BloodAlcoholContent` | `%` (fraction) |
 | `RunningPower`, `CyclingPower` | `W` |
-| `RunningGroundContactTime`, `HeartRateVariabilitySDNN` | `ms` |
+| `RunningGroundContactTime`, `HeartRateVariabilitySDNN`, `HeartRateVariabilityRMSSD` | `ms` |
 | `RunningVerticalOscillation` | `cm` |
 | `CyclingCadence`, `HeartRate`, `RestingHeartRate`, `WalkingHeartRateAverage`, `HeartRateRecoveryOneMinute`, `RespiratoryRate` | `count/min` |
 | `VO2Max` | `ml/kg*min` |

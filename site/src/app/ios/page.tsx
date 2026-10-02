@@ -295,7 +295,7 @@ export default function AppPage() {
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold tracking-tight mb-4">What You Can Sync</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            80 HealthKit types, grouped the way Apple Health groups them. Turn on a starter
+            81 HealthKit types, grouped the way Apple Health groups them. Turn on a starter
             set in one tap, or choose type by type. Nothing is read until you enable it and iOS
             grants permission.
           </p>

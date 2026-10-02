@@ -242,7 +242,7 @@ Sources/
                           real sync state.
 
 HostedTests/              XCTest bundle hosted in the app (HealthKit entitlement
-                          required to execute statistics queries): probes all 372
+                          required to execute statistics queries): probes all 378
                           aggregate type×function combos behind an ObjC exception
                           catcher and fails on any mismatch with the library's
                           allowedAggregateFunctions — run on every new iOS runtime.

@@ -15,7 +15,7 @@ import { cache } from "react";
 import { query } from "./db";
 import { typeByIdentifier } from "./catalog";
 import { configuredTimeZone } from "./config";
-import { defaultAgg, RANGES } from "./metrics";
+import { defaultAgg, RANGES, resolvePresetWindow } from "./metrics";
 import type { ResolvedSeriesWindow } from "./metrics";
 import {
   demoActivityRings,
@@ -262,21 +262,23 @@ export async function getSeries(
     // time_bucket($1, $from, $tz): otherwise the first day/week bucket held a
     // partial slice (10:37 → midnight), rendered as a low bar, and became the
     // range's "Minimum".
-    const resolvedWindow: ResolvedSeriesWindow =
-      window ??
-      (() => {
-        const end = new Date();
-        const start = new Date(
-          end.getTime() - (spec.spanMs ?? 5 * 365 * DAY_MS),
-        );
-        return {
-          range: range as Exclude<RangeKey, "CUSTOM">,
-          start,
-          end,
-          bucket: spec.bucket,
-          bucketMs: spec.bucketMs,
-        };
-      })();
+    let resolvedWindow: ResolvedSeriesWindow | null = window ?? null;
+    if (!resolvedWindow) {
+      const earliest =
+        range === "ALL"
+          ? (await getStats(userId)).get(identifier)?.earliest ?? null
+          : null;
+
+      if (range === "CUSTOM") return empty;
+
+      resolvedWindow = resolvePresetWindow(
+        range as Exclude<RangeKey, "CUSTOM">,
+        new Date(),
+        earliest,
+      );
+    }
+
+    if (!resolvedWindow) return empty;
 
     const isCustom = resolvedWindow.range === "CUSTOM";
     const bucket = resolvedWindow.bucket;
@@ -285,13 +287,16 @@ export async function getSeries(
 
     // Presets use exact instants. Custom ranges are calendar dates in the
     // viewer's configured timezone and use an inclusive start / exclusive end.
-    const from = isCustom
-      ? resolvedWindow.fromDate
-      : resolvedWindow.start;
+    let from: string | Date;
+    let endExclusive: string | Date;
 
-    const endExclusive = isCustom
-      ? resolvedWindow.endExclusive
-      : resolvedWindow.end;
+    if (resolvedWindow.range === "CUSTOM") {
+      from = resolvedWindow.fromDate;
+      endExclusive = resolvedWindow.endExclusive;
+    } else {
+      from = resolvedWindow.start;
+      endExclusive = resolvedWindow.end;
+    }
 
     if (type?.kind === "category") {
       const category = categoryAggregation(identifier);

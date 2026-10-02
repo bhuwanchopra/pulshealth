@@ -47,7 +47,7 @@ columns are in [`docs/export.md`](docs/export.md#on-device-export-no-server).
 | **Reference server** | [`server/`](server/README.md) | Docker Compose stack: TimescaleDB, Go ingest API, Go product API (OpenAPI 3.1), Grafana with provisioned dashboards and alert rules. |
 | **Web viewer** | [`web/`](web/README.md) | Next.js viewer (activity rings, trends, workouts, catalog) reading Postgres directly. |
 | **Marketing site** | [`site/`](site/README.md) | Next.js static export behind pulshealth.com: product pages, this repository's documentation (`/docs`), the blog, and the knowledge-base viewer. Distinct from `web/`. |
-| **Knowledge base** | [`knowledge-base/`](knowledge-base/README.md) | 177 YAML files describing every HealthKit type — what it measures, how it is interpreted, typical and notable ranges, sources. Read by `site/` and bundled into the app. |
+| **Knowledge base** | [`knowledge-base/`](knowledge-base/README.md) | 178 YAML files describing every HealthKit type — what it measures, how it is interpreted, typical and notable ranges, sources. Read by `site/` and bundled into the app. |
 | **Blog** | [`blog/`](blog/BLOG_SYSTEM.md) | The site's MDX posts and their images. |
 | **Protocol** | [`docs/protocol/`](docs/protocol/README.md) | The Puls Sync Protocol v1 specification, JSON Schema, fixture corpus, a checker (`tools/protocol-check/`), and a minimal Python + SQLite receiver (`examples/receivers/python-sqlite/`). |
 | **MCP server** | [`server/mcp/`](server/mcp/README.md) | Read-only MCP server over the product API for Claude Desktop, Claude Code, Cursor and remote connectors, with an embedded guide for the model. Setup in [`docs/ai.md`](docs/ai.md). |

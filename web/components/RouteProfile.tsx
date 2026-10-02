@@ -2,7 +2,7 @@
 // the selected workout unit system. No interactivity; the map is the interactive
 // piece. Built on the same chart helpers as TrendChart.
 
-import { makeScale, niceBounds, smoothPath, type Pt } from "@/lib/chart";
+import { makeScale, niceTicks, smoothPath, type Pt } from "@/lib/chart";
 import type { ProfilePoint } from "@/lib/geo";
 import {
   distanceUnit,
@@ -47,10 +47,8 @@ export function RouteProfile({
   const xs = xy.map((d) => d.x);
   const ys = xy.map((d) => d.y);
   const xMax = Math.max(...xs);
-  const bounds = niceBounds(Math.min(...ys), Math.max(...ys));
-  let lo = bounds[0];
-  const hi = bounds[1];
-  if (metric === "speed") lo = Math.min(lo, 0);
+  const minY = Math.min(...ys);
+  const { lo, hi, ticks } = niceTicks(metric === "speed" ? Math.min(minY, 0) : minY, Math.max(...ys));
 
   const sx = makeScale(0, xMax || 1, PAD.left, PAD.left + innerW);
   const sy = makeScale(lo, hi, PAD.top + innerH, PAD.top);
@@ -59,11 +57,7 @@ export function RouteProfile({
   const base = sy(lo);
   const areaPath = `${smoothPath(linePts, 0.55)} L ${linePts[linePts.length - 1][0]} ${base} L ${linePts[0][0]} ${base} Z`;
 
-  const ticks = 4;
-  const grid = Array.from({ length: ticks + 1 }, (_, i) => {
-    const val = lo + ((hi - lo) * i) / ticks;
-    return { y: sy(val), val };
-  });
+  const grid = ticks.map((t) => ({ y: sy(t.val), label: t.label }));
 
   const xticks = 5;
   const xlabels = Array.from({ length: xticks + 1 }, (_, i) => {
@@ -95,7 +89,7 @@ export function RouteProfile({
         <g key={i}>
           <line x1={PAD.left} y1={g.y} x2={W - PAD.right} y2={g.y} stroke="var(--border)" strokeOpacity={0.6} />
           <text x={PAD.left - 8} y={g.y + 3} textAnchor="end" fontSize="10.5" fill="var(--faint)" className="mono">
-            {Math.round(g.val)}
+            {g.label}
           </text>
         </g>
       ))}

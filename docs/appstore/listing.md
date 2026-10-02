@@ -222,6 +222,10 @@ flags.
 for someone who has the current version, and delete it once that version is
 live — App Store Connect keeps the history.
 
+> Recovery HRV: on iOS 27, PulsHealth can now sync the RMSSD heart rate
+> variability your Apple Watch records on watchOS 27, next to the HRV it
+> already sends. Turn it on in Sync → Synced Data → Heart.
+
 ## Screenshots
 
 Required: 6.9" iPhone (1320 × 2868 or 1290 × 2796). Apple scales those down for

@@ -14,7 +14,7 @@ plus two standalone CLIs and the public website:
 | `tools/puls-export/` | Standalone Go module: CLI for the product API's `GET /v1/export` (streamed CSV/JSONL). Its own `go.mod`, stdlib only | `docs/export.md` |
 | `tools/protocol-check/` | Standalone Go module: validates the `docs/protocol/fixtures/` corpus against the JSON Schemas. Own `go.mod`, own CI job | `docs/protocol/README.md` |
 | `site/` | Next.js static export behind **pulshealth.com** (marketing pages, blog, knowledge-base viewer). Built with bun. **Not** `web/`, which is the self-hosted viewer | `site/README.md` |
-| `knowledge-base/`, `blog/` | The site's content: 177 YAML HealthKit type files (clinical prose, ranges, sources) and the MDX posts + images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
+| `knowledge-base/`, `blog/` | The site's content: 178 YAML HealthKit type files (clinical prose, ranges, sources) and the MDX posts + images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
 
 [`AGENTS.md`](AGENTS.md) is the short, tool-agnostic version of this file for
 an automated contributor (components, where the authoritative facts live, the
@@ -42,7 +42,7 @@ cd web && npm run gen:catalog
 # carries DEVELOPMENT_TEAM from Config/Local.xcconfig, which xcodegen seeds.
 cd PulsHealth && xcodegen && xcodebuild build -scheme PulsHealth \
   -destination 'platform=iOS Simulator,name=iPhone 17'
-# App-hosted XCTest (HealthKit entitlement): the 372-combo aggregate matrix
+# App-hosted XCTest (HealthKit entitlement): the 378-combo aggregate matrix
 cd PulsHealth && xcodebuild test -scheme PulsHealth \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 
@@ -356,7 +356,7 @@ entitlements): set `DEVELOPMENT_TEAM` in `PulsHealth/Config/Local.xcconfig`.
   `site/src/lib/docs.ts` manifest (rendered at `/docs/<slug>/`; never edit the
   markdown for the site). Move or rename any of them and the build **still
   succeeds** with fewer pages, so the `site` CI job asserts the counts: one
-  type page per tracked YAML file (177), one per `blog/articles/*.mdx`, one per
+  type page per tracked YAML file (178), one per `blog/articles/*.mdx`, one per
   manifest entry (`manifest=11` in `ci.yml` moves with the manifest). Keep that
   check honest; don't loosen it.
 - **The app is shipped software, not a source drop.** It is on the App Store as
@@ -395,7 +395,7 @@ entitlements): set `DEVELOPMENT_TEAM` in `PulsHealth/Config/Local.xcconfig`.
   uncatchable NSInvalidArgumentException when the query *executes*, not when it
   is built. Only ever offer or construct functions from
   `HealthTypeCatalog.allowedAggregateFunctions(for:)` (derived from
-  `aggregationStyle`), verified against all 372 type×function combos by
+  `aggregationStyle`), verified against all 378 type×function combos by
   `PulsHealth/HostedTests/AggregateMatrixTests` (ObjC exception catcher +
   legacy `execute()`); re-run it on each new iOS runtime.
   Settings → Validate Aggregate Functions checks the legal set on-device.

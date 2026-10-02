@@ -31,11 +31,11 @@ knowledge-base/
 
 | Type | Count | Description |
 |------|-------|-------------|
-| HKQuantityType | 110 | Numeric measurements with units |
+| HKQuantityType | 111 | Numeric measurements with units |
 | HKCategoryType | 59 | Categorical/enum values |
 | HKCharacteristicType | 6 | Static user characteristics |
 | HKCorrelationType | 2 | Grouped related samples |
-| **Total** | **177** | All HealthKit data types |
+| **Total** | **178** | All HealthKit data types |
 
 One page per file is exported by `site/` to
 `https://pulshealth.com/knowledge-base/types/<identifier>/`, and CI asserts

@@ -20,8 +20,6 @@ const CUMULATIVE_HINTS = [
   "BasalEnergyBurned",
   "AppleExerciseTime",
   "AppleStandTime",
-  "AppleMoveTime",
-  "SwimmingStrokeCount",
   "PushCount",
   "NikeFuel",
   "NumberOfTimesFallen",
@@ -57,6 +55,7 @@ const DAY = 86_400_000;
 const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 
+/** A bucket that keeps a chart of `durationMs` to roughly 30–90 points. */
 export function bucketForDuration(durationMs: number): {
   bucket: string;
   bucketMs: number;
@@ -76,18 +75,17 @@ export function bucketForDuration(durationMs: number): {
   return { bucket: "3 months", bucketMs: 90 * DAY };
 }
 
-
 export const RANGES: Record<RangeKey, RangeSpec> = {
   // New UI presets.
   "7D":  { key: "7D",  label: "7 Days",   spanMs: 7 * DAY,   bucket: "1 day",    bucketMs: DAY },
   "30D": { key: "30D", label: "30 Days",  spanMs: 30 * DAY,  bucket: "1 day",    bucketMs: DAY },
   "90D": { key: "90D", label: "90 Days",  spanMs: 90 * DAY,  bucket: "1 day",    bucketMs: DAY },
-  "6M":  { key: "6M",  label: "6 Months", spanMs: 182 * DAY, bucket: "1 day",    bucketMs: DAY },
-  "Y":   { key: "Y",   label: "1 Year",   spanMs: 365 * DAY, bucket: "1 day",    bucketMs: DAY },
+  "6M":  { key: "6M",  label: "6 Months", spanMs: 182 * DAY, bucket: "1 week",   bucketMs: WEEK },
+  "Y":   { key: "Y",   label: "1 Year",   spanMs: 365 * DAY, bucket: "1 week",   bucketMs: WEEK },
   "2Y":  { key: "2Y",  label: "2 Years",  spanMs: 730 * DAY, bucket: "2 weeks",  bucketMs: 14 * DAY },
   "5Y":  { key: "5Y",  label: "5 Years",  spanMs: 1825 * DAY, bucket: "1 month", bucketMs: MONTH },
   "ALL": { key: "ALL", label: "All Time", spanMs: null,      bucket: "3 months", bucketMs: 90 * DAY },
-  "CUSTOM": { key: "CUSTOM", label: "Custom", spanMs: null,   bucket: "1 day",    bucketMs: DAY },
+  "CUSTOM": { key: "CUSTOM", label: "Custom", spanMs: null, bucket: "1 day", bucketMs: DAY },
 
   // Backward-compatible keys used by the existing dashboard/demo code.
   D: { key: "D", label: "Day", spanMs: DAY, bucket: "1 hour", bucketMs: HOUR },
@@ -116,7 +114,6 @@ export function parseRange(v: string | null | undefined): RangeKey {
 
   return "7D";
 }
-
 
 export interface SeriesWindow {
   range: Exclude<RangeKey, "CUSTOM">;
@@ -180,24 +177,43 @@ export function resolveCustomWindow(
   };
 }
 
+/**
+ * The window a preset covers at `now`.
+ *
+ * ALL starts at the series' earliest sample and picks its bucket from that
+ * span. Presets retain their explicit start/end instants.
+ *
+ * With no earliest sample supplied for ALL, there is no resolved window.
+ */
 export function resolvePresetWindow(
   range: Exclude<RangeKey, "CUSTOM">,
   now = new Date(),
   earliestMs?: number | null,
-): SeriesWindow {
+): SeriesWindow | null {
   const spec = RANGES[range];
 
-  const end = now;
-  const start =
-    range === "ALL" && earliestMs != null
-      ? new Date(earliestMs)
-      : new Date(end.getTime() - (spec.spanMs ?? 5 * 365 * DAY));
+  if (spec.spanMs != null) {
+    return {
+      range,
+      start: new Date(now.getTime() - spec.spanMs),
+      end: now,
+      bucket: spec.bucket,
+      bucketMs: spec.bucketMs,
+    };
+  }
+
+  if (earliestMs == null) return null;
+
+  const start = new Date(earliestMs);
+  const { bucket, bucketMs } = bucketForDuration(
+    Math.max(0, now.getTime() - earliestMs),
+  );
 
   return {
     range,
     start,
-    end,
-    bucket: spec.bucket,
-    bucketMs: spec.bucketMs,
+    end: now,
+    bucket,
+    bucketMs,
   };
 }

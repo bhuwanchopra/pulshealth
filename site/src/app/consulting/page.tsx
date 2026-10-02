@@ -49,7 +49,7 @@ const services = [
 
 const facts = [
   { value: "80", label: "HealthKit types in the protocol catalog" },
-  { value: "177", label: "Type references in the knowledge base" },
+  { value: "178", label: "Type references in the knowledge base" },
   { value: "11", label: "Read-only MCP tools over your data" },
   { value: "v1", label: "Sync protocol, specified with JSON Schema" },
 ];

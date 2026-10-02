@@ -3,7 +3,7 @@
 // Same hand-rolled chart helpers and house style as RouteProfile. Optional
 // zone bands (HR zones) shade the background; optional markers draw lap lines.
 
-import { makeScale, niceBounds, smoothPath, type Pt } from "@/lib/chart";
+import { makeScale, niceStep, niceTicks, smoothPath, type Pt } from "@/lib/chart";
 
 const PAD = { top: 14, right: 14, bottom: 24, left: 44 };
 const W = 760;
@@ -43,7 +43,7 @@ export function TimeSeriesChart({
   const ys = xy.map((d) => d.y);
   const xMax = Math.max(...xs) || 1;
   const bandVals = zoneBands.flatMap((b) => [b.lo, b.hi].filter((v): v is number => v != null));
-  const [lo, hi] = niceBounds(Math.min(...ys, ...bandVals), Math.max(...ys, ...bandVals));
+  const { lo, hi, ticks } = niceTicks(Math.min(...ys, ...bandVals), Math.max(...ys, ...bandVals));
 
   const sx = makeScale(0, xMax, PAD.left, PAD.left + innerW);
   const sy = makeScale(lo, hi, PAD.top + innerH, PAD.top);
@@ -52,16 +52,14 @@ export function TimeSeriesChart({
   const base = sy(lo);
   const areaPath = `${smoothPath(linePts, 0.55)} L ${linePts[linePts.length - 1][0]} ${base} L ${linePts[0][0]} ${base} Z`;
 
-  const ticks = 4;
-  const grid = Array.from({ length: ticks + 1 }, (_, i) => {
-    const val = lo + ((hi - lo) * i) / ticks;
-    return { y: sy(val), val };
-  });
+  const grid = ticks.map((t) => ({ y: sy(t.val), label: t.label }));
 
-  const xticks = 5;
-  const xlabels = Array.from({ length: xticks + 1 }, (_, i) => {
-    const min = (xMax * i) / xticks;
-    return { x: sx(min), min };
+  // Whole multiples of a nice minute step, never past the data's end; the
+  // first one carries the unit.
+  const xstep = niceStep(xMax / 8);
+  const xlabels = Array.from({ length: Math.floor(xMax / xstep.step + 1e-9) + 1 }, (_, i) => {
+    const min = i * xstep.step;
+    return { x: sx(min), label: i === 0 ? "0 min" : min.toFixed(xstep.decimals) };
   });
 
   const gid = `ts-${color.replace(/[^a-z0-9]/gi, "")}`;
@@ -95,7 +93,7 @@ export function TimeSeriesChart({
         <g key={i}>
           <line x1={PAD.left} y1={g.y} x2={W - PAD.right} y2={g.y} stroke="var(--border)" strokeOpacity={0.6} />
           <text x={PAD.left - 8} y={g.y + 3} textAnchor="end" fontSize="10.5" fill="var(--faint)" className="mono">
-            {Math.round(g.val)}
+            {g.label}
           </text>
         </g>
       ))}
@@ -108,15 +106,12 @@ export function TimeSeriesChart({
       })}
 
       {xlabels.map((d, i) => (
-        <text key={i} x={d.x} y={height - 7} textAnchor="middle" fontSize="10.5" fill="var(--faint)" className="mono">
-          {d.min.toFixed(0)}
+        <text key={i} x={d.x} y={height - 7} textAnchor={i === 0 ? "start" : "middle"} fontSize="10.5" fill="var(--faint)" className="mono">
+          {d.label}
         </text>
       ))}
       <text x={W - PAD.right} y={PAD.top - 2} textAnchor="end" fontSize="10" fill="var(--muted)" className="mono">
         {unit}
-      </text>
-      <text x={PAD.left} y={height - 7} textAnchor="start" fontSize="10" fill="var(--muted)" className="mono">
-        min
       </text>
 
       <path d={areaPath} fill={`url(#${gid})`} />

@@ -69,6 +69,7 @@ extension HealthTypeDescriptor {
         "HKQuantityTypeIdentifierRestingHeartRate": "arrow.down.heart.fill",
         "HKQuantityTypeIdentifierWalkingHeartRateAverage": "figure.walk",
         "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": "waveform.path",
+        "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD": "waveform.path",
         "HKQuantityTypeIdentifierAtrialFibrillationBurden": "waveform.path.ecg.rectangle",
         "HKDataTypeIdentifierHeartbeatSeries": "waveform.path",
         "HKDataTypeIdentifierElectrocardiogram": "waveform.path.ecg",

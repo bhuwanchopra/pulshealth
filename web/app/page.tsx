@@ -47,7 +47,7 @@ export default async function Dashboard() {
     getSleepDays(user, 14),
   ]);
 
-  const seriesList = await Promise.all(KEY_METRICS.map((id) => getSeries(user, id, "M")));
+  const seriesList = await Promise.all(KEY_METRICS.map((id) => getSeries(user, id, "30D")));
   const seriesById = new Map(seriesList.map((s) => [s.identifier, s]));
 
   // Rings: prefer the real HKActivitySummary (Move / Exercise / Stand with the

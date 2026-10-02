@@ -27,6 +27,16 @@ enum CatalogVocabulary {
         -only-testing:PulsHealthSyncTests/CatalogVocabularyTests
         """
 
+    /// True when this runtime has every catalog quantity type, so HealthKit
+    /// can answer `aggregationStyle` for all of them. Below the newest gate
+    /// (HRV RMSSD, iOS 27) the rendering tests are skipped — CI's Xcode 27
+    /// job runs them — unless `PULS_WRITE_CATALOG=1` asks for a rewrite, which
+    /// then fails with `RenderError` naming the runtime it needs.
+    static var isRenderableHere: Bool {
+        HealthTypeCatalog.definitions.allSatisfy { $0.kind != .quantity || $0.isAvailableOnThisOS }
+            || ProcessInfo.processInfo.environment["PULS_WRITE_CATALOG"] == "1"
+    }
+
     struct RenderError: Error, CustomStringConvertible {
         let description: String
     }
@@ -173,7 +183,8 @@ enum CatalogVocabulary {
     /// what the live catalog renders. With `PULS_WRITE_CATALOG=1` in the test
     /// runner's environment (`TEST_RUNNER_PULS_WRITE_CATALOG=1` on the
     /// xcodebuild command line) the test rewrites the file instead.
-    @Test func publishedVocabularyMatchesTheCatalog() throws {
+    @Test(.enabled(if: CatalogVocabulary.isRenderableHere, "a catalog quantity type is gated above this runtime; rendered on the newest simulator"))
+    func publishedVocabularyMatchesTheCatalog() throws {
         let root = CatalogVocabulary.repositoryRoot()
         let url = root.appendingPathComponent(CatalogVocabulary.relativePath)
         let docs = root.appendingPathComponent("docs/protocol", isDirectory: true)
@@ -207,7 +218,8 @@ enum CatalogVocabulary {
         }
     }
 
-    @Test func renderingIsValidJSONSortedByIdentifier() throws {
+    @Test(.enabled(if: CatalogVocabulary.isRenderableHere, "a catalog quantity type is gated above this runtime; rendered on the newest simulator"))
+    func renderingIsValidJSONSortedByIdentifier() throws {
         let text = try CatalogVocabulary.render()
         #expect(text.hasSuffix("}\n"))
         let object = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any]
@@ -228,7 +240,8 @@ enum CatalogVocabulary {
         }
     }
 
-    @Test func entriesCarryTheCatalogFacts() throws {
+    @Test(.enabled(if: CatalogVocabulary.isRenderableHere, "a catalog quantity type is gated above this runtime; rendered on the newest simulator"))
+    func entriesCarryTheCatalogFacts() throws {
         let text = try CatalogVocabulary.render()
         let document = try #require(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
         let types = try #require(document["types"] as? [[String: Any]])

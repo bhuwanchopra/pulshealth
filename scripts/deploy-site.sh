@@ -9,7 +9,7 @@
 # objects up immediately.
 #
 # The build reads two sibling directories at the repository root by relative
-# path — ../knowledge-base (177 YAML types) and ../blog (MDX + images) — so
+# path — ../knowledge-base (178 YAML types) and ../blog (MDX + images) — so
 # this script always builds from the repository, never from a copy of site/
 # on its own. It works from any directory: paths are derived from its own
 # location, not the caller's.
@@ -80,12 +80,12 @@ fi
 [ -d "$out_dir" ] ||
   { echo "deploy-site: $out_dir does not exist; drop --skip-build" >&2; exit 1; }
 
-# 177 knowledge-base types + blog + the static pages. A build that lost the
+# 178 knowledge-base types + blog + the static pages. A build that lost the
 # relative path to ../knowledge-base still succeeds, just much smaller, and
 # syncing that with --delete would take the knowledge base off the site.
 types=$(find "$out_dir/knowledge-base/types" -name index.html 2>/dev/null | wc -l | tr -d ' ')
-if [ "$types" -lt 177 ]; then
-  echo "deploy-site: only $types knowledge-base type pages in $out_dir (expected 177)." >&2
+if [ "$types" -lt 178 ]; then
+  echo "deploy-site: only $types knowledge-base type pages in $out_dir (expected 178)." >&2
   echo "deploy-site: refusing to sync a partial export." >&2
   exit 1
 fi

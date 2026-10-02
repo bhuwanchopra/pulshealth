@@ -17,9 +17,6 @@ behind them.
   over several days; the iOS 26 continued-processing first run; leaving the
   app mid-backfill; an export on a device; and on iOS 27, limiting a type's
   history, widening it again, and the re-sweep that follows.
-- **Explore's search field:** on iOS 27 a `.navigationBarDrawer` search field
-  cannot both show on arrival and scroll away. A fix that makes it the list's
-  first row exists on a branch, not yet on main.
 
 ## 2. Standing maintenance
 
@@ -27,7 +24,7 @@ Not backlog — things that come due on someone else's schedule.
 
 | Trigger | Do this |
 |---|---|
-| A new iOS runtime | Re-run the app-hosted `AggregateMatrixTests` (372 type×function combos): the legal set is HealthKit's, not ours. |
+| A new iOS runtime | Re-run the app-hosted `AggregateMatrixTests` (378 type×function combos): the legal set is HealthKit's, not ours. |
 | A major Xcode/iOS SDK update | Refresh `010_category_labels.sql` from `HKCategoryValues.h` and check the seed shape (`server/README.md`). |
 | Never yet done on real data | The backup restore drill. The one recorded in `server/README.md` ran against a throwaway stack; nothing else verifies that a dump restores. |
 | Publishing images from a new organization or a fork | A package `release.yml` creates starts private, and it can be made public only once the organization's package-creation policy allows public packages. Change the policy first, then flip each of the four in its package settings. |

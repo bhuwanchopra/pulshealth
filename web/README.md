@@ -116,7 +116,7 @@ untrusted network, and never directly on the internet.
 |---|---|
 | `/` | **Today** — activity rings from today's local `HKActivitySummary`; falls back to today's quantity totals when today's summary is missing, plus headline metrics, recent workouts, and categories |
 | `/category/[group]` | All metrics in an Apple-Health group (Activity, Heart, Sleep, …) as live cards |
-| `/type/[id]` | **Metric detail** — interactive trend chart with D/W/M/6M/Y ranges, min–max band for instantaneous metrics, bar series for cumulative ones, range stats; hover, tap or arrow keys read a bucket, wheel/pinch zoom and drag pan (see "The trend chart" below) |
+| `/type/[id]` | **Metric detail** — interactive trend chart with D/7D/30D/90D/6M/Y/2Y/5Y/ALL ranges (see "The trend chart" below), min–max band for instantaneous metrics, bar series for cumulative ones, range stats; hover, tap or arrow keys read a bucket, wheel/pinch zoom and drag pan |
 | `/data` | **Catalog** — quantity, category, and workout types with supported viewer routes, grouped with per-user sample counts and last-seen |
 | `/workouts` | Latest 120 sessions with duration / energy / distance totals |
 | `/workouts/[uuid]` | **Workout detail** — route map, heart rate and zones, splits, intra-workout streams, elevation, sub-activities |
@@ -172,6 +172,18 @@ merged catalog to the JSON.
 
 ## The trend chart
 
+**Ranges.** The selector (and `?range=`) offers D, 7D, 30D, 90D, 6M, Y, 2Y, 5Y
+and ALL; `lib/metrics.ts` holds the table. The old `W` and `M` links still
+open 7D and 30D. Each range fixes its bucket — hourly for D, daily through 90D,
+weekly for 6M and Y, two-weekly for 2Y, calendar months for 5Y — and ALL starts
+at the type's earliest sample (from the per-user stats the page loads anyway)
+and sizes its bucket to that span, from days up to calendar quarters, so a
+chart stays at roughly 30–90 points. Every bucket boundary is a local one in
+`PULS_TIME_ZONE`, and day-or-coarser buckets of a covered type read
+`metric_daily` (the hourly `quantity_rollups` underneath it) rather than raw
+samples; the rest read `quantity_samples`, as before, so a 5Y or ALL chart of
+a type without a daily aggregate is a scan of that type's whole history.
+
 `components/TrendChart.tsx` is hand-drawn SVG driven by pointer events — no
 chart library, in keeping with the viewer's dependency budget. On a metric page:
 
@@ -181,10 +193,10 @@ chart library, in keeping with the viewer's dependency budget. On a metric page:
 | Click / tap | Pins that bucket; the tooltip stays until another is picked, or Escape. Tapping again unpins |
 | Wheel, trackpad pinch, two-finger pinch | Zooms the time window about the pointer, never narrower than five buckets or wider than the data |
 | Horizontal drag, horizontal wheel | Pans the window while zoomed, stopping at the data's edges |
-| **Reset** (shown while zoomed) | Back to the full D/W/M/6M/Y range |
+| **Reset** (shown while zoomed) | Back to the full selected range |
 | Arrow keys, Home/End, PageUp/PageDown, `+`/`-`, Escape, `0` | Keyboard equivalents once the chart has focus (Tab reaches it): move the selection, zoom about it, clear the selection, then the zoom |
 
-Changing the range (D/W/M/6M/Y) always starts from the full new range with
+Changing the range always starts from the full new range with
 nothing pinned — the zoom never changes which range button is selected. The
 row above the chart is an `aria-live` readout of the active bucket (or the
 visible window while zoomed), so the value is never hover-only. The SVG uses
@@ -196,15 +208,20 @@ The time arithmetic (clamp, zoom, pan, nearest bucket, wheel normalisation) is
 ## Map tiles
 
 The workout route map (`lib/mapStyles.ts`) draws its basemap from free public
-tile endpoints that need no API key: CARTO (`basemaps.cartocdn.com` — the dark,
-light and Voyager styles, and so the `auto` default), OpenStreetMap
-(`tile.openstreetmap.org`), Esri World Imagery, and OpenTopoMap. Each style
+tile endpoints that need no API key: Esri's Dark Gray and Light Gray Canvas
+(`server.arcgisonline.com` — the dark and light styles, and so the `auto`
+default), OpenStreetMap (`tile.openstreetmap.org`), Esri World Imagery, and
+OpenTopoMap. The Canvas tiles stop at zoom 16; Leaflet scales those up for the
+three levels past it. CARTO's basemaps used to supply the dark, light and
+Voyager styles, but since September 2026 they answer every keyless request
+with an "API KEY REQUIRED" tile, so they are gone: Voyager had no keyless
+equivalent, and a browser that had picked it falls back to Auto. Each style
 carries the attribution its operator requires, set in `mapStyles.ts` and
 rendered by Leaflet's attribution control — that is a licence condition, not
 decoration. These are other people's servers, though, offered under usage
 policies written for modest, non-redistributed use (the
 [OSMF tile usage policy](https://operations.osmfoundation.org/policies/tiles/),
-[CARTO's basemap terms](https://carto.com/basemaps/)). One person's viewer sits
+Esri's ArcGIS Online terms). One person's viewer sits
 well inside them; a public or heavily-trafficked deployment does not, and should
 point at its own tile server or a paid provider rather than lean on the free
 endpoints.

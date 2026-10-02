@@ -821,6 +821,23 @@
       "estimatedSamplesPerDay": 1
     },
     {
+      "identifier": "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD",
+      "kind": "quantity",
+      "unit": "ms",
+      "aggregationStyle": "discreteArithmetic",
+      "allowedAggregateFunctions": [
+        "average",
+        "min",
+        "max",
+        "mostRecent",
+        "duration"
+      ],
+      "minimumIOS": "27.0",
+      "displayName": "HRV (RMSSD)",
+      "group": "heart",
+      "estimatedSamplesPerDay": 100
+    },
+    {
       "identifier": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
       "kind": "quantity",
       "unit": "ms",

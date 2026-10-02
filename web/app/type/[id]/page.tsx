@@ -83,7 +83,7 @@ export default async function TypePage({
     );
   }
 
-  const series = await getSeries(user, id, range, seriesWindow);
+  const series = await getSeries(user, id, range, seriesWindow ?? undefined);
 
   const vals = series.points.map((p) => p.value).filter(Number.isFinite);
   const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;

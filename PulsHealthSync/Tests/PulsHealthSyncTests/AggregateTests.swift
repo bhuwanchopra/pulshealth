@@ -24,7 +24,7 @@ import Testing
     }
 
     // Mapping verified empirically by the app-hosted AggregateMatrixTests
-    // (probes all 372 type×function combos against HealthKit).
+    // (probes all 378 type×function combos against HealthKit).
     @Test func aggregationStylesMapToExpectedFunctions() {
         // Cumulative: sum (plus mostRecent/duration) but never average/min/max.
         let steps = HealthTypeCatalog.allowedAggregateFunctions(

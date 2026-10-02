@@ -284,6 +284,8 @@ metadata_keys:
 related_types:
   - identifier: "HKQuantityTypeIdentifierHeartRate"
     relationship: "Source data - HRV is calculated from beat-to-beat intervals derived from heart rate data"
+  - identifier: "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD"
+    relationship: "Sibling HRV type (iOS 27+, shown as Recovery HRV) - RMSSD reflects beat-to-beat, vagally mediated variability and stays stable over short windows; not interchangeable with SDNN"
   - identifier: "HKQuantityTypeIdentifierRestingHeartRate"
     relationship: "Correlated - Lower resting HR often correlates with higher HRV (both reflect parasympathetic tone)"
   - identifier: "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute"
@@ -316,7 +318,7 @@ references:
     type: "medical"
 
 # --- KNOWLEDGE BASE METADATA ---
-last_updated: "2026-01-27"
+last_updated: "2026-10-02"
 research_notes: |
   - iOS 11.0/watchOS 4.0 introduction confirmed via Apple documentation timeline
   - Clinical thresholds from 1996 ESC/NASPE Task Force guidelines and subsequent validation studies

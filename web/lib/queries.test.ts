@@ -100,7 +100,7 @@ describe("query semantics", () => {
     expect(intradaySql).toContain("sum(value)::float8 AS sum");
 
     const [yearSql, yearParams] = calls[1];
-    expect(yearParams.slice(0, 2)).toEqual(["1 day", "1 day"]);
+    expect(yearParams.slice(0, 2)).toEqual(["1 week", "1 day"]);
     expect(yearSql).toContain("time_bucket($2::interval");
     expect(yearSql).toContain("time_bucket($1::interval");
   });
@@ -198,8 +198,89 @@ describe("query semantics", () => {
     }
 
     expect(windows[0].params).toContain("1 day");
-    expect(windows[1].params).toContain("1 day");
+    expect(windows[1].params).toContain("1 week");
     expect(windows[2].params).toContain("1 day");
+  });
+
+  it("starts All Time at the type's earliest sample", async () => {
+    const { getSeries } = await import("./queries");
+    const user = "33333333-3333-4333-8333-333333333333";
+    const earliest = Date.now() - 200 * 86_400_000;
+
+    queryMock.mockImplementation((text: string) => {
+      if (text.includes("SELECT st.identifier,")) {
+        return Promise.resolve([{
+          identifier: "HKQuantityTypeIdentifierHeartRate",
+          rows: "10",
+          earliest: String(earliest),
+          latest: String(Date.now()),
+        }]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const series = await getSeries(
+      user,
+      "HKQuantityTypeIdentifierHeartRate",
+      "ALL",
+    );
+
+    const [, params] =
+      queryMock.mock.calls.find(([sql]) =>
+        /time_bucket[\s\S]*FROM quantity_samples/.test(sql),
+      ) ?? [];
+
+    expect(params?.[0]).toBe("1 week");
+    expect(params?.[2]).toEqual(new Date(earliest));
+    expect(series.bucketMs).toBe(7 * 86_400_000);
+
+    queryMock.mockClear();
+
+    const none = await getSeries(
+      user,
+      "HKQuantityTypeIdentifierBodyMass",
+      "ALL",
+    );
+
+    expect(none.points).toEqual([]);
+    expect(queryMock.mock.calls.some(([sql]) => /time_bucket/.test(sql))).toBe(false);
+  });
+
+  it("binds the time zone wherever a query expects one", async () => {
+    const { getSeries } = await import("./queries");
+
+    for (const id of [
+      "HKCategoryTypeIdentifierSleepAnalysis",
+      "HKCategoryTypeIdentifierMindfulSession",
+      "HKCategoryTypeIdentifierAppleStandHour",
+      "HKQuantityTypeIdentifierStepCount",
+      "HKQuantityTypeIdentifierHeartRate",
+    ]) {
+      await getSeries(USER_ID, id, "30D");
+      await getSeries(USER_ID, id, "D");
+      await getSeries(USER_ID, id, "ALL");
+    }
+
+    const charts = queryMock.mock.calls.filter(([sql]) =>
+      /time_bucket/.test(sql as string),
+    );
+
+    expect(charts.length).toBeGreaterThanOrEqual(10);
+
+    for (const [sql, params] of charts as [string, unknown[]][]) {
+      const zones = [
+        ...sql.matchAll(/time_bucket\([^;]*?, *\$(\d+)::text\)/g),
+        ...sql.matchAll(/AT TIME ZONE \$(\d+)::text/g),
+      ].map((m) => Number(m[1]));
+
+      expect(zones.length, sql).toBeGreaterThan(0);
+
+      for (const n of zones) {
+        expect(params[n - 1], `$${n} in ${sql}`).toBe(
+          "America/Los_Angeles",
+        );
+      }
+    }
   });
 
   it("attributes sleep to the wake day and dedups duration sources", async () => {
