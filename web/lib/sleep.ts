@@ -135,7 +135,7 @@ export function calculateSleepScore(night: SleepDay, recentNights: SleepDay[]): 
     const sorted = baseline.map((day) => day.bedtimeMinutes as number).sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
     const direct = Math.abs(night.bedtimeMinutes - median);
-    bedtimeDeviationMinutes = Math.min(direct, 1440 - direct);
+    bedtimeDeviationMinutes = Math.round(Math.min(direct, 1440 - direct));
     consistencyPoints = 30 * clamp(1 - bedtimeDeviationMinutes / 120, 0, 1);
   } else if (night.bedtimeMinutes != null) {
     consistencyPoints = 30;
