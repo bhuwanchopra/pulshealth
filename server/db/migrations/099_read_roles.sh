@@ -900,6 +900,8 @@ GRANT SELECT ON TABLE
   web.category_samples,
   web.workouts,
   web.sources,
+  web.aggregate_series,
+  web.aggregate_samples,
   web.workout_route_points,
   web.workout_series_points,
   web.activity_summaries,
@@ -969,6 +971,8 @@ BEGIN
       ('web', 'category_samples', 'SELECT', false),
       ('web', 'workouts', 'SELECT', false),
       ('web', 'sources', 'SELECT', false),
+      ('web', 'aggregate_series', 'SELECT', false),
+      ('web', 'aggregate_samples', 'SELECT', false),
       ('web', 'workout_route_points', 'SELECT', false),
       ('web', 'workout_series_points', 'SELECT', false),
       ('web', 'activity_summaries', 'SELECT', false),
@@ -1089,7 +1093,7 @@ BEGIN
     WITH expected(relname) AS (VALUES
       ('users'), ('quantity_samples'), ('category_samples'), ('workouts'),
       ('sources'), ('workout_route_points'), ('workout_series_points'),
-      ('activity_summaries'), ('metric_daily')
+      ('activity_summaries'), ('aggregate_series'), ('aggregate_samples'), ('metric_daily')
     ), actual AS (
       SELECT c.relname::text FROM pg_class c
       WHERE c.relnamespace = 'web'::regnamespace
@@ -1103,6 +1107,7 @@ BEGIN
     FROM pg_class c
     WHERE c.relnamespace = 'web'::regnamespace
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND c.relname <> 'aggregate_series'
       AND (c.relkind <> 'v'
            OR NOT coalesce(c.reloptions @> ARRAY['security_barrier=true'], false)
            OR pg_get_viewdef(c.oid) NOT LIKE '%puls_viewer_user()%')
