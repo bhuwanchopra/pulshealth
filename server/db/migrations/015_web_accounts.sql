@@ -128,8 +128,9 @@ BEGIN
   -- No CASCADE: something unexpected that depends on these should stop the
   -- run loudly, not vanish with them.
   DROP VIEW IF EXISTS web.users, web.quantity_samples, web.category_samples,
-    web.workouts, web.sources, web.aggregate_series, web.workout_route_points,
-    web.workout_series_points, web.activity_summaries, web.metric_daily;
+    web.workouts, web.sources, web.aggregate_series, web.aggregate_samples,
+    web.workout_route_points, web.workout_series_points, web.activity_summaries,
+    web.metric_daily;
 
   CREATE VIEW web.users WITH (security_barrier) AS
     SELECT * FROM public.users WHERE id = (SELECT puls_viewer_user());
@@ -163,6 +164,9 @@ BEGIN
   CREATE VIEW web.aggregate_series WITH (security_barrier) AS
     SELECT * FROM public.aggregate_series
      WHERE (SELECT puls_viewer_user()) IS NOT NULL;
+
+  CREATE VIEW web.aggregate_samples WITH (security_barrier) AS
+    SELECT * FROM public.aggregate_samples WHERE user_id = (SELECT puls_viewer_user());
 
   CREATE VIEW web.workout_route_points WITH (security_barrier) AS
     SELECT * FROM public.workout_route_points WHERE user_id = (SELECT puls_viewer_user());
