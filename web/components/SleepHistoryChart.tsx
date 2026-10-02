@@ -8,6 +8,14 @@ const STAGES = [
   { key: "awakeMinutes", label: "Awake", color: "rgb(251 191 36)" },
 ] as const;
 
+const STACKED_STAGES = [
+  STAGES[0],
+  STAGES[1],
+  STAGES[2],
+  STAGES[3],
+  STAGES[4],
+] as const;
+
 function hoursAndMinutes(minutes: number): string {
   const total = Math.max(0, Math.round(minutes));
   const hours = Math.floor(total / 60);
@@ -130,7 +138,7 @@ export function SleepHistoryChart({
                   <polyline
                     fill="none"
                     stroke="var(--fg)"
-                    strokeWidth="1"
+                    strokeWidth="1.5"
                     vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -193,7 +201,7 @@ export function SleepHistoryChart({
                         background: "var(--border)",
                       }}
                     >
-                      {STAGES.map((stage) => {
+                      {STACKED_STAGES.map((stage) => {
                         const minutes = Math.max(0, night[stage.key]);
                         if (!minutes) return null;
                         return (
