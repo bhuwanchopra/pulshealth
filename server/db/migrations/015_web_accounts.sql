@@ -128,8 +128,8 @@ BEGIN
   -- No CASCADE: something unexpected that depends on these should stop the
   -- run loudly, not vanish with them.
   DROP VIEW IF EXISTS web.users, web.quantity_samples, web.category_samples,
-    web.workouts, web.sources, web.workout_route_points, web.workout_series_points,
-    web.activity_summaries, web.metric_daily;
+    web.workouts, web.sources, web.aggregate_series, web.workout_route_points,
+    web.workout_series_points, web.activity_summaries, web.metric_daily;
 
   CREATE VIEW web.users WITH (security_barrier) AS
     SELECT * FROM public.users WHERE id = (SELECT puls_viewer_user());
@@ -155,6 +155,14 @@ BEGIN
      WHERE EXISTS (SELECT 1 FROM public.workouts w
                     WHERE w.source_id = s.source_id
                       AND w.user_id = (SELECT puls_viewer_user()));
+
+  -- aggregate_series is shared metadata, but keep it behind the same view
+  -- surface so web_app never receives a direct grant on the public relation.
+  -- Requiring the transaction-local viewer setting also keeps the metadata
+  -- unavailable outside a scoped viewer transaction.
+  CREATE VIEW web.aggregate_series WITH (security_barrier) AS
+    SELECT * FROM public.aggregate_series
+     WHERE (SELECT puls_viewer_user()) IS NOT NULL;
 
   CREATE VIEW web.workout_route_points WITH (security_barrier) AS
     SELECT * FROM public.workout_route_points WHERE user_id = (SELECT puls_viewer_user());
