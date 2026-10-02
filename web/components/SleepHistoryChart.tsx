@@ -158,6 +158,30 @@ export function SleepHistoryChart({
                       })
                       .join(" ")}
                   />
+                  {displayNights.map((night, index) => {
+                    const x = index + 0.5;
+                    const totalSleep =
+                      night.coreMinutes +
+                      night.deepMinutes +
+                      night.remMinutes +
+                      night.unspecifiedMinutes;
+                    const y =
+                      chartHeight -
+                      (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                        chartHeight;
+                    return (
+                      <circle
+                        key={night.date}
+                        cx={x}
+                        cy={y}
+                        r="2.5"
+                        fill="var(--fg)"
+                        stroke="var(--bg)"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    );
+                  })}
                 </svg>
               )}
 
