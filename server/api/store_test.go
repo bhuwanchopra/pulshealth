@@ -407,7 +407,7 @@ func TestIntegrationDailyMetricsFixture(t *testing.T) {
 
 	rangeStart := time.Date(2099, 7, 3, 0, 0, 0, 0, loc)
 	rangeEnd := time.Date(2099, 7, 4, 0, 0, 0, 0, loc)
-	metrics, err := store.DailyMetrics(ctx, defaultUserID, []string{identifier}, rangeStart, rangeEnd)
+	metrics, err := store.DailyMetrics(ctx, defaultUserID, DailyFilters{Types: []string{identifier}, Start: rangeStart, End: rangeEnd})
 	if err != nil {
 		t.Fatalf("DailyMetrics: %v", err)
 	}

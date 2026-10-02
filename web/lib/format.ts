@@ -91,8 +91,51 @@ export function formatToday(date = new Date()): string {
   return dateFormatter({ weekday: "long", month: "long", day: "numeric" }).format(date);
 }
 
+// The tooltip's timestamp for one chart bucket: an hour bucket names its clock
+// time, a day bucket its date, and a longer bucket the span it covers, so a
+// weekly total is never mistaken for one day's reading.
+export function formatBucket(ms: number, bucketMs: number): string {
+  if (bucketMs < 86_400_000) {
+    return dateFormatter({ weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(
+      new Date(ms),
+    );
+  }
+  if (bucketMs <= 86_400_000) {
+    return dateFormatter({ weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(new Date(ms));
+  }
+  // A month or quarter bucket (5Y, ALL) is a calendar one on the server, but
+  // its bucketMs is a fixed 30 or 90 days, so a day-precise end would be off
+  // by up to two days ("Feb 1 – Mar 2"): name the months instead.
+  if (bucketMs >= 80 * 86_400_000) {
+    return dateFormatter({ month: "short", year: "numeric" }).formatRange(new Date(ms), new Date(ms + bucketMs - 1));
+  }
+  if (bucketMs >= 28 * 86_400_000) return formatMonth(ms);
+  // Inclusive last day of the bucket.
+  return dateFormatter({ month: "short", day: "numeric", year: "numeric" }).formatRange(new Date(ms), new Date(ms + bucketMs - 1));
+}
+
+// The readout for a zoomed window, [startMs, endMs): one range at the
+// chart's grain, so it never reads as two bucket spans joined by a dash.
+export function formatWindow(startMs: number, endMs: number, bucketMs: number): string {
+  const last = new Date(Math.max(startMs, endMs - 1));
+  if (bucketMs < 86_400_000) {
+    return dateFormatter({ month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).formatRange(new Date(startMs), last);
+  }
+  if (bucketMs >= 28 * 86_400_000) {
+    return dateFormatter({ month: "short", year: "numeric" }).formatRange(new Date(startMs), last);
+  }
+  return dateFormatter({ month: "short", day: "numeric", year: "numeric" }).formatRange(new Date(startMs), last);
+}
+
+export function formatMonth(ms: number): string {
+  return dateFormatter({ month: "short", year: "numeric" }).format(new Date(ms));
+}
+
 export function tickLabel(ms: number, bucketMs: number): string {
-  // Sub-day buckets show the clock; daily+ show the date.
+  // Sub-day buckets show the clock; daily and weekly ones the date. Buckets
+  // of two weeks or more (2Y, 5Y, All Time) span years, where "Jan 1" alone
+  // repeats, so they show the month and year.
   if (bucketMs < 86_400_000) return formatTime(ms);
+  if (bucketMs >= 14 * 86_400_000) return formatMonth(ms);
   return formatDay(ms);
 }

@@ -203,10 +203,15 @@ func (st *Store) Summary(ctx context.Context, userID string, days int) (*Summary
 		data.Name = profile.Name
 	}
 
-	daily, err := st.DailyMetrics(ctx, userID, []string{
-		summaryStepsType, summaryActiveEnergyType, summaryExerciseType,
-		summaryRestingHRType, summaryHRVType,
-	}, start, end)
+	// At most 90 days of five types: no page boundary to follow (Limit
+	// zero is the whole range).
+	daily, err := st.DailyMetrics(ctx, userID, DailyFilters{
+		Types: []string{
+			summaryStepsType, summaryActiveEnergyType, summaryExerciseType,
+			summaryRestingHRType, summaryHRVType,
+		},
+		Start: start, End: end,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("daily metrics: %w", err)
 	}

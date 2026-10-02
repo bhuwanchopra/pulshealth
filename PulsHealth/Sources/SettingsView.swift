@@ -1,200 +1,160 @@
 import SwiftUI
 import PulsHealthSync
 
+/// Screens pushed from Settings.
+enum SettingsRoute: Hashable {
+    case user, benchmark
+}
+
+/// The Settings tab: who the data is stored as, the sync window and backfill
+/// (only once a server is applied), how many types run at once, Health access
+/// and the on-device data under Privacy & Data, diagnostics, and About. The
+/// database is not here — it is the Sync tab's (`ServerSettingsView`).
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @State private var serverURLText = ""
-    @State private var tokenText = ""
-    @State private var loaded = false
     @State private var confirmResetAll = false
     @State private var confirmBackfill = false
+    @State private var confirmDeleteExport = false
+    @State private var confirmDeleteAnalysis = false
     @State private var validatingAggregates = false
-    @State private var aggregateValidationResult: String?
-    @State private var testingConnection = false
-    /// Outcome of the last Test Connection for the values currently entered;
-    /// cleared whenever either field changes.
-    @State private var connectionTest: ConnectionTestResult?
-    @State private var showScanner = false
-
-    /// Validation of the entered URL; nil while the field is empty (an empty
-    /// URL is allowed — it un-configures the server).
-    private var serverURLValidation: Result<URL, ServerURLValidation.Failure>? {
-        let trimmed = serverURLText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : ServerURLValidation.validate(trimmed)
-    }
-
-    private var validatedServerURL: URL? {
-        if case .success(let url) = serverURLValidation { return url }
-        return nil
-    }
-
-    private var serverURLIssue: String? {
-        if case .failure(let failure) = serverURLValidation { return failure.errorDescription }
-        return nil
-    }
-
-    private var enteredToken: String { ServerTokenField.normalize(tokenText) }
+    /// Failures in the last Validate Aggregate Functions run; nil before one.
+    @State private var aggregateValidationFailures: Int?
 
     var body: some View {
         @Bindable var model = model
+        let analyzed = model.explore.profiles.count
         Form {
-            Section("User") {
-                NavigationLink {
-                    UserView()
-                } label: {
-                    LabeledContent(model.config.userName?.isEmpty == false
-                        ? model.config.userName! : "User") {
-                        Text(model.config.userEmail ?? "")
-                            .foregroundStyle(.secondary)
-                    }
+            Section {
+                NavigationLink(value: SettingsRoute.user) {
+                    UserRow(name: model.config.userName, email: model.config.userEmail)
                 }
-                Text("All synced data is stored under this user. Change it before the initial backfill.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section {
-                TextField("https://your-host:8080", text: $serverURLText)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                if let issue = serverURLIssue {
-                    Label(issue, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                SecureField("Bearer token", text: $tokenText)
-                Button {
-                    runConnectionTest()
-                } label: {
-                    HStack {
-                        Text(testingConnection ? "Testing Connection…" : "Test Connection")
-                        if testingConnection {
-                            Spacer()
-                            ProgressView()
+            // Keyed on the *applied* server, like the Sync tab's setup card:
+            // without one there is nothing for a start date, a backfill or
+            // an anchor to act on.
+            if model.appliedConfig.serverURL != nil {
+                Section("Sync") {
+                    DatePicker(
+                        // "Sync", not "Export": the Export tab has its own time
+                        // range, and this date is not it.
+                        "Sync data from",
+                        selection: $model.config.startDate,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    Button {
+                        confirmBackfill = true
+                    } label: {
+                        HStack {
+                            Text("Start Initial Backfill")
+                            // Progress and ETA are the Sync tab's status card;
+                            // this only says why the button is disabled.
+                            if model.backfillActive {
+                                Spacer()
+                                ProgressView()
+                            }
                         }
                     }
+                    // Not under a running export: the two are the same sweep
+                    // over the same HealthKit store (AppModel.exportBlockedByBackfill
+                    // is this rule from the other side).
+                    .disabled(!model.configured || model.backfillActive || model.export.isRunning)
+                    Button("Reset All Anchors", role: .destructive) { confirmResetAll = true }
+                        .disabled(model.anySyncActive)
                 }
-                .disabled(testingConnection || validatedServerURL == nil || enteredToken.isEmpty)
-                if let result = connectionTest {
-                    ConnectionTestResultRow(result: result)
-                }
-                Button {
-                    showScanner = true
-                } label: {
-                    Label("Scan Pairing Code", systemImage: "qrcode.viewfinder")
-                }
-            } header: {
-                Text("Server")
-            } footer: {
-                Text("Use https://. Plain http:// is accepted only for hosts on your local network (localhost, *.local, 10.x, 172.16–31.x, 192.168.x). Test Connection uses the values entered above without saving them. Scanning fills all three values from the QR code the server prints (`make pairing`); Save & Apply still has to be tapped.")
             }
 
-            Section("Sync window") {
-                DatePicker(
-                    "Export data from",
-                    selection: $model.config.startDate,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                Text("The initial backfill exports everything from this date forward. Changing it later only affects types whose anchors are reset.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
+            // Not sync-only: the on-device export and the benchmark run the
+            // same sweep with these values.
             Section("Performance") {
-                Stepper(
-                    "Concurrent types: \(model.config.maxConcurrentTypes)",
-                    value: $model.config.maxConcurrentTypes, in: 1...8
-                )
+                Stepper(value: $model.config.maxConcurrentTypes, in: 1...8) {
+                    LabeledContent("Concurrent types", value: "\(model.config.maxConcurrentTypes)")
+                }
                 Picker("Batch size", selection: $model.config.batchSize) {
                     ForEach([250, 500, 1_000, 2_000, 5_000], id: \.self) {
                         Text($0.formatted()).tag($0)
                     }
                 }
-                Text("Defaults (4 types, 1,000/batch) are the field-tested sweet spot. Use the benchmark in Diagnostics to tune for your network.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section {
-                Button("Save & Apply") {
-                    Task { await apply() }
-                }
-                    .disabled(serverURLIssue != nil)
-            }
-
-            Section("Backfill") {
-                Button("Start Initial Backfill") { confirmBackfill = true }
-                    .disabled(!model.configured || model.backfillActive)
-                if model.backfillActive {
-                    HStack {
-                        ProgressView().controlSize(.small)
-                        Text("Sync in progress…").foregroundStyle(.secondary)
-                        if let eta = model.backfillRemaining {
-                            Spacer()
-                            Text("ETA \(eta.shortDuration)")
-                        }
+            // Only while there is something to apply: the draft holds edits
+            // from this screen and the User page until this or another
+            // Save & Apply commits them.
+            if model.hasPendingSettingsChanges {
+                Section {
+                    Button {
+                        Task { await model.applyConfiguration() }
+                    } label: {
+                        Text("Save & Apply")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
+                    .listRowSeparator(.hidden)
                 }
-                Text("Keep the app in the foreground and the device plugged in for the fastest backfill. Progress is saved after every batch — it's safe to interrupt.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section {
-                NavigationLink("Run Throughput Benchmark") { BenchmarkView() }
+            Section("Privacy & Data") {
+                // iOS has no link into the Health permission list itself; the
+                // app's own Settings page carries a Health row that opens it.
+                Link("Health Access", destination: URL(string: UIApplication.openSettingsURLString)!)
+                // The staged export is health data at rest on the device,
+                // and this is the way to remove it without going back to the
+                // Export tab. Only while there is one: a run in flight owns
+                // its files until it ends (`ExportModel.discard`).
+                if case .finished(let finished) = model.export.state, !finished.filesRemoved {
+                    Button("Delete Export", role: .destructive) { confirmDeleteExport = true }
+                }
+                // The per-type summaries the Explore tab keeps
+                // (`TypeProfileStore`): derived numbers, never samples, but
+                // health-derived data at rest, so the privacy policy promises
+                // this one-tap way to remove all of them.
+                Button("Delete Analysis", role: .destructive) { confirmDeleteAnalysis = true }
+                    .disabled(analyzed == 0 || !model.explore.running.isEmpty)
+            }
+
+            Section("Diagnostics") {
+                NavigationLink("Run Throughput Benchmark", value: SettingsRoute.benchmark)
                 Button {
                     runAggregateValidation()
                 } label: {
-                    if validatingAggregates {
-                        HStack {
-                            Text("Validating Aggregate Functions…")
-                            Spacer()
-                            ProgressView()
-                        }
-                    } else {
+                    HStack {
                         Text("Validate Aggregate Functions")
+                        Spacer()
+                        if validatingAggregates {
+                            ProgressView()
+                        } else if let failures = aggregateValidationFailures {
+                            // Each failure is logged under Sync → Activity.
+                            if failures == 0 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .accessibilityLabel("All passed")
+                            } else {
+                                Text("\(failures) failed").foregroundStyle(.red)
+                            }
+                        }
                     }
                 }
                 .disabled(validatingAggregates)
-                if let result = aggregateValidationResult {
-                    Text(result)
-                        .font(.caption)
-                        .foregroundStyle(result.hasPrefix("All") ? Color.secondary : .red)
-                }
                 Button("Show Onboarding Again") { model.restartOnboarding() }
-                Button("Reset All Anchors", role: .destructive) { confirmResetAll = true }
-                    .disabled(model.anySyncActive)
-            } header: {
-                Text("Diagnostics")
-            } footer: {
-                Text("Validation runs every type × aggregate-function combo against HealthKit. A crash here means the allowed-function table needs fixing; listed failures (also in the Log) are softer errors like missing authorization.")
             }
 
             Section("About") {
-                LabeledContent("Engine", value: "PulsHealthSync")
-                LabeledContent(
-                    "Background delivery",
-                    value: "immediate (per-type caps apply)"
-                )
-                Text("Real-time expectations: data written directly on this iPhone arrives in seconds. Steps/energy are throttled by iOS to roughly hourly. Apple Watch data must first sync to the phone, which iOS schedules opportunistically — typically minutes, sometimes hours. Opening this app forces a catch-up.")
-                    .font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Version", value: Self.versionString)
+                Link("Documentation", destination: URL(string: "https://pulshealth.com/docs/")!)
+                Link("Privacy Policy", destination: URL(string: "https://pulshealth.com/privacy")!)
+                Link("Open Source on GitHub", destination: URL(string: "https://github.com/PulsHealth/pulshealth")!)
+                Link("Report an Issue", destination: URL(string: "https://github.com/PulsHealth/pulshealth/issues/new/choose")!)
             }
         }
         .navigationTitle("Settings")
-        .onAppear {
-            guard !loaded else { return }
-            loaded = true
-            serverURLText = model.config.serverURL?.absoluteString ?? ""
-            tokenText = model.config.authToken ?? ""
-        }
-        .onChange(of: serverURLText) { connectionTest = nil }
-        .onChange(of: tokenText) { connectionTest = nil }
-        .sheet(isPresented: $showScanner) {
-            // A scanned code fills the fields (and the draft's user ID); it
-            // never applies anything on its own — Save & Apply still runs the
-            // server/user-change prompt if the target moved.
-            PairingScannerView { payload in
-                serverURLText = payload.serverURL.absoluteString
-                tokenText = payload.token
-                model.config.userID = payload.userID
+        .navigationDestination(for: SettingsRoute.self) { route in
+            switch route {
+            case .user: UserView()
+            case .benchmark: BenchmarkView()
             }
         }
         .alert("Reset all anchors?", isPresented: $confirmResetAll) {
@@ -203,82 +163,107 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Re-exports everything from the start date for all enabled types.")
+            Text("Re-sends everything from the start date for every synced type. Your database skips what it already has.")
+        }
+        .alert("Delete all analysis?", isPresented: $confirmDeleteAnalysis) {
+            Button("Delete", role: .destructive) { Task { await model.deleteAnalysis() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes the stored summaries for \(analyzed) type\(analyzed == 1 ? "" : "s"). Nothing in Apple Health changes.")
+        }
+        .alert("Delete this export?", isPresented: $confirmDeleteExport) {
+            Button("Delete", role: .destructive) { model.export.discard() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes the exported files from this iPhone. Copies you already saved or sent elsewhere are not affected.")
         }
         .alert("Start initial backfill?", isPresented: $confirmBackfill) {
             Button("Start Backfill") {
                 Task {
                     // A server/user change defers the apply to the fresh-vs-
                     // keep prompt; the backfill is then part of "start fresh".
-                    if await apply() {
+                    if await model.applyConfiguration() {
                         await model.startBackfill()
                     }
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Exports \(model.config.enabledTypes.count) data types from \(model.config.startDate.formatted(date: .abbreviated, time: .omitted)) onward.")
+            Text("Syncs \(model.config.enabledTypes.count) data types from \(model.config.startDate.formatted(date: .abbreviated, time: .omitted)) onward.")
         }
+    }
+
+    /// "1.6 (17)", from the bundle so it can never disagree with what shipped.
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     private func runAggregateValidation() {
         validatingAggregates = true
-        aggregateValidationResult = nil
+        aggregateValidationFailures = nil
         Task {
             let failures = await model.engine.validateAggregateFunctionMatrix()
             for failure in failures {
                 await model.engine.eventLog.log(.error, failure)
             }
-            aggregateValidationResult = failures.isEmpty
-                ? "All type × function combinations passed."
-                : "\(failures.count) failure\(failures.count == 1 ? "" : "s") — details in the Log tab."
+            aggregateValidationFailures = failures.count
             validatingAggregates = false
         }
     }
-
-    /// Runs the connection test against the *entered* URL and token — not the
-    /// saved ones — and persists nothing; only the result row changes.
-    private func runConnectionTest() {
-        guard let url = validatedServerURL else { return }
-        let token = enteredToken
-        testingConnection = true
-        connectionTest = nil
-        Task {
-            connectionTest = await model.testConnection(url: url, token: token)
-            testingConnection = false
-        }
-    }
-
-    /// False when the apply was deferred to the server-change prompt.
-    @discardableResult
-    private func apply() async -> Bool {
-        // Save & Apply is disabled while the URL is invalid; an empty field
-        // clears the server.
-        model.config.serverURL = validatedServerURL
-        let token = enteredToken
-        model.config.authToken = token.isEmpty ? nil : token
-        return await model.applyConfiguration()
-    }
-
 }
 
-/// The bearer-token field's input rules, shared by Settings and the first-run
-/// flow so both accept the same things.
-enum ServerTokenField {
-    /// Accepts a pasted `PULS_TOKEN=…` line from the server's `.env` as well as
-    /// the bare token.
-    static func normalize(_ text: String) -> String {
-        var token = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if token.hasPrefix("PULS_TOKEN="), let value = token.split(separator: "=", maxSplits: 1).last {
-            token = String(value)
+/// The row that opens the User page, in the style of iOS Settings' own
+/// account row: initials on an accent circle (a person glyph until there is a
+/// name), the name, and the e-mail under it when there is one.
+private struct UserRow: View {
+    let name: String?
+    let email: String?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Color.accentColor.gradient)
+                if let initials {
+                    Text(initials)
+                        .font(.headline)
+                } else {
+                    Image(systemName: "person.fill")
+                        .font(.title3)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name.flatMap { $0.isEmpty ? nil : $0 } ?? "User")
+                    .font(.headline)
+                if let email, !email.isEmpty {
+                    Text(email)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        return token
+        .padding(.vertical, 2)
+    }
+
+    private var initials: String? {
+        guard let name, !name.isEmpty,
+              let components = PersonNameComponentsFormatter().personNameComponents(from: name)
+        else { return nil }
+        let formatter = PersonNameComponentsFormatter()
+        formatter.style = .abbreviated
+        let initials = formatter.string(from: components)
+        return initials.isEmpty ? nil : initials
     }
 }
 
 /// Icon + one-liner for a `ConnectionTestResult`, plus the advertised feature
 /// list on success so it is visible why (say) reconciliation is offered or not.
-/// Shared with the onboarding flow's server step.
+/// Shown by `ServerSettingsView`, under Test Connection.
 struct ConnectionTestResultRow: View {
     let result: ConnectionTestResult
 
@@ -302,6 +287,7 @@ struct ConnectionTestResultRow: View {
         case .ok: "checkmark.circle.fill"
         case .okNoCapabilities: "checkmark.circle"
         case .tokenRejected: "lock.slash"
+        case .userMismatch: "person.crop.circle.badge.exclamationmark"
         case .unsupportedProtocol: "exclamationmark.triangle.fill"
         case .unreachable: "wifi.exclamationmark"
         case .serverError: "exclamationmark.octagon.fill"
@@ -312,13 +298,13 @@ struct ConnectionTestResultRow: View {
         switch result {
         case .ok, .okNoCapabilities: .green
         case .unsupportedProtocol: .orange
-        case .tokenRejected, .unreachable, .serverError: .red
+        case .tokenRejected, .userMismatch, .unreachable, .serverError: .red
         }
     }
 }
 
-/// The fresh-vs-keep prompt raised when Save & Apply (from Settings, the User
-/// page or the Data Types tab) would point the sync at a different server or
+/// The fresh-vs-keep prompt raised when Save & Apply (from the Database screen,
+/// Settings, the User page or the Synced Data bar) would point the sync at a different server or
 /// user ID than the stored anchors and watermarks were earned against.
 /// Attached at the root so it appears whichever tab the apply came from.
 struct ServerChangePrompt: ViewModifier {
@@ -327,7 +313,7 @@ struct ServerChangePrompt: ViewModifier {
     func body(content: Content) -> some View {
         content.alert(
             model.pendingServerChange?.serverChanged == false
-                ? "Sync as a different user?" : "Sync to a different server?",
+                ? "Sync as a different user?" : "Sync to a different database?",
             isPresented: Binding(
                 get: { model.pendingServerChange != nil },
                 // An alert only closes through its buttons, and each of them
@@ -347,11 +333,11 @@ struct ServerChangePrompt: ViewModifier {
     static func message(for change: ServerIdentityChange?) -> String {
         guard let change else { return "" }
         let what = change.serverChanged && change.userChanged
-            ? "The server and user ID changed"
-            : change.serverChanged ? "The server changed" : "The user ID changed"
+            ? "The database and user ID changed"
+            : change.serverChanged ? "The database changed" : "The user ID changed"
         let target = change.userChanged && !change.serverChanged
-            ? "the server treats a new user ID as a different person, so nothing synced so far counts for it"
-            : "your sync progress belongs to the previous server"
+            ? "your database treats a new user ID as a different person, so nothing synced so far counts for it"
+            : "your sync progress belongs to the previous database"
         return """
         \(what) (\(change.summary)) — \(target).
 
@@ -400,7 +386,7 @@ struct UserView: View {
                 .autocorrectionDisabled()
             }
 
-            Section("Characteristics") {
+            Section {
                 if let dob = model.config.userDateOfBirth {
                     DatePicker("Date of birth", selection: Binding(
                         get: { model.config.userDateOfBirth ?? dob },
@@ -425,8 +411,10 @@ struct UserView: View {
                     Text("Male").tag(String?.some("male"))
                     Text("Other").tag(String?.some("other"))
                 }
-                Text("Optional. Date of birth and sex feed derived metrics like heart-rate zones; leave them unset and those metrics are simply not computed.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Characteristics")
+            } footer: {
+                Text("Optional. Used for heart-rate zones.")
             }
 
             Section {
@@ -442,7 +430,7 @@ struct UserView: View {
                         }
                     }
                 if !userIDValid {
-                    Text("Not a valid UUID (8-4-4-4-12 hex digits). The previous ID stays in effect until this is fixed.")
+                    Text("Not a valid UUID.")
                         .font(.caption).foregroundStyle(.red)
                 }
                 Button("Generate New ID") {
@@ -451,7 +439,7 @@ struct UserView: View {
             } header: {
                 Text("Advanced")
             } footer: {
-                Text("Every row stored for you on the server is tagged with this ID, and it survives reinstalls. If several people share one server, each should sync under a distinct ID. Changing it makes the server treat you as a different person, so saving asks whether to re-sync all history under the new ID or keep going with only new data.")
+                Text("Each person sharing a database needs their own ID.")
             }
 
             Section {

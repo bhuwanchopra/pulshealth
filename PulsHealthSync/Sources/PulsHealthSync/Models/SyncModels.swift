@@ -467,6 +467,25 @@ public struct ProfilePayload: Codable, Sendable, Equatable {
     public var isEmpty: Bool {
         name == nil && email == nil && dateOfBirth == nil && biologicalSex == nil
     }
+
+    /// Whether Save & Apply should send `profile`, given the one this install
+    /// had applied before it.
+    ///
+    /// The line replaces the server's copy, so an empty profile clears it. That
+    /// is right when the user has just emptied the fields, and wrong when the
+    /// fields were never filled: a fresh install pairing with a server that
+    /// already holds the user's name, e-mail, date of birth and sex used to
+    /// erase all four on its first Apply — and with them the inputs heart-rate
+    /// zones are computed from. So an empty profile goes out only when it
+    /// replaces a non-empty one — or when an earlier clear never reached the
+    /// server (`clearPending`): from the Apply after a failed one, the stored
+    /// profile is already empty, and without the flag the clear would never be
+    /// retried.
+    public static func shouldUpload(
+        _ profile: ProfilePayload, replacing previous: ProfilePayload, clearPending: Bool = false
+    ) -> Bool {
+        !profile.isEmpty || !previous.isEmpty || clearPending
+    }
 }
 
 /// One computed statistics value (covering one time bucket) from an aggregate

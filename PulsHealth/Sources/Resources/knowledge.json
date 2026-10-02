@@ -1,0 +1,3130 @@
+{
+  "HKCategoryTypeIdentifierAbdominalCramps": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Abdominal Cramps",
+    "identifier": "HKCategoryTypeIdentifierAbdominalCramps",
+    "short_description": "Tracks episodes of cramping pain in the abdominal region.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierAcne": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Acne",
+    "identifier": "HKCategoryTypeIdentifierAcne",
+    "short_description": "Tracks acne breakouts and their severity.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierAppetiteChanges": {
+    "category_values": [
+      {
+        "description": "No appetite changes experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Appetite decreased from normal",
+        "name": "decreased",
+        "value": 1
+      },
+      {
+        "description": "Appetite unchanged",
+        "name": "noChange",
+        "value": 2
+      },
+      {
+        "description": "Appetite increased from normal",
+        "name": "increased",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Appetite Changes",
+    "identifier": "HKCategoryTypeIdentifierAppetiteChanges",
+    "short_description": "Tracks changes in appetite including increased or decreased hunger.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierAppleStandHour": {
+    "category_values": [
+      {
+        "description": "User stood up and moved around for at least one minute during the hour. The stand goal for that hour is achieved.",
+        "name": "stood",
+        "value": 0
+      },
+      {
+        "description": "User did not stand and move for at least one minute during the hour. The hour is counted as sedentary.",
+        "name": "idle",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Apple Stand Hour",
+    "identifier": "HKCategoryTypeIdentifierAppleStandHour",
+    "short_description": "Records whether the user stood and moved for at least one minute during a given hour.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent": {
+    "category_values": [
+      {
+        "description": "Walking Steadiness has been classified as Low for the first time. This indicates significant concern for fall risk and warrants attention.",
+        "name": "initialLow",
+        "value": 1
+      },
+      {
+        "description": "Walking Steadiness has been classified as Very Low for the first time. This indicates critical fall risk requiring immediate attention and likely clinical evaluation.",
+        "name": "initialVeryLow",
+        "value": 2
+      },
+      {
+        "description": "Walking Steadiness remains classified as Low on subsequent measurement. Persistent low steadiness indicates ongoing fall risk.",
+        "name": "repeatLow",
+        "value": 3
+      },
+      {
+        "description": "Walking Steadiness remains classified as Very Low on subsequent measurement. Persistent very low steadiness indicates critical ongoing fall risk.",
+        "name": "repeatVeryLow",
+        "value": 4
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Apple Walking Steadiness Event",
+    "identifier": "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent",
+    "short_description": "Records events when walking steadiness measurements indicate increased fall risk, categorized by severity.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierAudioExposureEvent": {
+    "category_values": [
+      {
+        "description": "Environmental sound level exceeded the WHO-recommended threshold for hearing damage risk. Event indicates sustained exposure to loud ambient noise.",
+        "name": "loudEnvironment",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Audio Exposure Event",
+    "identifier": "HKCategoryTypeIdentifierAudioExposureEvent",
+    "short_description": "Records events when environmental sound levels reach potentially harmful thresholds for hearing health.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierBladderIncontinence": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Bladder Incontinence",
+    "identifier": "HKCategoryTypeIdentifierBladderIncontinence",
+    "short_description": "Tracks episodes of involuntary urine leakage.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierBloating": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Bloating",
+    "identifier": "HKCategoryTypeIdentifierBloating",
+    "short_description": "Tracks episodes of abdominal bloating and distension.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierCervicalMucusQuality": {
+    "category_values": [
+      {
+        "description": "No noticeable cervical mucus; vaginal area feels dry. Typically indicates low fertility, occurring immediately after menstruation and before the next period.",
+        "name": "dry",
+        "value": 1
+      },
+      {
+        "description": "Thick, tacky mucus that holds its shape when touched. Low to moderate fertility; sperm survival is limited in this environment.",
+        "name": "sticky",
+        "value": 2
+      },
+      {
+        "description": "Smooth, lotion-like mucus that is white or yellowish. Moderate fertility; indicates approaching ovulation but not peak fertility.",
+        "name": "creamy",
+        "value": 3
+      },
+      {
+        "description": "Thin, clear, watery mucus that feels slippery. High fertility; often occurs 1-2 days before the most fertile period.",
+        "name": "watery",
+        "value": 4
+      },
+      {
+        "description": "Clear, stretchy mucus resembling raw egg whites that can stretch between fingers. Peak fertility; optimal environment for sperm survival and transport, indicating ovulation is imminent or occurring.",
+        "name": "eggWhite",
+        "value": 5
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Cervical Mucus Quality",
+    "identifier": "HKCategoryTypeIdentifierCervicalMucusQuality",
+    "short_description": "Tracks cervical mucus characteristics to identify fertile windows through natural family planning methods.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierChestTightnessOrPain": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Chest Tightness or Pain",
+    "identifier": "HKCategoryTypeIdentifierChestTightnessOrPain",
+    "short_description": "Tracks episodes of chest tightness, pressure, or pain.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierChills": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Chills",
+    "identifier": "HKCategoryTypeIdentifierChills",
+    "short_description": "Tracks episodes of chills and shivering.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierConstipation": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Constipation",
+    "identifier": "HKCategoryTypeIdentifierConstipation",
+    "short_description": "Tracks episodes of constipation and difficulty passing stool.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierContraceptive": {
+    "category_values": [
+      {
+        "description": "Contraceptive use occurred but the specific type was not specified.",
+        "name": "unspecified",
+        "value": 1
+      },
+      {
+        "description": "Subdermal contraceptive implant (e.g., Nexplanon), a long-acting reversible contraceptive inserted under the skin of the upper arm.",
+        "name": "implant",
+        "value": 2
+      },
+      {
+        "description": "Injectable contraceptive (e.g., Depo-Provera), typically administered every 3 months.",
+        "name": "injection",
+        "value": 3
+      },
+      {
+        "description": "Intrauterine device (IUD), either hormonal (e.g., Mirena, Kyleena) or copper (Paragard), providing long-term contraception.",
+        "name": "intrauterineDevice",
+        "value": 4
+      },
+      {
+        "description": "Vaginal ring (e.g., NuvaRing), a flexible ring inserted monthly that releases hormones.",
+        "name": "intravaginalRing",
+        "value": 5
+      },
+      {
+        "description": "Oral contraceptive pills, including combination pills and progestin-only pills, taken daily.",
+        "name": "oral",
+        "value": 6
+      },
+      {
+        "description": "Transdermal contraceptive patch (e.g., Xulane), worn on the skin and changed weekly.",
+        "name": "patch",
+        "value": 7
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Contraceptive",
+    "identifier": "HKCategoryTypeIdentifierContraceptive",
+    "short_description": "Tracks contraceptive methods used, including hormonal, barrier, and other birth control types.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierCoughing": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Coughing",
+    "identifier": "HKCategoryTypeIdentifierCoughing",
+    "short_description": "Tracks coughing episodes and their severity.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierDiarrhea": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Diarrhea",
+    "identifier": "HKCategoryTypeIdentifierDiarrhea",
+    "short_description": "Tracks episodes of diarrhea and loose stools.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierDizziness": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Dizziness",
+    "identifier": "HKCategoryTypeIdentifierDizziness",
+    "short_description": "Tracks episodes of dizziness, lightheadedness, or vertigo.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierDrySkin": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Dry Skin",
+    "identifier": "HKCategoryTypeIdentifierDrySkin",
+    "short_description": "Tracks episodes of dry, rough, or flaky skin.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierFatigue": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Fatigue",
+    "identifier": "HKCategoryTypeIdentifierFatigue",
+    "short_description": "Tracks episodes of fatigue, tiredness, or exhaustion.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierFever": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Fever",
+    "identifier": "HKCategoryTypeIdentifierFever",
+    "short_description": "Tracks episodes of fever or elevated body temperature.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierGeneralizedBodyAche": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Generalized Body Ache",
+    "identifier": "HKCategoryTypeIdentifierGeneralizedBodyAche",
+    "short_description": "Tracks episodes of widespread muscle aches and body pain.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHairLoss": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Hair Loss",
+    "identifier": "HKCategoryTypeIdentifierHairLoss",
+    "short_description": "Tracks episodes of unusual hair shedding or thinning.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHandwashingEvent": {
+    "category_values": [
+      {
+        "description": "The only valid value for handwashing events - indicates a washing session occurred",
+        "name": "notApplicable",
+        "value": 0
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Handwashing",
+    "identifier": "HKCategoryTypeIdentifierHandwashingEvent",
+    "short_description": "Records handwashing events detected automatically or logged manually, tracking hygiene behavior.",
+    "typical_range": {
+      "max": null,
+      "min": null,
+      "notes": "CDC recommends washing hands for at least 20 seconds\nduration_seconds: 20-40\nfrequency: 6-10+ times daily",
+      "unit": null
+    }
+  },
+  "HKCategoryTypeIdentifierHeadache": {
+    "category_values": [
+      {
+        "description": "Symptom not experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Symptom present - mild",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Symptom present - moderate",
+        "name": "present",
+        "value": 2
+      },
+      {
+        "description": "Symptom present - severe",
+        "name": "present",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Headache",
+    "identifier": "HKCategoryTypeIdentifierHeadache",
+    "short_description": "Tracks headache episodes and their severity.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent": {
+    "category_values": [
+      {
+        "description": "Headphone audio exposure over the past 7 days has exceeded the WHO-recommended safe limit of 80 decibels averaged over 40 hours per week.",
+        "name": "sevenDayLimit",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Headphone Audio Exposure Event",
+    "identifier": "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
+    "short_description": "Records events when headphone audio levels exceed safe listening thresholds, risking hearing damage.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHeartburn": {
+    "category_values": [
+      {
+        "description": "No heartburn symptoms experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild heartburn - slight burning sensation, easily tolerable",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate heartburn - noticeable discomfort affecting activities",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe heartburn - intense burning, significant distress",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Heartburn",
+    "identifier": "HKCategoryTypeIdentifierHeartburn",
+    "short_description": "Tracks episodes of heartburn or acid reflux symptoms",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHighHeartRateEvent": {
+    "category_values": [
+      {
+        "description": "The only value for high heart rate events. The presence of a sample indicates the threshold was exceeded while inactive. The actual heart rate value is stored in associated metadata.",
+        "name": "notApplicable",
+        "value": 0
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "High Heart Rate Event",
+    "identifier": "HKCategoryTypeIdentifierHighHeartRateEvent",
+    "short_description": "Records events when heart rate exceeds a user-configured threshold while the user appears inactive.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierHotFlashes": {
+    "category_values": [
+      {
+        "description": "No hot flash episodes experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild hot flash - brief warmth, minimal disruption",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate hot flash - noticeable flushing and sweating",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe hot flash - intense heat, profuse sweating, significant distress",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Hot Flashes",
+    "identifier": "HKCategoryTypeIdentifierHotFlashes",
+    "short_description": "Tracks episodes of sudden warmth and flushing, commonly associated with menopause",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierInfrequentMenstrualCycles": {
+    "category_values": [
+      {
+        "description": "Infrequent menstrual cycles have been detected. This is a system notification indicating the user's cycle data shows fewer than expected periods over a defined tracking period.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Infrequent Menstrual Cycles",
+    "identifier": "HKCategoryTypeIdentifierInfrequentMenstrualCycles",
+    "short_description": "System-generated notification indicating menstrual cycles are occurring less frequently than typical, potentially signaling oligomenorrhea.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierIntermenstrualBleeding": {
+    "category_values": [
+      {
+        "description": "The only value for this category type, indicating that intermenstrual bleeding occurred on this day.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Intermenstrual Bleeding",
+    "identifier": "HKCategoryTypeIdentifierIntermenstrualBleeding",
+    "short_description": "Records spotting or bleeding that occurs between menstrual periods.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierIrregularHeartRhythmEvent": {
+    "category_values": [
+      {
+        "description": "Algorithm detected irregular rhythm patterns consistent with atrial fibrillation during the monitoring period.",
+        "name": "aFibDetected",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Irregular Heart Rhythm Event",
+    "identifier": "HKCategoryTypeIdentifierIrregularHeartRhythmEvent",
+    "short_description": "Records events when Apple Watch detects heart rhythm patterns suggestive of atrial fibrillation (AFib).",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierIrregularMenstrualCycles": {
+    "category_values": [
+      {
+        "description": "Irregular menstrual cycles have been detected. This is a system notification indicating significant cycle-to-cycle length variability in the user's logged period data.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Irregular Menstrual Cycles",
+    "identifier": "HKCategoryTypeIdentifierIrregularMenstrualCycles",
+    "short_description": "System-generated notification indicating significant variability in menstrual cycle length from month to month.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierLactation": {
+    "category_values": [
+      {
+        "description": "Lactation event occurred. This is the only category value; additional details like duration or breast side may be stored in metadata or sample duration.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Lactation",
+    "identifier": "HKCategoryTypeIdentifierLactation",
+    "short_description": "Tracks breastfeeding and pumping sessions for postpartum mothers.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierLowCardioFitnessEvent": {
+    "category_values": [
+      {
+        "description": "VO2 max estimate has fallen into the 'Low' fitness category based on age and sex-adjusted clinical thresholds, indicating cardiovascular fitness below healthy ranges.",
+        "name": "lowFitness",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Low Cardio Fitness Event",
+    "identifier": "HKCategoryTypeIdentifierLowCardioFitnessEvent",
+    "short_description": "Records events when VO2 max estimates fall below clinically significant thresholds indicating poor cardiorespiratory fitness.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierLowHeartRateEvent": {
+    "category_values": [
+      {
+        "description": "The only value for low heart rate events. The presence of a sample indicates the threshold was breached. The actual heart rate value is stored in associated metadata.",
+        "name": "notApplicable",
+        "value": 0
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Low Heart Rate Event",
+    "identifier": "HKCategoryTypeIdentifierLowHeartRateEvent",
+    "short_description": "Records events when heart rate falls below a user-configured threshold while the user has been inactive.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierLowerBackPain": {
+    "category_values": [
+      {
+        "description": "No lower back pain experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild pain - noticeable but does not limit activities",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate pain - limits some activities, may require medication",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe pain - significantly limits activities, requires intervention",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Lower Back Pain",
+    "identifier": "HKCategoryTypeIdentifierLowerBackPain",
+    "short_description": "Tracks episodes and severity of lower back pain",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierMenstrualFlow": {
+    "category_values": [
+      {
+        "description": "Menstrual flow occurred but intensity was not specified by the user.",
+        "name": "unspecified",
+        "value": 1
+      },
+      {
+        "description": "No menstrual flow on this day, typically used to mark the end of a period or spotting-free days during expected menstruation.",
+        "name": "none",
+        "value": 2
+      },
+      {
+        "description": "Light menstrual flow, typically requiring only panty liners or light absorbency products.",
+        "name": "light",
+        "value": 3
+      },
+      {
+        "description": "Moderate menstrual flow, typically requiring regular absorbency tampons or pads changed every 3-4 hours.",
+        "name": "medium",
+        "value": 4
+      },
+      {
+        "description": "Heavy menstrual flow, requiring high-absorbency products and frequent changes, potentially every 1-2 hours.",
+        "name": "heavy",
+        "value": 5
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Menstrual Flow",
+    "identifier": "HKCategoryTypeIdentifierMenstrualFlow",
+    "short_description": "Tracks menstrual bleeding intensity during a period, ranging from none to heavy flow.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierMindfulSession": {
+    "category_values": [
+      {
+        "description": "The only value for mindful sessions. The presence of a sample indicates a mindfulness session occurred; duration is captured via start and end timestamps.",
+        "name": "notApplicable",
+        "value": 0
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Mindful Session",
+    "identifier": "HKCategoryTypeIdentifierMindfulSession",
+    "short_description": "Records mindfulness or meditation sessions, tracking time spent in intentional mental health practice.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierMoodChanges": {
+    "category_values": [
+      {
+        "description": "No notable mood changes; stable emotional state",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild mood changes - slight emotional variability",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate mood changes - noticeable emotional shifts affecting daily life",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe mood changes - significant emotional instability, difficult to manage",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Mood Changes",
+    "identifier": "HKCategoryTypeIdentifierMoodChanges",
+    "short_description": "Tracks changes in emotional state or mood stability",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierNausea": {
+    "category_values": [
+      {
+        "description": "No nausea experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild nausea - slight queasiness, able to eat and function",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate nausea - persistent discomfort, reduced appetite",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe nausea - intense, may lead to vomiting, significantly impacts function",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Nausea",
+    "identifier": "HKCategoryTypeIdentifierNausea",
+    "short_description": "Tracks episodes and severity of nausea",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierNightSweats": {
+    "category_values": [
+      {
+        "description": "No night sweats experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild night sweats - light sweating, may not require changing clothes",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate night sweats - noticeable sweating, may need to change clothes",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe night sweats - drenching sweats requiring bedding/clothing change",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Night Sweats",
+    "identifier": "HKCategoryTypeIdentifierNightSweats",
+    "short_description": "Tracks episodes of excessive sweating during sleep",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierOvulationTestResult": {
+    "category_values": [
+      {
+        "description": "Test line is lighter than control line, indicating LH levels have not yet surged. Ovulation is not imminent.",
+        "name": "negative",
+        "value": 1
+      },
+      {
+        "description": "Test line is equal to or darker than control line, indicating the LH surge has been detected. Ovulation typically occurs within 24-36 hours.",
+        "name": "luteinizingHormoneSurge",
+        "value": 2
+      },
+      {
+        "description": "Test result is unclear or invalid, possibly due to testing error, diluted urine, or faulty test strip.",
+        "name": "indeterminate",
+        "value": 3
+      },
+      {
+        "description": "For advanced digital OPKs that detect estrogen rise before LH surge, indicating high fertility is approaching but peak has not yet been reached.",
+        "name": "estrogenSurge",
+        "value": 4
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Ovulation Test Result",
+    "identifier": "HKCategoryTypeIdentifierOvulationTestResult",
+    "short_description": "Records results from ovulation predictor kit (OPK) tests that detect the LH surge preceding ovulation.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierPelvicPain": {
+    "category_values": [
+      {
+        "description": "No pelvic pain experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild pelvic pain - slight discomfort, does not limit activities",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate pelvic pain - noticeable pain affecting some activities",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe pelvic pain - significant pain limiting daily activities",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Pelvic Pain",
+    "identifier": "HKCategoryTypeIdentifierPelvicPain",
+    "short_description": "Tracks episodes and severity of pelvic region pain",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding": {
+    "category_values": [
+      {
+        "description": "Persistent intermenstrual bleeding has been detected. This is a system notification indicating the user has logged spotting between periods in multiple consecutive cycles.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Persistent Intermenstrual Bleeding",
+    "identifier": "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding",
+    "short_description": "System-generated notification indicating spotting or bleeding between periods has occurred repeatedly across multiple menstrual cycles.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierPregnancy": {
+    "category_values": [
+      {
+        "description": "User is currently pregnant. This is the only category value; the sample start and end dates indicate the pregnancy duration.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Pregnancy",
+    "identifier": "HKCategoryTypeIdentifierPregnancy",
+    "short_description": "Records pregnancy status to provide context for other health metrics during gestation.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierPregnancyTestResult": {
+    "category_values": [
+      {
+        "description": "Pregnancy test did not detect hCG above threshold level, indicating pregnancy is unlikely. However, testing too early may produce false negatives.",
+        "name": "negative",
+        "value": 1
+      },
+      {
+        "description": "Pregnancy test detected hCG, indicating pregnancy. Confirmation with healthcare provider is recommended.",
+        "name": "positive",
+        "value": 2
+      },
+      {
+        "description": "Test result is unclear, possibly due to faint line, testing error, or early pregnancy with borderline hCG levels.",
+        "name": "indeterminate",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Pregnancy Test Result",
+    "identifier": "HKCategoryTypeIdentifierPregnancyTestResult",
+    "short_description": "Records results from home pregnancy tests that detect human chorionic gonadotropin (hCG).",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierProgesteroneTestResult": {
+    "category_values": [
+      {
+        "description": "Low progesterone levels detected, indicating ovulation has not occurred or the luteal phase is inadequate.",
+        "name": "negative",
+        "value": 1
+      },
+      {
+        "description": "Elevated progesterone levels detected, confirming ovulation has occurred and the corpus luteum is producing progesterone.",
+        "name": "positive",
+        "value": 2
+      },
+      {
+        "description": "Test result is unclear or progesterone levels are borderline, making interpretation uncertain.",
+        "name": "indeterminate",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Progesterone Test Result",
+    "identifier": "HKCategoryTypeIdentifierProgesteroneTestResult",
+    "short_description": "Records results from progesterone tests used to confirm ovulation and assess luteal phase function.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierProlongedMenstrualPeriods": {
+    "category_values": [
+      {
+        "description": "Prolonged menstrual periods have been detected. This is a system notification indicating the user's logged period duration consistently exceeds typical ranges.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Prolonged Menstrual Periods",
+    "identifier": "HKCategoryTypeIdentifierProlongedMenstrualPeriods",
+    "short_description": "System-generated notification indicating menstrual bleeding is lasting longer than typical, potentially signaling menorrhagia.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat": {
+    "category_values": [
+      {
+        "description": "No palpitations or abnormal heartbeat awareness",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild palpitations - brief awareness, not distressing",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate palpitations - persistent awareness, somewhat distressing",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe palpitations - intense, frightening, or with other symptoms",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Rapid, Pounding, or Fluttering Heartbeat",
+    "identifier": "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat",
+    "short_description": "Tracks episodes of palpitations or awareness of heartbeat",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierRunnyNose": {
+    "category_values": [
+      {
+        "description": "No runny nose or nasal discharge",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild runny nose - occasional drip, minimal tissue use",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate runny nose - frequent discharge, regular tissue use",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe runny nose - constant dripping, significantly bothersome",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Runny Nose",
+    "identifier": "HKCategoryTypeIdentifierRunnyNose",
+    "short_description": "Tracks episodes and severity of nasal discharge",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSexualActivity": {
+    "category_values": [
+      {
+        "description": "Sexual activity occurred. This is the only category value; additional context about protection use is stored in metadata.",
+        "name": "notApplicable",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Sexual Activity",
+    "identifier": "HKCategoryTypeIdentifierSexualActivity",
+    "short_description": "Logs sexual activity events with optional indication of protection use for fertility and reproductive health tracking.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierShortnessOfBreath": {
+    "category_values": [
+      {
+        "description": "No shortness of breath experienced",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild shortness of breath - slight awareness, able to complete activities",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate shortness of breath - noticeable difficulty, limits some activities",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe shortness of breath - significant distress, markedly limits activities",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Shortness of Breath",
+    "identifier": "HKCategoryTypeIdentifierShortnessOfBreath",
+    "short_description": "Tracks episodes of dyspnea or breathing difficulty",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSinusCongestion": {
+    "category_values": [
+      {
+        "description": "No sinus congestion; normal nasal breathing",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild congestion - slight stuffiness, can breathe through nose",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate congestion - noticeable obstruction, partial mouth breathing",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe congestion - near-complete obstruction, mouth breathing required",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Sinus Congestion",
+    "identifier": "HKCategoryTypeIdentifierSinusCongestion",
+    "short_description": "Tracks episodes and severity of nasal and sinus congestion",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSkippedHeartbeat": {
+    "category_values": [
+      {
+        "description": "No skipped or extra heartbeats noticed",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild - occasional isolated skipped beats",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate - multiple skipped beats, somewhat bothersome",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe - frequent skipped beats, distressing or associated with other symptoms",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Skipped Heartbeat",
+    "identifier": "HKCategoryTypeIdentifierSkippedHeartbeat",
+    "short_description": "Tracks episodes of perceived missed or extra heartbeats",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSleepAnalysis": {
+    "category_values": [
+      {
+        "description": "User is in bed but sleep state is undetermined. Represents the total time from getting into bed to getting out, regardless of actual sleep.",
+        "name": "inBed",
+        "value": 0
+      },
+      {
+        "description": "User is asleep but the specific sleep stage cannot be determined. Used when device lacks sleep staging capability or data is insufficient for classification.",
+        "name": "asleepUnspecified",
+        "value": 1
+      },
+      {
+        "description": "User is awake during a sleep session. Captures periods of wakefulness after initially falling asleep (WASO - Wake After Sleep Onset).",
+        "name": "awake",
+        "value": 2
+      },
+      {
+        "description": "User is in core (light) sleep, also known as N1 and N2 NREM sleep stages. Characterized by reduced muscle activity, slower eye movements, and sleep spindles.",
+        "name": "asleepCore",
+        "value": 3
+      },
+      {
+        "description": "User is in deep sleep (N3 NREM/slow-wave sleep). Most restorative stage characterized by delta brain waves, growth hormone release, and physical recovery.",
+        "name": "asleepDeep",
+        "value": 4
+      },
+      {
+        "description": "User is in REM (Rapid Eye Movement) sleep. Associated with vivid dreaming, memory consolidation, emotional processing, and temporary muscle paralysis.",
+        "name": "asleepREM",
+        "value": 5
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Sleep Analysis",
+    "identifier": "HKCategoryTypeIdentifierSleepAnalysis",
+    "short_description": "Records sleep stages and time spent in bed, including detailed sleep architecture data.",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSleepChanges": {
+    "category_values": [
+      {
+        "description": "No notable changes in sleep patterns",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild sleep changes - slight variation from normal",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate sleep changes - noticeable impact on rest quality",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe sleep changes - significant disruption to sleep patterns",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Sleep Changes",
+    "identifier": "HKCategoryTypeIdentifierSleepChanges",
+    "short_description": "Tracks changes in sleep patterns or quality",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierSoreThroat": {
+    "category_values": [
+      {
+        "description": "No sore throat or throat discomfort",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild sore throat - slight scratchiness or irritation",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate sore throat - noticeable pain, uncomfortable swallowing",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe sore throat - significant pain, difficulty swallowing",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Sore Throat",
+    "identifier": "HKCategoryTypeIdentifierSoreThroat",
+    "short_description": "Tracks episodes and severity of throat pain or irritation",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierToothbrushingEvent": {
+    "category_values": [
+      {
+        "description": "The only valid value for toothbrushing events - indicates a brushing session occurred",
+        "name": "notApplicable",
+        "value": 0
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Toothbrushing",
+    "identifier": "HKCategoryTypeIdentifierToothbrushingEvent",
+    "short_description": "Records toothbrushing events with duration and timing information.",
+    "typical_range": {
+      "max": null,
+      "min": null,
+      "notes": "Dental associations recommend brushing for 2 minutes, twice daily\nduration_seconds: 120-180\nfrequency: 2-3 times daily",
+      "unit": null
+    }
+  },
+  "HKCategoryTypeIdentifierVomiting": {
+    "category_values": [
+      {
+        "description": "No vomiting episodes",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild - isolated episode(s), tolerable",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate - multiple episodes, limited oral intake",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe - frequent episodes, unable to keep fluids down",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Vomiting",
+    "identifier": "HKCategoryTypeIdentifierVomiting",
+    "short_description": "Tracks episodes and severity of vomiting",
+    "typical_range": null
+  },
+  "HKCategoryTypeIdentifierWheezing": {
+    "category_values": [
+      {
+        "description": "No wheezing; normal breath sounds",
+        "name": "notPresent",
+        "value": 0
+      },
+      {
+        "description": "Mild wheezing - audible with effort, minimal distress",
+        "name": "present",
+        "value": 1
+      },
+      {
+        "description": "Moderate wheezing - easily audible, some breathing difficulty",
+        "name": "moderate",
+        "value": 2
+      },
+      {
+        "description": "Severe wheezing - loud, significant respiratory distress",
+        "name": "severe",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Wheezing",
+    "identifier": "HKCategoryTypeIdentifierWheezing",
+    "short_description": "Tracks episodes of whistling sounds during breathing",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierActivityMoveMode": {
+    "category_values": [
+      {
+        "description": "Move ring tracks Active Energy Burned (calories/kilocalories) - the default mode",
+        "name": "activeEnergy",
+        "value": 0
+      },
+      {
+        "description": "Move ring tracks Apple Move Time (exercise minutes) instead of active calories",
+        "name": "appleMoveTime",
+        "value": 1
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Activity Move Mode",
+    "identifier": "HKCharacteristicTypeIdentifierActivityMoveMode",
+    "short_description": "Specifies whether the Activity ring tracks Active Calories or Exercise Minutes as the Move goal.",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierBiologicalSex": {
+    "category_values": [
+      {
+        "description": "The user has not specified their biological sex in Health settings",
+        "name": "notSet",
+        "value": 0
+      },
+      {
+        "description": "Female biological sex",
+        "name": "female",
+        "value": 1
+      },
+      {
+        "description": "Male biological sex",
+        "name": "male",
+        "value": 2
+      },
+      {
+        "description": "Other or not exclusively male or female",
+        "name": "other",
+        "value": 3
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Biological Sex",
+    "identifier": "HKCharacteristicTypeIdentifierBiologicalSex",
+    "short_description": "The user's biological sex as set in their Health profile, used for health calculations and reference ranges.",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierBloodType": {
+    "category_values": [
+      {
+        "description": "The user has not specified their blood type",
+        "name": "notSet",
+        "value": 0
+      },
+      {
+        "description": "Blood type A positive (A+)",
+        "name": "aPositive",
+        "value": 1
+      },
+      {
+        "description": "Blood type A negative (A-)",
+        "name": "aNegative",
+        "value": 2
+      },
+      {
+        "description": "Blood type B positive (B+)",
+        "name": "bPositive",
+        "value": 3
+      },
+      {
+        "description": "Blood type B negative (B-)",
+        "name": "bNegative",
+        "value": 4
+      },
+      {
+        "description": "Blood type AB positive (AB+)",
+        "name": "abPositive",
+        "value": 5
+      },
+      {
+        "description": "Blood type AB negative (AB-)",
+        "name": "abNegative",
+        "value": 6
+      },
+      {
+        "description": "Blood type O positive (O+)",
+        "name": "oPositive",
+        "value": 7
+      },
+      {
+        "description": "Blood type O negative (O-)",
+        "name": "oNegative",
+        "value": 8
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Blood Type",
+    "identifier": "HKCharacteristicTypeIdentifierBloodType",
+    "short_description": "The user's ABO blood type and Rh factor as set in their Health profile.",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierDateOfBirth": {
+    "category_values": null,
+    "default_unit": null,
+    "human_readable_name": "Date of Birth",
+    "identifier": "HKCharacteristicTypeIdentifierDateOfBirth",
+    "short_description": "The user's date of birth as set in their Health profile, used for age-based health calculations.",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierFitzpatrickSkinType": {
+    "category_values": [
+      {
+        "description": "The user has not specified their skin type",
+        "name": "notSet",
+        "value": 0
+      },
+      {
+        "description": "Very fair skin, always burns, never tans. Light eyes, blond or red hair. High sensitivity to UV.",
+        "name": "I",
+        "value": 1
+      },
+      {
+        "description": "Fair skin, usually burns, tans minimally. Light eyes, blond or light brown hair. High sensitivity to UV.",
+        "name": "II",
+        "value": 2
+      },
+      {
+        "description": "Medium skin, sometimes mild burn, tans uniformly. Any eye or hair color. Moderate sensitivity to UV.",
+        "name": "III",
+        "value": 3
+      },
+      {
+        "description": "Olive skin, rarely burns, tans easily. Dark eyes, dark hair. Low sensitivity to UV.",
+        "name": "IV",
+        "value": 4
+      },
+      {
+        "description": "Brown skin, very rarely burns, tans very easily. Dark eyes, dark hair. Very low sensitivity to UV.",
+        "name": "V",
+        "value": 5
+      },
+      {
+        "description": "Dark brown to black skin, never burns, deeply pigmented. Dark eyes, dark hair. Least sensitivity to UV.",
+        "name": "VI",
+        "value": 6
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Fitzpatrick Skin Type",
+    "identifier": "HKCharacteristicTypeIdentifierFitzpatrickSkinType",
+    "short_description": "The user's skin phototype classification used for UV exposure recommendations and skin health guidance.",
+    "typical_range": null
+  },
+  "HKCharacteristicTypeIdentifierWheelchairUse": {
+    "category_values": [
+      {
+        "description": "The user has not specified their wheelchair use status",
+        "name": "notSet",
+        "value": 0
+      },
+      {
+        "description": "The user does not use a wheelchair",
+        "name": "no",
+        "value": 1
+      },
+      {
+        "description": "The user uses a wheelchair as their primary means of mobility",
+        "name": "yes",
+        "value": 2
+      }
+    ],
+    "default_unit": null,
+    "human_readable_name": "Wheelchair Use",
+    "identifier": "HKCharacteristicTypeIdentifierWheelchairUse",
+    "short_description": "Indicates whether the user uses a wheelchair, enabling appropriate activity tracking and metrics.",
+    "typical_range": null
+  },
+  "HKCorrelationTypeIdentifierBloodPressure": {
+    "category_values": null,
+    "default_unit": "mmHg",
+    "human_readable_name": "Blood Pressure",
+    "identifier": "HKCorrelationTypeIdentifierBloodPressure",
+    "short_description": "A correlation grouping systolic and diastolic blood pressure readings taken at the same time.",
+    "typical_range": {
+      "max": null,
+      "min": null,
+      "notes": "Normal blood pressure is typically below 120/80 mmHg\ndiastolic: 60-80 mmHg\nsystolic: 90-120 mmHg",
+      "unit": null
+    }
+  },
+  "HKCorrelationTypeIdentifierFood": {
+    "category_values": null,
+    "default_unit": null,
+    "human_readable_name": "Food",
+    "identifier": "HKCorrelationTypeIdentifierFood",
+    "short_description": "A correlation grouping nutritional data from a single food item or meal, including calories and nutrients.",
+    "typical_range": {
+      "max": null,
+      "min": null,
+      "notes": "Varies widely based on food item size and type",
+      "unit": null
+    }
+  },
+  "HKQuantityTypeIdentifierActiveEnergyBurned": {
+    "category_values": null,
+    "default_unit": "kcal",
+    "human_readable_name": "Active Energy Burned",
+    "identifier": "HKQuantityTypeIdentifierActiveEnergyBurned",
+    "short_description": "Measures the energy expended through physical activity and movement above resting metabolic rate.",
+    "typical_range": {
+      "max": 2000,
+      "min": 100,
+      "notes": "Highly variable based on activity level. Sedentary individuals may burn 150-300 kcal/day active; very active individuals can exceed 1500 kcal/day.",
+      "unit": "kcal/day"
+    }
+  },
+  "HKQuantityTypeIdentifierAppleExerciseTime": {
+    "category_values": null,
+    "default_unit": "min",
+    "human_readable_name": "Apple Exercise Time",
+    "identifier": "HKQuantityTypeIdentifierAppleExerciseTime",
+    "short_description": "Measures the amount of time the user spent exercising at or above a brisk walk intensity.",
+    "typical_range": {
+      "max": 180,
+      "min": 0,
+      "notes": "Most users accumulate 0-60 minutes daily. Athletes or highly active individuals may exceed 120 minutes. Values above 180 minutes suggest extended training sessions or endurance activities.",
+      "unit": "min"
+    }
+  },
+  "HKQuantityTypeIdentifierAppleMoveTime": {
+    "category_values": null,
+    "default_unit": "min",
+    "human_readable_name": "Apple Move Time",
+    "identifier": "HKQuantityTypeIdentifierAppleMoveTime",
+    "short_description": "Measures the amount of time the user has spent performing activities involving full-body movements, primarily designed for wheelchair users.",
+    "typical_range": {
+      "max": 480,
+      "min": 0,
+      "notes": "Values depend on mobility level and activity patterns. Wheelchair users with active lifestyles may accumulate 120-300+ minutes daily. Sedentary periods will show lower values.",
+      "unit": "min"
+    }
+  },
+  "HKQuantityTypeIdentifierAppleSleepingWristTemperature": {
+    "category_values": null,
+    "default_unit": "degC",
+    "human_readable_name": "Sleeping Wrist Temperature",
+    "identifier": "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+    "short_description": "A relative measurement of wrist skin temperature deviation from a personal baseline, recorded during sleep by Apple Watch, used for menstrual cycle tracking and detecting physiological changes.",
+    "typical_range": {
+      "max": 1.0,
+      "min": -1.0,
+      "notes": "Typical nightly variation from personal baseline. Values represent deviation, not absolute temperature. Larger deviations may indicate illness or hormonal changes.",
+      "unit": "degC"
+    }
+  },
+  "HKQuantityTypeIdentifierAppleStandTime": {
+    "category_values": null,
+    "default_unit": "min",
+    "human_readable_name": "Apple Stand Time",
+    "identifier": "HKQuantityTypeIdentifierAppleStandTime",
+    "short_description": "Measures the amount of time the user has spent standing throughout the day.",
+    "typical_range": {
+      "max": 480,
+      "min": 0,
+      "notes": "Typical values range from 60-180 minutes for sedentary individuals to 300+ minutes for active individuals. Maximum possible depends on waking hours and activity level.",
+      "unit": "min"
+    }
+  },
+  "HKQuantityTypeIdentifierAppleWalkingSteadiness": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Apple Walking Steadiness",
+    "identifier": "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+    "short_description": "Composite measure of walking stability and balance, used to estimate fall risk.",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": "Scores are classified as OK (high steadiness), Low, or Very Low (highest fall risk).",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierAtrialFibrillationBurden": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Atrial Fibrillation Burden",
+    "identifier": "HKQuantityTypeIdentifierAtrialFibrillationBurden",
+    "short_description": "An estimate of the percentage of time a person's heart shows signs of atrial fibrillation over a defined monitoring period.",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": "0% indicates no AFib detected; 100% indicates persistent/permanent AFib. Most paroxysmal AFib patients show intermittent burden.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierBasalBodyTemperature": {
+    "category_values": null,
+    "default_unit": "degC",
+    "human_readable_name": "Basal Body Temperature",
+    "identifier": "HKQuantityTypeIdentifierBasalBodyTemperature",
+    "short_description": "The lowest body temperature attained during rest, typically measured immediately upon waking, used primarily for fertility awareness and ovulation tracking.",
+    "typical_range": {
+      "max": 37.3,
+      "min": 35.5,
+      "notes": "BBT typically ranges from 36.1-36.4 degC (97.0-97.5 degF) in the follicular phase and rises to 36.4-37.0 degC (97.5-98.6 degF) in the luteal phase after ovulation.",
+      "unit": "degC"
+    }
+  },
+  "HKQuantityTypeIdentifierBasalEnergyBurned": {
+    "category_values": null,
+    "default_unit": "kcal",
+    "human_readable_name": "Basal Energy Burned",
+    "identifier": "HKQuantityTypeIdentifierBasalEnergyBurned",
+    "short_description": "Measures the resting energy expenditure (calories burned at rest) to maintain basic physiological functions.",
+    "typical_range": {
+      "max": 2500,
+      "min": 1000,
+      "notes": "Daily basal energy expenditure varies based on age, sex, height, weight, and body composition. Range represents typical adult values.",
+      "unit": "kcal/day"
+    }
+  },
+  "HKQuantityTypeIdentifierBloodAlcoholContent": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Blood Alcohol Content",
+    "identifier": "HKQuantityTypeIdentifierBloodAlcoholContent",
+    "short_description": "Concentration of alcohol in blood, indicating intoxication level with legal and health implications",
+    "typical_range": {
+      "max": 0.08,
+      "min": 0.0,
+      "notes": "0.08% is the legal driving limit in most US states; impairment begins at lower levels",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierBloodGlucose": {
+    "category_values": null,
+    "default_unit": "mg/dL",
+    "human_readable_name": "Blood Glucose",
+    "identifier": "HKQuantityTypeIdentifierBloodGlucose",
+    "short_description": "The concentration of glucose in the blood, a key indicator for diabetes management and metabolic health.",
+    "typical_range": {
+      "max": 140,
+      "min": 70,
+      "notes": "Fasting typically 70-100 mg/dL; post-meal can rise to 140 mg/dL in non-diabetic individuals.",
+      "unit": "mg/dL"
+    }
+  },
+  "HKQuantityTypeIdentifierBloodPressureDiastolic": {
+    "category_values": null,
+    "default_unit": "mmHg",
+    "human_readable_name": "Blood Pressure (Diastolic)",
+    "identifier": "HKQuantityTypeIdentifierBloodPressureDiastolic",
+    "short_description": "The minimum arterial pressure between heartbeats when the heart relaxes, representing the lower number in a blood pressure reading.",
+    "typical_range": {
+      "max": 120,
+      "min": 60,
+      "notes": "Normal diastolic pressure ranges from 60-80 mmHg. Values above 120 mmHg indicate hypertensive crisis.",
+      "unit": "mmHg"
+    }
+  },
+  "HKQuantityTypeIdentifierBloodPressureSystolic": {
+    "category_values": null,
+    "default_unit": "mmHg",
+    "human_readable_name": "Blood Pressure (Systolic)",
+    "identifier": "HKQuantityTypeIdentifierBloodPressureSystolic",
+    "short_description": "The maximum arterial pressure during heart contraction, representing the upper number in a blood pressure reading.",
+    "typical_range": {
+      "max": 180,
+      "min": 90,
+      "notes": "Normal systolic pressure ranges from 90-120 mmHg. Values above 180 mmHg indicate hypertensive crisis.",
+      "unit": "mmHg"
+    }
+  },
+  "HKQuantityTypeIdentifierBodyFatPercentage": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Body Fat Percentage",
+    "identifier": "HKQuantityTypeIdentifierBodyFatPercentage",
+    "short_description": "The proportion of total body mass composed of adipose tissue, expressed as a percentage.",
+    "typical_range": {
+      "max": 60,
+      "min": 3,
+      "notes": "Essential fat minimum is approximately 3% for men and 10-12% for women; values above 50% indicate severe obesity.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierBodyMass": {
+    "category_values": null,
+    "default_unit": "kg",
+    "human_readable_name": "Body Mass (Weight)",
+    "identifier": "HKQuantityTypeIdentifierBodyMass",
+    "short_description": "The user's total body weight, typically measured using a scale.",
+    "typical_range": {
+      "max": 300,
+      "min": 20,
+      "notes": "Adult range typically 40-150 kg; extreme values outside 20-300 kg should be validated for data entry errors.",
+      "unit": "kg"
+    }
+  },
+  "HKQuantityTypeIdentifierBodyMassIndex": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Body Mass Index",
+    "identifier": "HKQuantityTypeIdentifierBodyMassIndex",
+    "short_description": "A calculated ratio of weight to height used to classify weight status and assess health risks.",
+    "typical_range": {
+      "max": 60,
+      "min": 10,
+      "notes": "Extreme values outside 10-60 are physiologically implausible for adults; typical adult range is 15-40.",
+      "unit": "kg/m^2"
+    }
+  },
+  "HKQuantityTypeIdentifierBodyTemperature": {
+    "category_values": null,
+    "default_unit": "degC",
+    "human_readable_name": "Body Temperature",
+    "identifier": "HKQuantityTypeIdentifierBodyTemperature",
+    "short_description": "A measurement of the body's internal temperature, a fundamental vital sign indicating metabolic and immune system status.",
+    "typical_range": {
+      "max": 37.5,
+      "min": 35.5,
+      "notes": "Normal oral temperature range for healthy adults. Values vary by measurement site and individual baseline.",
+      "unit": "degC"
+    }
+  },
+  "HKQuantityTypeIdentifierCyclingCadence": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Cycling Cadence",
+    "identifier": "HKQuantityTypeIdentifierCyclingCadence",
+    "short_description": "Measures pedal revolutions per minute (RPM) during cycling.",
+    "typical_range": {
+      "max": 130,
+      "min": 40,
+      "notes": "Most cyclists naturally pedal between 60-100 RPM. Trained cyclists typically maintain 85-100 RPM. Professional cyclists may sustain 100-110 RPM. Sprints can briefly exceed 120-150 RPM. Low cadence (<60) common during climbing or heavy resistance.",
+      "unit": "count/min"
+    }
+  },
+  "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower": {
+    "category_values": null,
+    "default_unit": "W",
+    "human_readable_name": "Cycling Functional Threshold Power",
+    "identifier": "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower",
+    "short_description": "Represents the maximum power a cyclist can sustain for approximately one hour.",
+    "typical_range": {
+      "max": 500,
+      "min": 100,
+      "notes": "FTP varies dramatically by fitness, training, and body size. Untrained individuals may have FTP of 100-150W. Recreational cyclists typically 150-250W. Well-trained amateurs 250-350W. Elite professionals can exceed 400-450W. Female values typically 10-15% lower at same training level.",
+      "unit": "W"
+    }
+  },
+  "HKQuantityTypeIdentifierCyclingPower": {
+    "category_values": null,
+    "default_unit": "W",
+    "human_readable_name": "Cycling Power",
+    "identifier": "HKQuantityTypeIdentifierCyclingPower",
+    "short_description": "Measures the instantaneous power output during cycling in watts.",
+    "typical_range": {
+      "max": 2000,
+      "min": 50,
+      "notes": "Highly variable by fitness, effort level, and duration. Recreational cyclists may average 100-150W on easy rides. Trained amateurs average 200-300W. Elite professionals can sustain 400+ watts and sprint to 1500-2000W.",
+      "unit": "W"
+    }
+  },
+  "HKQuantityTypeIdentifierCyclingSpeed": {
+    "category_values": null,
+    "default_unit": "m/s",
+    "human_readable_name": "Cycling Speed",
+    "identifier": "HKQuantityTypeIdentifierCyclingSpeed",
+    "short_description": "Measures the instantaneous speed during cycling activities.",
+    "typical_range": {
+      "max": 25,
+      "min": 0,
+      "notes": "Equivalent to 0-90 km/h (0-56 mph). Recreational cyclists typically average 15-25 km/h (4-7 m/s). Trained cyclists average 25-35 km/h (7-10 m/s). Professional sprints can exceed 70 km/h (19 m/s). Descents may reach 80-100+ km/h.",
+      "unit": "m/s"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryBiotin": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Biotin (Vitamin B7)",
+    "identifier": "HKQuantityTypeIdentifierDietaryBiotin",
+    "short_description": "Records dietary intake of biotin (vitamin B7), essential for carboxylase enzymes in fatty acid, amino acid, and glucose metabolism.",
+    "typical_range": {
+      "max": 100,
+      "min": 10,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryCaffeine": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Caffeine",
+    "identifier": "HKQuantityTypeIdentifierDietaryCaffeine",
+    "short_description": "Total caffeine consumed from beverages, food, and supplements, measured in milligrams.",
+    "typical_range": {
+      "max": 600,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryCalcium": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Calcium",
+    "identifier": "HKQuantityTypeIdentifierDietaryCalcium",
+    "short_description": "Calcium intake from food and supplements, essential for bone health and muscle function.",
+    "typical_range": {
+      "max": 2500,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryCarbohydrates": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Dietary Carbohydrates",
+    "identifier": "HKQuantityTypeIdentifierDietaryCarbohydrates",
+    "short_description": "Total carbohydrate intake including sugars, starches, and fiber",
+    "typical_range": {
+      "max": 500,
+      "min": 20,
+      "notes": "Highly variable based on dietary approach. Ketogenic diets may target <50g; endurance athletes may exceed 500g on heavy training days.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryChloride": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Chloride",
+    "identifier": "HKQuantityTypeIdentifierDietaryChloride",
+    "short_description": "Chloride intake from food and supplements, essential for fluid balance, gastric acid production, and nerve transmission.",
+    "typical_range": {
+      "max": 5000,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryCholesterol": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Cholesterol",
+    "identifier": "HKQuantityTypeIdentifierDietaryCholesterol",
+    "short_description": "Cholesterol intake from animal-based foods",
+    "typical_range": {
+      "max": 600,
+      "min": 0,
+      "notes": "Vegans consume 0mg; average American intake is 250-350mg/day. Single egg yolk contains ~186mg.",
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryChromium": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Chromium",
+    "identifier": "HKQuantityTypeIdentifierDietaryChromium",
+    "short_description": "Chromium intake from food and supplements, involved in insulin signaling and macronutrient metabolism.",
+    "typical_range": {
+      "max": 200,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryCopper": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Copper",
+    "identifier": "HKQuantityTypeIdentifierDietaryCopper",
+    "short_description": "Copper intake from food and supplements, essential for iron metabolism, connective tissue, and nervous system function.",
+    "typical_range": {
+      "max": 10000,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryEnergyConsumed": {
+    "category_values": null,
+    "default_unit": "kcal",
+    "human_readable_name": "Dietary Energy Consumed",
+    "identifier": "HKQuantityTypeIdentifierDietaryEnergyConsumed",
+    "short_description": "Total caloric energy intake from food and beverages",
+    "typical_range": {
+      "max": 4000,
+      "min": 1200,
+      "notes": "Highly variable based on age, sex, body size, activity level, and metabolic health. Athletes may exceed 5000 kcal/day.",
+      "unit": "kcal"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFatMonounsaturated": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Monounsaturated Fat",
+    "identifier": "HKQuantityTypeIdentifierDietaryFatMonounsaturated",
+    "short_description": "Monounsaturated fatty acid intake, primarily from olive oil, nuts, and avocados",
+    "typical_range": {
+      "max": 80,
+      "min": 10,
+      "notes": "Mediterranean diet provides 15-20% of calories from MUFA. Average American intake is ~11-12% of calories.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFatPolyunsaturated": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Polyunsaturated Fat",
+    "identifier": "HKQuantityTypeIdentifierDietaryFatPolyunsaturated",
+    "short_description": "Polyunsaturated fatty acid intake including omega-3 and omega-6 essential fatty acids",
+    "typical_range": {
+      "max": 40,
+      "min": 5,
+      "notes": "Average intake is 5-10% of calories. Western diets are often imbalanced with omega-6:omega-3 ratios of 15-20:1 (optimal: 4:1 or lower).",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFatSaturated": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Saturated Fat",
+    "identifier": "HKQuantityTypeIdentifierDietaryFatSaturated",
+    "short_description": "Saturated fatty acid intake from animal and tropical plant sources",
+    "typical_range": {
+      "max": 60,
+      "min": 5,
+      "notes": "Average American intake is 11-12% of calories (~25-30g). Recommendations target <10% of calories (<22g on 2000 kcal).",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFatTotal": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Dietary Fat (Total)",
+    "identifier": "HKQuantityTypeIdentifierDietaryFatTotal",
+    "short_description": "Total fat intake from all dietary sources",
+    "typical_range": {
+      "max": 200,
+      "min": 30,
+      "notes": "On a 2000 kcal diet, 44-78g represents 20-35% of calories. Ketogenic diets may reach 150-200g/day.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFiber": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Dietary Fiber",
+    "identifier": "HKQuantityTypeIdentifierDietaryFiber",
+    "short_description": "Total fiber intake from plant-based foods and supplements",
+    "typical_range": {
+      "max": 50,
+      "min": 5,
+      "notes": "Most Americans consume only 10-15g/day, well below recommendations. High-fiber diets may exceed 40g/day.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryFolate": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Folate (Vitamin B9)",
+    "identifier": "HKQuantityTypeIdentifierDietaryFolate",
+    "short_description": "Records dietary intake of folate (vitamin B9), essential for DNA synthesis, cell division, and neural tube development.",
+    "typical_range": {
+      "max": 1000,
+      "min": 100,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryIodine": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Iodine",
+    "identifier": "HKQuantityTypeIdentifierDietaryIodine",
+    "short_description": "Iodine intake from food and supplements, essential for thyroid hormone synthesis and metabolic regulation.",
+    "typical_range": {
+      "max": 1100,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryIron": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Iron",
+    "identifier": "HKQuantityTypeIdentifierDietaryIron",
+    "short_description": "Iron intake from food and supplements, essential for oxygen transport and energy metabolism.",
+    "typical_range": {
+      "max": 45,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryMagnesium": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Magnesium",
+    "identifier": "HKQuantityTypeIdentifierDietaryMagnesium",
+    "short_description": "Magnesium intake from food and supplements, essential for energy metabolism, muscle function, and bone health.",
+    "typical_range": {
+      "max": 600,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryManganese": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Manganese",
+    "identifier": "HKQuantityTypeIdentifierDietaryManganese",
+    "short_description": "Manganese intake from food and supplements, essential for bone formation, metabolism, and antioxidant defense.",
+    "typical_range": {
+      "max": 11,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryMolybdenum": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Molybdenum",
+    "identifier": "HKQuantityTypeIdentifierDietaryMolybdenum",
+    "short_description": "Molybdenum intake from food and supplements, essential as a cofactor for enzymes involved in sulfur metabolism.",
+    "typical_range": {
+      "max": 2000,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryNiacin": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Niacin (Vitamin B3)",
+    "identifier": "HKQuantityTypeIdentifierDietaryNiacin",
+    "short_description": "Records dietary intake of niacin (vitamin B3), essential for energy metabolism, DNA repair, and cellular signaling.",
+    "typical_range": {
+      "max": 40.0,
+      "min": 5.0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryPantothenicAcid": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Pantothenic Acid (Vitamin B5)",
+    "identifier": "HKQuantityTypeIdentifierDietaryPantothenicAcid",
+    "short_description": "Records dietary intake of pantothenic acid (vitamin B5), essential for coenzyme A synthesis and acyl carrier protein function.",
+    "typical_range": {
+      "max": 15.0,
+      "min": 2.0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryPhosphorus": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Phosphorus",
+    "identifier": "HKQuantityTypeIdentifierDietaryPhosphorus",
+    "short_description": "Phosphorus intake from food and supplements, essential for bone structure, energy metabolism, and cellular function.",
+    "typical_range": {
+      "max": 4000,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryPotassium": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Potassium",
+    "identifier": "HKQuantityTypeIdentifierDietaryPotassium",
+    "short_description": "Potassium intake from food and supplements, essential for fluid balance, nerve transmission, and muscle contraction.",
+    "typical_range": {
+      "max": 6000,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryProtein": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Dietary Protein",
+    "identifier": "HKQuantityTypeIdentifierDietaryProtein",
+    "short_description": "Total protein intake from food and supplements",
+    "typical_range": {
+      "max": 250,
+      "min": 40,
+      "notes": "Varies significantly by body weight, activity level, and health goals. Athletes and those in caloric deficit may consume 2-3g/kg body weight.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryRiboflavin": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Riboflavin (Vitamin B2)",
+    "identifier": "HKQuantityTypeIdentifierDietaryRiboflavin",
+    "short_description": "Records dietary intake of riboflavin (vitamin B2), essential for energy production and antioxidant function.",
+    "typical_range": {
+      "max": 4.0,
+      "min": 0.5,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietarySelenium": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Selenium",
+    "identifier": "HKQuantityTypeIdentifierDietarySelenium",
+    "short_description": "Selenium intake from food and supplements, essential for antioxidant defense, thyroid function, and immune health.",
+    "typical_range": {
+      "max": 400,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietarySodium": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Sodium",
+    "identifier": "HKQuantityTypeIdentifierDietarySodium",
+    "short_description": "Sodium intake from food, beverages, and table salt",
+    "typical_range": {
+      "max": 6000,
+      "min": 500,
+      "notes": "Average American intake is 3400mg/day, well above the 2300mg guideline. Processed foods contribute 70%+ of intake.",
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietarySugar": {
+    "category_values": null,
+    "default_unit": "g",
+    "human_readable_name": "Dietary Sugar",
+    "identifier": "HKQuantityTypeIdentifierDietarySugar",
+    "short_description": "Total sugar intake including natural and added sugars",
+    "typical_range": {
+      "max": 150,
+      "min": 10,
+      "notes": "Average American consumes 60-80g/day of added sugars alone. WHO recommends limiting added sugars to <25g/day.",
+      "unit": "g"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryThiamin": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Thiamin (Vitamin B1)",
+    "identifier": "HKQuantityTypeIdentifierDietaryThiamin",
+    "short_description": "Records dietary intake of thiamin (vitamin B1), essential for carbohydrate metabolism and neurological function.",
+    "typical_range": {
+      "max": 3.0,
+      "min": 0.5,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminA": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Vitamin A",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminA",
+    "short_description": "Fat-soluble vitamin essential for vision, immune function, and cellular growth",
+    "typical_range": {
+      "max": 3000,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminB12": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Vitamin B12",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminB12",
+    "short_description": "Water-soluble vitamin essential for DNA synthesis, neurological function, and red blood cell formation",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminB6": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Vitamin B6",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminB6",
+    "short_description": "Water-soluble vitamin essential for amino acid metabolism, neurotransmitter synthesis, and hemoglobin formation",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminC": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Vitamin C",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminC",
+    "short_description": "Water-soluble antioxidant essential for collagen synthesis, immune function, and iron absorption",
+    "typical_range": {
+      "max": 2000,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminD": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Vitamin D",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminD",
+    "short_description": "Fat-soluble vitamin essential for calcium absorption, bone health, immune function, and cellular regulation",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminE": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Vitamin E",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminE",
+    "short_description": "Fat-soluble antioxidant protecting cell membranes from oxidative damage",
+    "typical_range": {
+      "max": 1000,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminK": {
+    "category_values": null,
+    "default_unit": "mcg",
+    "human_readable_name": "Dietary Vitamin K",
+    "identifier": "HKQuantityTypeIdentifierDietaryVitaminK",
+    "short_description": "Fat-soluble vitamin essential for blood clotting and bone metabolism",
+    "typical_range": {
+      "max": 500,
+      "min": 0,
+      "notes": null,
+      "unit": "mcg"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryWater": {
+    "category_values": null,
+    "default_unit": "mL",
+    "human_readable_name": "Dietary Water",
+    "identifier": "HKQuantityTypeIdentifierDietaryWater",
+    "short_description": "Total water consumed from beverages and food, measured in milliliters or liters.",
+    "typical_range": {
+      "max": 5000,
+      "min": 0,
+      "notes": null,
+      "unit": "mL"
+    }
+  },
+  "HKQuantityTypeIdentifierDietaryZinc": {
+    "category_values": null,
+    "default_unit": "mg",
+    "human_readable_name": "Dietary Zinc",
+    "identifier": "HKQuantityTypeIdentifierDietaryZinc",
+    "short_description": "Zinc intake from food and supplements, essential for immune function, wound healing, and protein synthesis.",
+    "typical_range": {
+      "max": 50,
+      "min": 0,
+      "notes": null,
+      "unit": "mg"
+    }
+  },
+  "HKQuantityTypeIdentifierDistanceCycling": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Cycling Distance",
+    "identifier": "HKQuantityTypeIdentifierDistanceCycling",
+    "short_description": "Measures the distance the user has moved by cycling.",
+    "typical_range": {
+      "max": 300000,
+      "min": 0,
+      "notes": "Daily values vary widely from 0 for non-cyclists to 50+ km for commuters and recreational riders. Competitive cyclists may log 100-200+ km in training rides. Century rides (160 km/100 mi) represent common endurance goals.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierDistanceDownhillSnowSports": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Downhill Snow Sports Distance",
+    "identifier": "HKQuantityTypeIdentifierDistanceDownhillSnowSports",
+    "short_description": "Measures the distance traveled while skiing or snowboarding downhill.",
+    "typical_range": {
+      "max": 100000,
+      "min": 0,
+      "notes": "Single-day values vary enormously based on terrain, conditions, and skier/snowboarder ability. Recreational skiers might cover 15-30 km per day; avid skiers can exceed 50 km on a full day.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierDistanceSwimming": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Swimming Distance",
+    "identifier": "HKQuantityTypeIdentifierDistanceSwimming",
+    "short_description": "Measures the distance the user has moved by swimming.",
+    "typical_range": {
+      "max": 10000,
+      "min": 0,
+      "notes": "Single session values typically range from 500m for casual swimmers to 4000m+ for competitive training. Open water swims can extend to marathon distances (10km+). Daily totals vary widely based on swim frequency.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierDistanceWalkingRunning": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Walking + Running Distance",
+    "identifier": "HKQuantityTypeIdentifierDistanceWalkingRunning",
+    "short_description": "Measures the distance the user has moved by walking or running.",
+    "typical_range": {
+      "max": 50000,
+      "min": 0,
+      "notes": "Daily values typically range from 2-10 km for most adults. Values above 20 km/day are uncommon except for runners, hikers, or occupations requiring extensive walking. Marathon distance (42.2 km) represents an upper extreme for single-day values.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierDistanceWheelchair": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Wheelchair Distance",
+    "identifier": "HKQuantityTypeIdentifierDistanceWheelchair",
+    "short_description": "Measures the distance the user has moved using a wheelchair.",
+    "typical_range": {
+      "max": 30000,
+      "min": 0,
+      "notes": "Daily values vary widely based on mobility level, activity type, and environment accessibility. Active wheelchair users may travel 2-10 km daily. Wheelchair athletes in training may exceed 20 km.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierElectrodermalActivity": {
+    "category_values": null,
+    "default_unit": "mcS",
+    "human_readable_name": "Electrodermal Activity",
+    "identifier": "HKQuantityTypeIdentifierElectrodermalActivity",
+    "short_description": "Skin conductance measurement indicating sympathetic nervous system arousal and stress response",
+    "typical_range": {
+      "max": 20.0,
+      "min": 0.1,
+      "notes": "Baseline varies significantly between individuals; relative changes are more clinically meaningful than absolute values",
+      "unit": "mcS"
+    }
+  },
+  "HKQuantityTypeIdentifierEnvironmentalAudioExposure": {
+    "category_values": null,
+    "default_unit": "dB(A)",
+    "human_readable_name": "Environmental Audio Exposure",
+    "identifier": "HKQuantityTypeIdentifierEnvironmentalAudioExposure",
+    "short_description": "Ambient sound level exposure measured in A-weighted decibels (dB(A)), indicating potential hearing damage risk from environmental noise.",
+    "typical_range": {
+      "max": 110,
+      "min": 30,
+      "notes": null,
+      "unit": "dB(A)"
+    }
+  },
+  "HKQuantityTypeIdentifierEnvironmentalSoundReduction": {
+    "category_values": null,
+    "default_unit": "dB",
+    "human_readable_name": "Environmental Sound Reduction",
+    "identifier": "HKQuantityTypeIdentifierEnvironmentalSoundReduction",
+    "short_description": "Amount of environmental noise reduced by active noise cancellation in compatible earbuds, measured in decibels (dB).",
+    "typical_range": {
+      "max": 30,
+      "min": 0,
+      "notes": null,
+      "unit": "dB"
+    }
+  },
+  "HKQuantityTypeIdentifierFlightsClimbed": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Flights Climbed",
+    "identifier": "HKQuantityTypeIdentifierFlightsClimbed",
+    "short_description": "Counts the number of flights of stairs climbed, where one flight equals approximately 10 feet (3 meters) of elevation gain.",
+    "typical_range": {
+      "max": 50,
+      "min": 0,
+      "notes": "Highly dependent on living/working environment. Office workers in single-story buildings may record 0-5; those in multi-story buildings or hilly areas can easily exceed 20.",
+      "unit": "flights/day"
+    }
+  },
+  "HKQuantityTypeIdentifierForcedExpiratoryVolume1": {
+    "category_values": null,
+    "default_unit": "L",
+    "human_readable_name": "Forced Expiratory Volume (FEV1)",
+    "identifier": "HKQuantityTypeIdentifierForcedExpiratoryVolume1",
+    "short_description": "Volume of air forcefully exhaled in the first second of spirometry, a key indicator of obstructive lung disease",
+    "typical_range": {
+      "max": 6.0,
+      "min": 1.0,
+      "notes": "Highly dependent on age, sex, height, and ethnicity; interpret using percent predicted values",
+      "unit": "L"
+    }
+  },
+  "HKQuantityTypeIdentifierForcedVitalCapacity": {
+    "category_values": null,
+    "default_unit": "L",
+    "human_readable_name": "Forced Vital Capacity",
+    "identifier": "HKQuantityTypeIdentifierForcedVitalCapacity",
+    "short_description": "Total volume of air forcefully exhaled after maximum inhalation, essential for assessing lung capacity and restrictive diseases",
+    "typical_range": {
+      "max": 7.0,
+      "min": 2.0,
+      "notes": "Varies significantly with age, sex, height, and ethnicity; interpret using percent predicted values",
+      "unit": "L"
+    }
+  },
+  "HKQuantityTypeIdentifierHeadphoneAudioExposure": {
+    "category_values": null,
+    "default_unit": "dB(A)",
+    "human_readable_name": "Headphone Audio Exposure",
+    "identifier": "HKQuantityTypeIdentifierHeadphoneAudioExposure",
+    "short_description": "Audio level exposure from headphones and earbuds measured in A-weighted decibels (dB(A)), tracking personal listening habits for hearing protection.",
+    "typical_range": {
+      "max": 100,
+      "min": 40,
+      "notes": null,
+      "unit": "dB(A)"
+    }
+  },
+  "HKQuantityTypeIdentifierHeartRate": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Heart Rate",
+    "identifier": "HKQuantityTypeIdentifierHeartRate",
+    "short_description": "Measures the number of times the heart beats per minute.",
+    "typical_range": {
+      "max": 220,
+      "min": 30,
+      "notes": "Range encompasses bradycardia through maximum exercise heart rates. Values outside this range are physiologically rare but possible.",
+      "unit": "count/min"
+    }
+  },
+  "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Heart Rate Recovery (1 Minute)",
+    "identifier": "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute",
+    "short_description": "Measures the reduction in heart rate from peak exercise intensity to one minute after exercise cessation, a powerful indicator of cardiovascular fitness and autonomic function.",
+    "typical_range": {
+      "max": 80,
+      "min": 5,
+      "notes": "Range varies by fitness level, exercise intensity, and individual physiology. Very fit individuals may show recovery >50 bpm while those with cardiac conditions may show <12 bpm.",
+      "unit": "count/min"
+    }
+  },
+  "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD": {
+    "category_values": null,
+    "default_unit": "ms",
+    "human_readable_name": "Heart Rate Variability (RMSSD)",
+    "identifier": "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD",
+    "short_description": "Measures the root mean square of successive differences between normal heartbeat intervals (RMSSD), a short-term heart rate variability metric that mainly reflects vagal (parasympathetic) activity; the Health app calls it Recovery HRV.",
+    "typical_range": {
+      "max": 100,
+      "min": 10,
+      "notes": "Covers most healthy adults at rest in short recordings: 5-minute resting means fall from about 40 ms at 25-34 to about 19 ms at 65-74 (Voss 2015), and pooled studies report a mean of 42 ms (Nunan 2010). Higher values are common in young and endurance-trained people. Values depend heavily on age, posture, time of day and breathing, so compare against the person's own baseline.",
+      "unit": "ms"
+    }
+  },
+  "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": {
+    "category_values": null,
+    "default_unit": "ms",
+    "human_readable_name": "Heart Rate Variability (SDNN)",
+    "identifier": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+    "short_description": "Measures the standard deviation of normal-to-normal heartbeat intervals, reflecting autonomic nervous system function and overall physiological resilience.",
+    "typical_range": {
+      "max": 200,
+      "min": 10,
+      "notes": "Apple Watch typically reports short-term SDNN measurements (not 24-hour SDNN). Values vary dramatically by age, fitness, and measurement duration. Context is critical for interpretation.",
+      "unit": "ms"
+    }
+  },
+  "HKQuantityTypeIdentifierHeight": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Height",
+    "identifier": "HKQuantityTypeIdentifierHeight",
+    "short_description": "A measurement of the user's standing height, a fundamental anthropometric parameter used for health assessment, growth monitoring, and clinical calculations.",
+    "typical_range": {
+      "max": 2.5,
+      "min": 0.5,
+      "notes": "Range encompasses newborns through exceptionally tall adults. Adult heights typically fall between 1.50-2.00 m (4'11\" - 6'7\").",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierInhalerUsage": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Inhaler Usage",
+    "identifier": "HKQuantityTypeIdentifierInhalerUsage",
+    "short_description": "Count of inhaler actuations for asthma and COPD management tracking",
+    "typical_range": {
+      "max": 12,
+      "min": 0,
+      "notes": "Per day; rescue inhaler use >2 times/week (excluding pre-exercise use) suggests suboptimal asthma control",
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierInsulinDelivery": {
+    "category_values": null,
+    "default_unit": "IU",
+    "human_readable_name": "Insulin Delivery",
+    "identifier": "HKQuantityTypeIdentifierInsulinDelivery",
+    "short_description": "Amount of insulin delivered for diabetes management, tracking basal and bolus doses in international units",
+    "typical_range": {
+      "max": 100,
+      "min": 0,
+      "notes": "Total daily dose varies widely; typically 0.5-1.0 IU/kg body weight for Type 1 diabetes",
+      "unit": "IU"
+    }
+  },
+  "HKQuantityTypeIdentifierLeanBodyMass": {
+    "category_values": null,
+    "default_unit": "kg",
+    "human_readable_name": "Lean Body Mass",
+    "identifier": "HKQuantityTypeIdentifierLeanBodyMass",
+    "short_description": "The total body mass minus all fat tissue, including muscle, bone, organs, and water.",
+    "typical_range": {
+      "max": 120,
+      "min": 25,
+      "notes": "Adult lean body mass typically ranges from 35-80 kg depending on sex, height, and muscularity.",
+      "unit": "kg"
+    }
+  },
+  "HKQuantityTypeIdentifierNikeFuel": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Nike Fuel",
+    "identifier": "HKQuantityTypeIdentifierNikeFuel",
+    "short_description": "A proprietary Nike activity metric that quantifies overall physical activity into a single numeric score (largely deprecated).",
+    "typical_range": {
+      "max": 5000,
+      "min": 0,
+      "notes": "Daily NikeFuel targets varied by user; 2000-3000 NikeFuel was considered a moderate daily goal during the metric's active period. Elite athletes could exceed 5000 NikeFuel daily.",
+      "unit": "count/day"
+    }
+  },
+  "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Alcoholic Beverages",
+    "identifier": "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages",
+    "short_description": "Count of standard alcoholic drinks consumed, used to track alcohol intake for health monitoring.",
+    "typical_range": {
+      "max": 10,
+      "min": 0,
+      "notes": null,
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierNumberOfTimesFallen": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Number of Times Fallen",
+    "identifier": "HKQuantityTypeIdentifierNumberOfTimesFallen",
+    "short_description": "Cumulative count of detected fall events for fall risk assessment and elderly health monitoring",
+    "typical_range": {
+      "max": 2,
+      "min": 0,
+      "notes": "Per year for community-dwelling adults; any fall warrants clinical evaluation in older adults",
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierOxygenSaturation": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Blood Oxygen Saturation (SpO2)",
+    "identifier": "HKQuantityTypeIdentifierOxygenSaturation",
+    "short_description": "The percentage of hemoglobin in the blood that is saturated with oxygen.",
+    "typical_range": {
+      "max": 100,
+      "min": 95,
+      "notes": "For healthy individuals at sea level. Values may be lower at high altitude or in certain medical conditions.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierPeakExpiratoryFlowRate": {
+    "category_values": null,
+    "default_unit": "L/min",
+    "human_readable_name": "Peak Expiratory Flow Rate",
+    "identifier": "HKQuantityTypeIdentifierPeakExpiratoryFlowRate",
+    "short_description": "Maximum speed of exhalation measuring airway patency, essential for asthma self-monitoring and action plan guidance",
+    "typical_range": {
+      "max": 700,
+      "min": 200,
+      "notes": "Highly variable by age, sex, and height; personal best is the key reference value",
+      "unit": "L/min"
+    }
+  },
+  "HKQuantityTypeIdentifierPeripheralPerfusionIndex": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Peripheral Perfusion Index",
+    "identifier": "HKQuantityTypeIdentifierPeripheralPerfusionIndex",
+    "short_description": "A measure of peripheral blood flow derived from pulse oximetry, representing the ratio of pulsatile to non-pulsatile blood components.",
+    "typical_range": {
+      "max": 20,
+      "min": 0.02,
+      "notes": "Normal range typically 0.5-2.0% in healthy adults at rest. Values vary significantly based on measurement site, temperature, and physiological state.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierPhysicalEffort": {
+    "category_values": null,
+    "default_unit": "kcal/(kg*hr)",
+    "human_readable_name": "Physical Effort",
+    "identifier": "HKQuantityTypeIdentifierPhysicalEffort",
+    "short_description": "Measures the perceived intensity of physical activity on a standardized effort scale.",
+    "typical_range": {
+      "max": 20,
+      "min": 1,
+      "notes": "Values roughly correspond to MET values. Resting is ~1.0, walking ~3-4, running ~8-12, and maximum effort activities can reach 15-20 for elite athletes.",
+      "unit": "kcal/(kg*hr)"
+    }
+  },
+  "HKQuantityTypeIdentifierPushCount": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Wheelchair Push Count",
+    "identifier": "HKQuantityTypeIdentifierPushCount",
+    "short_description": "Measures the number of wheelchair pushes performed by the user for mobility and exercise.",
+    "typical_range": {
+      "max": 15000,
+      "min": 0,
+      "notes": "Daily push counts vary significantly based on activity level, wheelchair type, and environmental factors. Active wheelchair users typically perform 3,000-8,000 pushes per day. Wheelchair athletes in training may exceed 10,000 pushes daily.",
+      "unit": "count/day"
+    }
+  },
+  "HKQuantityTypeIdentifierRespiratoryRate": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Respiratory Rate",
+    "identifier": "HKQuantityTypeIdentifierRespiratoryRate",
+    "short_description": "The number of breaths taken per minute, typically measured during sleep.",
+    "typical_range": {
+      "max": 20,
+      "min": 12,
+      "notes": "Range for healthy adults at rest. Values may vary during sleep, exercise, or illness.",
+      "unit": "breaths/min"
+    }
+  },
+  "HKQuantityTypeIdentifierRestingHeartRate": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Resting Heart Rate",
+    "identifier": "HKQuantityTypeIdentifierRestingHeartRate",
+    "short_description": "Measures the heart rate while the user is at rest and relaxed, typically the lowest heart rate during waking hours.",
+    "typical_range": {
+      "max": 110,
+      "min": 35,
+      "notes": "Encompasses athletic bradycardia through elevated resting rates seen in deconditioned or unwell individuals",
+      "unit": "count/min"
+    }
+  },
+  "HKQuantityTypeIdentifierRunningGroundContactTime": {
+    "category_values": null,
+    "default_unit": "ms",
+    "human_readable_name": "Running Ground Contact Time",
+    "identifier": "HKQuantityTypeIdentifierRunningGroundContactTime",
+    "short_description": "The duration each foot spends in contact with the ground during a running stride.",
+    "typical_range": {
+      "max": 320,
+      "min": 160,
+      "notes": "Elite sprinters show 160-180 ms; elite distance runners 180-220 ms; recreational runners 220-280 ms; slower joggers 260-320+ ms. Ground contact time decreases as running speed increases.",
+      "unit": "ms"
+    }
+  },
+  "HKQuantityTypeIdentifierRunningPower": {
+    "category_values": null,
+    "default_unit": "W",
+    "human_readable_name": "Running Power",
+    "identifier": "HKQuantityTypeIdentifierRunningPower",
+    "short_description": "The rate of mechanical work performed during running, measured in watts.",
+    "typical_range": {
+      "max": 450,
+      "min": 150,
+      "notes": "Highly dependent on body weight, running speed, and terrain. Recreational runners typically see 200-300W at easy pace; elite runners may sustain 350-450W during races.",
+      "unit": "W"
+    }
+  },
+  "HKQuantityTypeIdentifierRunningSpeed": {
+    "category_values": null,
+    "default_unit": "m/s",
+    "human_readable_name": "Running Speed",
+    "identifier": "HKQuantityTypeIdentifierRunningSpeed",
+    "short_description": "The rate of travel during running activities, typically measured in meters per second or minutes per mile/kilometer.",
+    "typical_range": {
+      "max": 6.5,
+      "min": 2.0,
+      "notes": "2.0 m/s = 13:24 min/mile (slow jog); 4.0 m/s = 6:42 min/mile (moderate run); 6.5 m/s = 4:07 min/mile (elite pace). Walking is typically 1.0-1.8 m/s.",
+      "unit": "m/s"
+    }
+  },
+  "HKQuantityTypeIdentifierRunningStrideLength": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Running Stride Length",
+    "identifier": "HKQuantityTypeIdentifierRunningStrideLength",
+    "short_description": "The distance covered in a single running stride, measured from one foot contact to the next contact of the same foot.",
+    "typical_range": {
+      "max": 2.8,
+      "min": 1.2,
+      "notes": "Stride length varies significantly with running speed, height, and running form. Jogging typically produces 1.2-1.6m strides; moderate running 1.6-2.0m; fast running 2.0-2.8m. Elite sprinters can exceed 3m.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierRunningVerticalOscillation": {
+    "category_values": null,
+    "default_unit": "cm",
+    "human_readable_name": "Running Vertical Oscillation",
+    "identifier": "HKQuantityTypeIdentifierRunningVerticalOscillation",
+    "short_description": "The amount of vertical bounce or up-and-down movement during each running stride.",
+    "typical_range": {
+      "max": 14,
+      "min": 5,
+      "notes": "Elite runners typically exhibit 6-8 cm; recreational runners commonly show 8-12 cm. Values above 12-14 cm suggest inefficient form. Vertical oscillation tends to increase with speed but efficient runners minimize this increase.",
+      "unit": "cm"
+    }
+  },
+  "HKQuantityTypeIdentifierSixMinuteWalkTestDistance": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Six-Minute Walk Test Distance",
+    "identifier": "HKQuantityTypeIdentifierSixMinuteWalkTestDistance",
+    "short_description": "Total distance walked during a standardized six-minute walk test, a validated measure of functional capacity.",
+    "typical_range": {
+      "max": 700,
+      "min": 200,
+      "notes": "Healthy adults typically achieve 400-700 m; cardiac/pulmonary patients often 200-400 m.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierStairAscentSpeed": {
+    "category_values": null,
+    "default_unit": "m/s",
+    "human_readable_name": "Stair Ascent Speed",
+    "identifier": "HKQuantityTypeIdentifierStairAscentSpeed",
+    "short_description": "Speed of climbing stairs, measuring vertical velocity during stair ascent.",
+    "typical_range": {
+      "max": 0.8,
+      "min": 0.2,
+      "notes": "Healthy adults typically achieve 0.4-0.6 m/s; values <0.3 m/s indicate functional limitation.",
+      "unit": "m/s"
+    }
+  },
+  "HKQuantityTypeIdentifierStairDescentSpeed": {
+    "category_values": null,
+    "default_unit": "m/s",
+    "human_readable_name": "Stair Descent Speed",
+    "identifier": "HKQuantityTypeIdentifierStairDescentSpeed",
+    "short_description": "Speed of descending stairs, measuring vertical velocity during stair descent.",
+    "typical_range": {
+      "max": 1.0,
+      "min": 0.3,
+      "notes": "Healthy adults typically achieve 0.5-0.8 m/s; descent is usually faster than ascent in healthy individuals.",
+      "unit": "m/s"
+    }
+  },
+  "HKQuantityTypeIdentifierStepCount": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Step Count",
+    "identifier": "HKQuantityTypeIdentifierStepCount",
+    "short_description": "Measures the number of steps the user has taken.",
+    "typical_range": {
+      "max": 50000,
+      "min": 0,
+      "notes": "Daily values typically range from 2,000-15,000 steps for most adults. Values above 25,000 are uncommon but possible for ultramarathon athletes or occupations requiring extensive walking.",
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierSwimmingStrokeCount": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "Swimming Stroke Count",
+    "identifier": "HKQuantityTypeIdentifierSwimmingStrokeCount",
+    "short_description": "Measures the number of strokes performed while swimming.",
+    "typical_range": {
+      "max": 5000,
+      "min": 0,
+      "notes": "Single workout values depend heavily on distance and stroke efficiency. A typical 1500m workout might involve 900-1500 strokes depending on swimmer skill level. Competitive swimmers are more efficient (fewer strokes per lap) than recreational swimmers.",
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierTimeInDaylight": {
+    "category_values": null,
+    "default_unit": "min",
+    "human_readable_name": "Time in Daylight",
+    "identifier": "HKQuantityTypeIdentifierTimeInDaylight",
+    "short_description": "Duration of exposure to outdoor daylight conditions, measured in minutes, relevant for circadian rhythm regulation, mental health, and eye health.",
+    "typical_range": {
+      "max": 480,
+      "min": 0,
+      "notes": null,
+      "unit": "min"
+    }
+  },
+  "HKQuantityTypeIdentifierUVExposure": {
+    "category_values": null,
+    "default_unit": "count",
+    "human_readable_name": "UV Exposure",
+    "identifier": "HKQuantityTypeIdentifierUVExposure",
+    "short_description": "Ultraviolet radiation exposure measurement for skin cancer risk assessment and vitamin D synthesis tracking",
+    "typical_range": {
+      "max": 11,
+      "min": 0,
+      "notes": "UV Index scale: 0-2 Low, 3-5 Moderate, 6-7 High, 8-10 Very High, 11+ Extreme",
+      "unit": "count"
+    }
+  },
+  "HKQuantityTypeIdentifierUnderwaterDepth": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Underwater Depth",
+    "identifier": "HKQuantityTypeIdentifierUnderwaterDepth",
+    "short_description": "Measures the user's depth underwater during diving activities.",
+    "typical_range": {
+      "max": 40,
+      "min": 0,
+      "notes": "Apple Watch Ultra rated for recreational diving to 40m (130 ft). Most recreational dives occur between 10-30m. Surface is 0m. Values above 40m exceed device rating and most recreational diving certification limits.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierVO2Max": {
+    "category_values": null,
+    "default_unit": "mL/kg/min",
+    "human_readable_name": "VO2 Max",
+    "identifier": "HKQuantityTypeIdentifierVO2Max",
+    "short_description": "Maximum oxygen uptake during exercise, a key indicator of cardiorespiratory fitness.",
+    "typical_range": {
+      "max": 60,
+      "min": 20,
+      "notes": "Wide variation based on age, sex, and fitness level. Elite endurance athletes may exceed 70-80 mL/kg/min. Sedentary adults typically range 25-40 mL/kg/min.",
+      "unit": "mL/kg/min"
+    }
+  },
+  "HKQuantityTypeIdentifierWaistCircumference": {
+    "category_values": null,
+    "default_unit": "cm",
+    "human_readable_name": "Waist Circumference",
+    "identifier": "HKQuantityTypeIdentifierWaistCircumference",
+    "short_description": "A measurement of the circumference of the waist at the level of the umbilicus or narrowest point, a key indicator of central adiposity and cardiometabolic risk.",
+    "typical_range": {
+      "max": 180,
+      "min": 40,
+      "notes": "Range encompasses children through adults with severe obesity. Healthy adult range typically 60-100 cm.",
+      "unit": "cm"
+    }
+  },
+  "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Walking Asymmetry Percentage",
+    "identifier": "HKQuantityTypeIdentifierWalkingAsymmetryPercentage",
+    "short_description": "Percentage difference in step time between left and right legs during walking.",
+    "typical_range": {
+      "max": 25,
+      "min": 0,
+      "notes": "Healthy adults typically show <10% asymmetry; values >15% warrant clinical evaluation.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": {
+    "category_values": null,
+    "default_unit": "%",
+    "human_readable_name": "Walking Double Support Percentage",
+    "identifier": "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage",
+    "short_description": "Percentage of the gait cycle when both feet are simultaneously in contact with the ground.",
+    "typical_range": {
+      "max": 45,
+      "min": 15,
+      "notes": "Healthy adults typically show 20-30% double support; values above 35% may indicate balance concerns.",
+      "unit": "%"
+    }
+  },
+  "HKQuantityTypeIdentifierWalkingHeartRateAverage": {
+    "category_values": null,
+    "default_unit": "count/min",
+    "human_readable_name": "Walking Heart Rate Average",
+    "identifier": "HKQuantityTypeIdentifierWalkingHeartRateAverage",
+    "short_description": "Measures the user's average heart rate while walking, providing insight into cardiovascular fitness during light activity.",
+    "typical_range": {
+      "max": 160,
+      "min": 70,
+      "notes": "Range varies significantly based on walking pace, terrain, fitness level, and age. Brisk walking elevates heart rate more than casual walking.",
+      "unit": "count/min"
+    }
+  },
+  "HKQuantityTypeIdentifierWalkingSpeed": {
+    "category_values": null,
+    "default_unit": "m/s",
+    "human_readable_name": "Walking Speed",
+    "identifier": "HKQuantityTypeIdentifierWalkingSpeed",
+    "short_description": "Average speed during walking, a key indicator of functional mobility and overall health status.",
+    "typical_range": {
+      "max": 1.8,
+      "min": 0.5,
+      "notes": "Healthy adults typically walk 1.2-1.4 m/s; values below 0.8 m/s are clinically significant.",
+      "unit": "m/s"
+    }
+  },
+  "HKQuantityTypeIdentifierWalkingStepLength": {
+    "category_values": null,
+    "default_unit": "m",
+    "human_readable_name": "Walking Step Length",
+    "identifier": "HKQuantityTypeIdentifierWalkingStepLength",
+    "short_description": "Average distance covered with each step during walking, a fundamental gait parameter.",
+    "typical_range": {
+      "max": 0.9,
+      "min": 0.4,
+      "notes": "Varies significantly with height; typical range is 65-85 cm for average height adults.",
+      "unit": "m"
+    }
+  },
+  "HKQuantityTypeIdentifierWaterTemperature": {
+    "category_values": null,
+    "default_unit": "degC",
+    "human_readable_name": "Water Temperature",
+    "identifier": "HKQuantityTypeIdentifierWaterTemperature",
+    "short_description": "Measures the temperature of the water during swimming or diving activities.",
+    "typical_range": {
+      "max": 40,
+      "min": 0,
+      "notes": "Apple Watch Ultra operates in water temperatures from 0°C to 40°C. Typical recreational water temperatures range from 15-30°C. Cold water (<15°C) and very warm water (>35°C) present specific physiological considerations.",
+      "unit": "degC"
+    }
+  }
+}

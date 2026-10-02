@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "PulsHealth",
     short_name: "PulsHealth",
-    description: "Apple Health, on a server you run.",
+    description: "Apple Health, in a database you run.",
     start_url: "/",
     display: "browser",
     background_color: "#0a0a0a",

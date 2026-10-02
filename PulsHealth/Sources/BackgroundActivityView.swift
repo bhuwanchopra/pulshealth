@@ -1,7 +1,7 @@
 import SwiftUI
 import PulsHealthSync
 
-/// The field-study screen: how often the app gets background execution time, when
+/// Sync → Activity → Background, the field-study screen: how often the app gets background execution time, when
 /// it wakes, and what work it does — plus a share-sheet export of the raw wake
 /// records (CSV/JSON) and the event log (JSON) for offline analysis.
 struct BackgroundActivityView: View {
@@ -17,10 +17,9 @@ struct BackgroundActivityView: View {
             triggerBreakdownSection
             recentSection
         }
-        .navigationTitle("Background Activity")
-        .navigationBarTitleDisplayMode(.inline)
+        // Title and the Log/Background switch are ActivityView's.
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if exportURLs.isEmpty {
                     ProgressView()
                 } else {

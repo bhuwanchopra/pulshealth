@@ -14,7 +14,7 @@ Python 3.11 or newer, nothing to install.
 ```bash
 cd examples/receivers/python-sqlite
 PULS_TOKEN="$(openssl rand -hex 32)" python3 receiver.py
-# puls-sqlite-receiver listening on 0.0.0.0:8080
+# puls-sqlite-receiver listening on 127.0.0.1:8080
 ```
 
 | Variable | Default | Meaning |
@@ -38,19 +38,20 @@ The receiver speaks plain HTTP, which the app allows for hosts on the local
 network (private addresses and `.local` names); anything reachable only over
 the internet needs HTTPS in front of it. On a phone on the same Wi-Fi:
 
-1. Find the machine's LAN address (`ipconfig getifaddr en0` on macOS,
-   `hostname -I` on Linux).
-2. In PulsHealth, **Settings → Server**: URL `http://192.168.1.23:8080`
-   (your address), token the `PULS_TOKEN` value. Tap **Test connection**; it
-   calls `/v1/capabilities` and should report a receiver speaking protocol 1.
-3. **Data Types**: pick what to sync, tap Apply. Batches start arriving
-   within seconds; the receiver logs one line per request.
+1. Start the receiver with `PULS_BIND=0.0.0.0` and find the machine's LAN
+   address (`ipconfig getifaddr en0` on macOS, `hostname -I` on Linux).
+2. In PulsHealth, **Sync → Set Up** (later, **Sync → Database**): Database
+   URL `http://192.168.1.23:8080` (your address), Token the `PULS_TOKEN`
+   value. Tap **Test Connection**; it calls `/v1/capabilities` and should
+   report a receiver speaking protocol 1. Then **Save & Apply**.
+3. **Sync → Synced Data**: pick what to sync, tap Apply. Batches start
+   arriving within seconds; the receiver logs one line per request.
 
 Because the receiver advertises only `batches` and `profile`, the app hides
-its server-count and reconciliation screens (they need `stats`, `digest`,
-`uuids`). Aggregate buckets, activity summaries, routes and series are stored
-anyway; the feature list says what a receiver *guarantees*, and this one
-keeps the claim modest.
+a type's database row counts and its **Reconcile with Database** action (they
+need `stats`, `digest` and `uuids`). Aggregate buckets, activity summaries,
+routes and series are stored anyway; the feature list says what a receiver
+*guarantees*, and this one keeps the claim modest.
 
 ## What it stores
 

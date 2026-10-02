@@ -20,7 +20,7 @@ const supportOptions = [
   {
     title: "Documentation",
     description:
-      "Setting up the server, the sync protocol, the database guide, exports, and the AI assistant recipes.",
+      "Setting up the self-hosted stack, the sync protocol, the database guide, exports, and the AI assistant recipes.",
     icon: FileText,
     href: "/docs",
     cta: "Read the Docs",
@@ -83,7 +83,7 @@ export default function SupportPage() {
           <Link href="/docs" className="text-brand underline-offset-4 hover:underline">
             documentation
           </Link>{" "}
-          covers the server, the protocol and the database in depth, and the{" "}
+          covers the self-hosted stack, the protocol and the database in depth, and the{" "}
           <Link href="/knowledge-base" className="text-brand underline-offset-4 hover:underline">
             knowledge base
           </Link>{" "}

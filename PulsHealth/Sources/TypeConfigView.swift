@@ -1,7 +1,7 @@
 import SwiftUI
 import PulsHealthSync
 
-/// Per-type configuration screen reached from the Data Types lists: raw-sample
+/// Per-type configuration screen reached from the Synced Data lists: raw-sample
 /// toggle plus the list of configured aggregate series for quantity types.
 struct TypeConfigView: View {
     @Environment(AppModel.self) private var model
@@ -153,7 +153,7 @@ private struct AggregateConfigRow: View {
 
 /// Editor for one aggregate config. Edits mutate the staged `model.config`
 /// draft directly (the app's usual style) but don't reach the engine until the
-/// Data Types tab's Apply bar (or this screen's explicit Sync Now / Recompute
+/// Sync tab's Apply bar (or this screen's explicit Sync Now / Recompute
 /// All) commits them. On apply, `AppModel` resets the watermark of any series
 /// whose `seriesIdentity`/`startDate` changed so it recomputes from scratch.
 struct AggregateEditorView: View {
@@ -209,7 +209,7 @@ struct AggregateEditorView: View {
                 }
             }
         } message: {
-            Text("Clears the local watermark and re-uploads every bucket from the start date. The server upserts buckets, so this is safe but re-sends the whole series.")
+            Text("Clears the local watermark and re-uploads every bucket from the start date. Your database replaces the buckets it already has, so this is safe but re-sends the whole series.")
         }
         .confirmationDialog(
             "Delete this aggregate?",
@@ -220,7 +220,7 @@ struct AggregateEditorView: View {
                 dismiss()
             }
         } message: {
-            Text("Stops computing this series. Data already uploaded stays on the server.")
+            Text("Stops computing this series. Data already uploaded stays in your database.")
         }
     }
 
@@ -247,7 +247,7 @@ struct AggregateEditorView: View {
         } header: {
             Text("Series")
         } footer: {
-            Text("Changing the function, interval, or device filter creates a different server series — it recomputes from scratch. Unit: \(current.unitString ?? "—").")
+            Text("Changing the function, interval, or device filter creates a different series in your database — it recomputes from scratch. Unit: \(current.unitString ?? "—").")
         }
     }
 

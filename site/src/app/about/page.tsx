@@ -9,7 +9,7 @@ const GITHUB = "https://github.com/PulsHealth/pulshealth";
 export const metadata = {
   title: "About PulsHealth - Why It Exists and Who Maintains It",
   description:
-    "PulsHealth is a one-maintainer open-source project: an iPhone app that copies Apple Health into a database you run, a reference server, and a public wire protocol. Why it exists, what it is not, and how to get involved.",
+    "PulsHealth is a one-maintainer open-source project: an iPhone app that copies Apple Health into a database you run, an example self-hosted stack, and a public wire protocol. Why it exists, what it is not, and how to get involved.",
   alternates: {
     canonical: "/about/",
   },
@@ -31,7 +31,7 @@ export default function AboutPage() {
         </Button>
         <Button asChild size="lg" variant="outline">
           <Link href="/server">
-            Run the Server
+            Set Up Your Database
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
@@ -48,21 +48,22 @@ export default function AboutPage() {
             anyone else.
           </p>
           <p>
-            The app does one thing. It reads Apple Health and posts every sample to the URL you
-            give it. There is no PulsHealth account and no PulsHealth server.
+            The app reads Apple Health, lets you explore and export it, and posts every sample to
+            the database address you give it. There is no PulsHealth account and no PulsHealth
+            server.
           </p>
 
           <h2>Why the wire format is public</h2>
           <p>
-            The reference server in the repository is one receiver, not the only one. The format
+            The self-hosted stack in the repository is one receiver, not the only one. The format
             the app speaks, the Puls Sync Protocol, is written down with a JSON Schema for every
             line type, a fixture corpus, a conformance checker and a complete receiver in one
-            Python file. If you would rather write your own backend, the spec is enough to do it.
+            Python file. If you would rather connect your own database, the spec is enough to do it.
           </p>
 
           <h2>Who maintains it</h2>
           <p>
-            One person. I wrote the app, the sync library, the server stack, the protocol and this
+            One person. I wrote the app, the sync library, the self-hosted stack, the protocol and this
             site, and I run the stack on my own data. Bugs, questions and protocol gaps go through{" "}
             <a href={`${GITHUB}/issues`} target="_blank" rel="noopener noreferrer">
               GitHub issues

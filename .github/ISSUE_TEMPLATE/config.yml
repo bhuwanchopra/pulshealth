@@ -3,6 +3,6 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/PulsHealth/pulshealth/security/advisories/new
     about: Report privately through GitHub. Never open a public issue for a security problem (see SECURITY.md).
-  - name: Roadmap and open decisions
-    url: https://github.com/PulsHealth/pulshealth/blob/main/docs/open-source-plan.md
-    about: What is planned, what is decided, and what is deliberately out of scope.
+  - name: Roadmap
+    url: https://github.com/PulsHealth/pulshealth/blob/main/docs/roadmap.md
+    about: What is still planned. The decisions and what is out of scope are in docs/open-source-plan.md.

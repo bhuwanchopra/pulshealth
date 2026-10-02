@@ -21,13 +21,25 @@ import (
 // (`make devices ARGS='…'` from the repository root), reusing the container's
 // DATABASE_URL. Plain text on stdout, errors on stderr, exit 2 on a usage
 // error and 1 on anything else.
+//
+// `issue` also prints the pairing code for the token it just minted (qr.go,
+// pairing.go) — the one moment that is possible, since only the hash is kept.
+// The code needs the URL the phone will use, which a container cannot work
+// out for itself (it sees neither the TLS proxy in front of it nor the host's
+// LAN address): --url, else PULS_PUBLIC_URL, which Compose hands over from
+// server/.env. `make devices` and `scripts/bootstrap.sh --issue-device` fill
+// it in from the same rules the pairing block uses.
 
 const devicesUsage = `usage: ingest devices <command>
 
   list [--all]                        active tokens; --all includes revoked ones
   issue --user <uuid> --name <label>  mint a token for a user (creates the user
-                                      row if needed — a mistyped UUID makes a
-                                      new user) and print it once
+        [--url <url>] [--no-qr]       row if needed — a mistyped UUID makes a
+                                      new user) and print it once, with the
+                                      QR code the app scans. --url is the URL
+                                      the phone will use (default:
+                                      $PULS_PUBLIC_URL); --no-qr prints the
+                                      payload as text only
   revoke <id>                         refuse the token from the next request on
   rename <id> <label>                 change a token's label
 `
@@ -39,6 +51,10 @@ type devicesCommand struct {
 	userID string
 	name   string
 	id     int64
+	// issue only. url is the normalized URL for the pairing code, "" when
+	// neither --url nor PULS_PUBLIC_URL supplied one.
+	url  string
+	noQR bool
 }
 
 // parseDevicesArgs is pure so it can be unit-tested without a database.
@@ -60,6 +76,10 @@ func parseDevicesArgs(args []string) (devicesCommand, error) {
 		}
 	case "issue":
 		for i := 0; i < len(rest); i++ {
+			if rest[i] == "--no-qr" {
+				cmd.noQR = true
+				continue
+			}
 			key, value, inline := strings.Cut(rest[i], "=")
 			if !inline {
 				if i+1 >= len(rest) {
@@ -70,9 +90,17 @@ func parseDevicesArgs(args []string) (devicesCommand, error) {
 			}
 			switch key {
 			case "--user":
-				cmd.userID = value
+				// Lower case is how the database hands a uuid back and how
+				// the app stores its own, so the pairing code agrees with both.
+				cmd.userID = strings.ToLower(value)
 			case "--name":
 				cmd.name = value
+			case "--url":
+				normalized, err := normalizePairingURL(value)
+				if err != nil {
+					return devicesCommand{}, fmt.Errorf("issue: --url: %w", err)
+				}
+				cmd.url = normalized
 			default:
 				return devicesCommand{}, fmt.Errorf("issue: unknown argument %q", key)
 			}
@@ -122,6 +150,18 @@ func runDevicesCLI(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "ingest devices: %v\n\n%s", err, devicesUsage)
 		return 2
 	}
+	// Settled before the database is touched: a URL the app would refuse
+	// must stop the command while there is still no token to throw away.
+	if cmd.op == "issue" && cmd.url == "" {
+		if raw := strings.TrimSpace(os.Getenv("PULS_PUBLIC_URL")); raw != "" {
+			normalized, err := normalizePairingURL(raw)
+			if err != nil {
+				fmt.Fprintf(stderr, "ingest devices: PULS_PUBLIC_URL: %v\nFix it in server/.env, or pass --url. No token was issued.\n", err)
+				return 1
+			}
+			cmd.url = normalized
+		}
+	}
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		fmt.Fprintln(stderr, "ingest devices: DATABASE_URL must be set")
@@ -157,10 +197,7 @@ func runDevicesCommand(ctx context.Context, store *Store, cmd devicesCommand, ou
 			return err
 		}
 		fmt.Fprintf(out, "Issued device token %d (%s…) for user %s.\n\n", d.ID, d.TokenPrefix, d.UserID)
-		fmt.Fprintf(out, "  Token    %s\n  User ID  %s\n\n", plaintext, d.UserID)
-		fmt.Fprintln(out, "Enter both in the app under Settings > Server. This is the only time the token")
-		fmt.Fprintln(out, "is shown: only its hash is stored, so a lost token is revoked and reissued,")
-		fmt.Fprintln(out, "never recovered.")
+		printIssuedPairing(out, cmd, d.ID, plaintext, d.UserID)
 	case "revoke":
 		if err := store.RevokeDeviceToken(ctx, cmd.id); err != nil {
 			return err
@@ -173,6 +210,46 @@ func runDevicesCommand(ctx context.Context, store *Store, cmd devicesCommand, ou
 		fmt.Fprintf(out, "Renamed device token %d to %q.\n", cmd.id, cmd.name)
 	}
 	return nil
+}
+
+// printIssuedPairing is the part of `issue` a person acts on: the three values
+// the app needs and, when the URL is known, the QR code that carries them.
+func printIssuedPairing(out io.Writer, cmd devicesCommand, id int64, token, userID string) {
+	if cmd.url != "" {
+		fmt.Fprintf(out, "  Server URL  %s\n", cmd.url)
+	} else {
+		fmt.Fprintln(out, "  Server URL  (not known to this command — see below)")
+	}
+	fmt.Fprintf(out, "  Token       %s\n  User ID     %s\n\n", token, userID)
+
+	if cmd.url == "" {
+		// The token is already minted and must not be lost to a missing
+		// URL, so this is advice, not an error.
+		fmt.Fprintln(out, "No QR code: it has to carry the URL the phone will use, and none was given.")
+		fmt.Fprintln(out, "This token works as it is — in the app, Settings > Server, enter the server URL")
+		fmt.Fprintln(out, "with the token and user ID above, then Test Connection. For a code to scan")
+		fmt.Fprintf(out, "instead, revoke it (devices revoke %d) and issue again one of these ways:\n", id)
+		fmt.Fprintln(out, "  scripts/bootstrap.sh --issue-device <label>   works the URL out for you")
+		fmt.Fprintln(out, "  devices issue … --url <URL>                   https://<your proxy>, or")
+		fmt.Fprintln(out, "                                                http://<LAN IP>:8080 on your Wi-Fi")
+		fmt.Fprintln(out, "  PULS_PUBLIC_URL=<URL> in server/.env          picked up by every later issue")
+	} else {
+		payload := pairingPayload(cmd.url, token, userID)
+		if !cmd.noQR {
+			// A payload that cannot be drawn is not worth failing over
+			// either: the values above pair the phone just as well.
+			if err := writeQR(out, payload); err != nil {
+				fmt.Fprintf(out, "(No QR code: %v.)\n", err)
+			}
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintf(out, "  Pairing payload (what the QR code encodes):\n  %s\n\n", payload)
+		fmt.Fprintln(out, "In the app: Settings > Server, scan the QR code or enter the three values, then")
+		fmt.Fprintln(out, "Test Connection.")
+	}
+	fmt.Fprintln(out, "This is the only time the token is shown: only its hash is stored, so a lost")
+	fmt.Fprintln(out, "token is revoked and reissued, never recovered. Keep this output private — with")
+	fmt.Fprintln(out, "the token, anyone who can reach the URL can upload and delete this user's data.")
 }
 
 func printDeviceTokens(out io.Writer, tokens []deviceToken, all bool) {

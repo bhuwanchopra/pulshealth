@@ -7,6 +7,10 @@
 #               credential hashes and is revoked on every run)
 #   api_reader  read-only; product API, exact SELECT set     API_DB_PASSWORD     (required)
 #   ingest      DML-only writer for the ingest server        INGEST_DB_PASSWORD  (see below)
+#   web_app     the web viewer in accounts mode: reads health WEB_DB_PASSWORD     (optional)
+#               data only through the per-user views in schema
+#               `web` (015_web_accounts.sql), and keeps the
+#               viewer's accounts in schema `auth`
 #
 # The migrate service (db/migrate.sh) runs this script on every invocation,
 # i.e. on every `docker compose up -d`, with all three passwords from .env —
@@ -16,7 +20,10 @@
 # grants, so rotating a database password is "edit .env, docker compose up -d".
 #
 # INGEST_DB_PASSWORD is only optional when the script is run by hand outside
-# Compose: unset, it skips the ingest role and says so. Connection comes from
+# Compose: unset, it skips the ingest role and says so. WEB_DB_PASSWORD is
+# optional everywhere: only the web viewer's accounts mode (WEB_ACCOUNTS=true)
+# connects as web_app, so unset, the role is not created, and an existing one
+# is set NOLOGIN so a password from before stops working. Connection comes from
 # PGHOST/PGPORT/PGPASSWORD in the environment (set by migrate.sh);
 # POSTGRES_USER / POSTGRES_DB default to postgres/postgres.
 set -euo pipefail
@@ -24,6 +31,7 @@ set -euo pipefail
 : "${GRAFANA_DB_PASSWORD:?GRAFANA_DB_PASSWORD must be set}"
 : "${API_DB_PASSWORD:?API_DB_PASSWORD must be set}"
 INGEST_DB_PASSWORD="${INGEST_DB_PASSWORD:-}"
+WEB_DB_PASSWORD="${WEB_DB_PASSWORD:-}"
 
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-postgres}"
@@ -131,6 +139,28 @@ DO $$
 BEGIN
   IF to_regclass('public.device_tokens') IS NOT NULL THEN
     REVOKE ALL ON TABLE device_tokens FROM grafana;
+  END IF;
+END
+$$;
+
+-- The web viewer's account store (schema auth, 015) holds password hashes
+-- and session ids: nothing a dashboard needs. grafana's blanket grants and
+-- default privileges name schema public only, so it never gets them; revoke
+-- anyway, on every run, so a hand-made grant cannot linger, and prove it.
+-- Guarded like device_tokens for a baseline run before 015.
+DO $$
+BEGIN
+  IF to_regnamespace('auth') IS NOT NULL THEN
+    REVOKE ALL ON SCHEMA auth FROM grafana;
+    REVOKE ALL ON ALL TABLES IN SCHEMA auth FROM grafana;
+    IF EXISTS (
+      SELECT 1 FROM pg_class c
+      WHERE c.relnamespace = 'auth'::regnamespace
+        AND (has_table_privilege('grafana', c.oid, 'SELECT')
+             OR has_any_column_privilege('grafana', c.oid, 'SELECT'))
+    ) THEN
+      RAISE EXCEPTION 'grafana can read a table in schema auth';
+    END IF;
   END IF;
 END
 $$;
@@ -438,9 +468,7 @@ if [[ -z "$INGEST_DB_PASSWORD" ]]; then
   echo "099_read_roles: INGEST_DB_PASSWORD is not set; skipping the ingest role." \
        "The Compose stack always sets it (the ingest service connects as ingest);" \
        "re-run with INGEST_DB_PASSWORD exported to create or rotate the role."
-  exit 0
-fi
-
+else
 psql -q -v ON_ERROR_STOP=1 \
      -v ingest_password="${INGEST_DB_PASSWORD}" \
      --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
@@ -743,6 +771,343 @@ BEGIN
     (SELECT * FROM actual EXCEPT SELECT * FROM expected)
   ) THEN
     RAISE EXCEPTION 'ingest default ACL set is not exact';
+  END IF;
+END
+$$;
+
+COMMIT;
+EOSQL
+fi
+
+# ---------------------------------------------------------------------------
+# web_app: the web viewer's role in accounts mode (WEB_ACCOUNTS=true).
+#
+# The database decides what a signed-in person can read. web_app holds no
+# grant on any table with health data in it: it reads the views in schema
+# `web` (015_web_accounts.sql), each filtered on puls_viewer_user(), which the
+# viewer sets per transaction from the session. Its search_path puts `web`
+# first, so the viewer's SQL names the same relations in both modes and
+# resolves to the views here and to the tables for grafana. The checks below
+# fail the migrate run, and so keep the app services down, if that ever stops
+# being true — a grant on a base table, a view without the filter, a missing
+# search_path. A relation the viewer newly reads needs a view, a GRANT below
+# and an expected_rel row.
+# ---------------------------------------------------------------------------
+if [[ -z "$WEB_DB_PASSWORD" ]]; then
+  psql -q -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'web_app') THEN
+    ALTER ROLE web_app NOLOGIN;
+  END IF;
+END
+$$;
+EOSQL
+  echo "099_read_roles: WEB_DB_PASSWORD is not set; skipping the web_app role" \
+       "(only the web viewer's accounts mode uses it; an existing one is now NOLOGIN)."
+  exit 0
+fi
+
+# A database baselined from before 015 has no views to grant yet; the next
+# plain migrate run applies 015, and this section with it.
+if [[ "$(psql -X -q -tA --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+          -c "SELECT to_regprocedure('puls_create_web_views()') IS NOT NULL")" != t ]]; then
+  echo "099_read_roles: 015_web_accounts.sql is not applied yet; skipping the web_app role."
+  exit 0
+fi
+
+psql -q -v ON_ERROR_STOP=1 \
+     -v web_password="${WEB_DB_PASSWORD}" \
+     --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
+BEGIN;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'web_app') THEN
+    CREATE ROLE web_app LOGIN;
+  END IF;
+END
+$$;
+
+-- Same reconciliation as api_reader: refuse to continue if the role owns
+-- anything (DROP OWNED would delete it), strip memberships, then DROP OWNED to
+-- clear every direct grant before re-applying the exact set below.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_shdepend
+    WHERE refclassid = 'pg_authid'::regclass
+      AND refobjid = (SELECT oid FROM pg_roles WHERE rolname = 'web_app')
+      AND deptype = 'o'
+  ) THEN
+    RAISE EXCEPTION 'web_app owns database objects; refusing automatic reconciliation';
+  END IF;
+END
+$$;
+
+DO $$
+DECLARE
+  membership record;
+BEGIN
+  FOR membership IN
+    SELECT parent.rolname
+    FROM pg_auth_members m
+    JOIN pg_roles parent ON parent.oid = m.roleid
+    WHERE m.member = (SELECT oid FROM pg_roles WHERE rolname = 'web_app')
+  LOOP
+    EXECUTE format('REVOKE %I FROM web_app', membership.rolname);
+  END LOOP;
+
+  FOR membership IN
+    SELECT child.rolname
+    FROM pg_auth_members m
+    JOIN pg_roles child ON child.oid = m.member
+    WHERE m.roleid = (SELECT oid FROM pg_roles WHERE rolname = 'web_app')
+  LOOP
+    EXECUTE format('REVOKE web_app FROM %I', membership.rolname);
+  END LOOP;
+END
+$$;
+
+DROP OWNED BY web_app;
+ALTER ROLE web_app
+  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION
+  NOBYPASSRLS CONNECTION LIMIT -1 VALID UNTIL 'infinity'
+  PASSWORD :'web_password';
+ALTER ROLE web_app RESET ALL;
+ALTER ROLE web_app IN DATABASE :"DBNAME" RESET ALL;
+-- The per-user views, rebuilt every run (015_web_accounts.sql): a view a
+-- CASCADE took with it (rebuilding quantity_rollups drops metric_daily's) or
+-- one a base-table column change left stale comes back here, before the
+-- grants below, instead of failing them.
+SELECT puls_create_web_views();
+
+-- The viewer's unqualified table names resolve to the per-user views first.
+-- Without this the role still reads nothing it should not (it has no grant
+-- on the tables); the viewer just gets "permission denied" everywhere.
+ALTER ROLE web_app SET search_path = web, public;
+
+GRANT CONNECT ON DATABASE :"DBNAME" TO web_app;
+-- public for sample_types and the functions the viewer's SQL calls
+-- (time_bucket, puls_time_zone, puls_viewer_user); EXECUTE on those is
+-- PostgreSQL's default PUBLIC grant.
+GRANT USAGE ON SCHEMA public, web, auth TO web_app;
+
+GRANT SELECT ON TABLE
+  web.users,
+  web.quantity_samples,
+  web.category_samples,
+  web.workouts,
+  web.sources,
+  web.workout_route_points,
+  web.workout_series_points,
+  web.activity_summaries,
+  web.metric_daily
+TO web_app;
+
+-- The HealthKit identifiers seen on this server and their units. Shared by
+-- every user; the viewer's queries join it by identifier.
+GRANT SELECT ON TABLE public.sample_types TO web_app;
+
+-- The account store. The viewer looks accounts up by email to sign people
+-- in, so it reads every row here; it never reads another user's health data.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  auth.accounts,
+  auth.sessions,
+  auth.invites
+TO web_app;
+
+DO $$
+DECLARE
+  web_oid oid := (SELECT oid FROM pg_roles WHERE rolname = 'web_app');
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_roles
+    WHERE oid = web_oid
+      AND rolcanlogin
+      AND NOT rolsuper
+      AND NOT rolinherit
+      AND NOT rolcreaterole
+      AND NOT rolcreatedb
+      AND NOT rolreplication
+      AND NOT rolbypassrls
+      AND rolconnlimit = -1
+  ) THEN
+    RAISE EXCEPTION 'web_app role attributes are not exact';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_auth_members WHERE roleid = web_oid OR member = web_oid
+  ) OR EXISTS (
+    SELECT 1 FROM pg_shdepend
+    WHERE refclassid = 'pg_authid'::regclass
+      AND refobjid = web_oid
+      AND deptype = 'o'
+  ) THEN
+    RAISE EXCEPTION 'web_app has memberships or owns objects';
+  END IF;
+
+  -- Exactly one setting: the search_path, for every database.
+  IF EXISTS (
+    WITH expected(setdatabase, setconfig) AS (
+      VALUES (0::oid, ARRAY['search_path=web, public']::text[])
+    ), actual AS (
+      SELECT setdatabase, setconfig FROM pg_db_role_setting WHERE setrole = web_oid
+    )
+    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    UNION ALL
+    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+  ) THEN
+    RAISE EXCEPTION 'web_app role settings are not exactly search_path = web, public';
+  END IF;
+
+  IF EXISTS (
+    WITH expected(nspname, relname, privilege_type, is_grantable) AS (VALUES
+      ('web', 'users', 'SELECT', false),
+      ('web', 'quantity_samples', 'SELECT', false),
+      ('web', 'category_samples', 'SELECT', false),
+      ('web', 'workouts', 'SELECT', false),
+      ('web', 'sources', 'SELECT', false),
+      ('web', 'workout_route_points', 'SELECT', false),
+      ('web', 'workout_series_points', 'SELECT', false),
+      ('web', 'activity_summaries', 'SELECT', false),
+      ('web', 'metric_daily', 'SELECT', false),
+      ('public', 'sample_types', 'SELECT', false),
+      ('auth', 'accounts', 'SELECT', false),
+      ('auth', 'accounts', 'INSERT', false),
+      ('auth', 'accounts', 'UPDATE', false),
+      ('auth', 'accounts', 'DELETE', false),
+      ('auth', 'sessions', 'SELECT', false),
+      ('auth', 'sessions', 'INSERT', false),
+      ('auth', 'sessions', 'UPDATE', false),
+      ('auth', 'sessions', 'DELETE', false),
+      ('auth', 'invites', 'SELECT', false),
+      ('auth', 'invites', 'INSERT', false),
+      ('auth', 'invites', 'UPDATE', false),
+      ('auth', 'invites', 'DELETE', false)
+    ), actual AS (
+      SELECT n.nspname::text, c.relname::text, acl.privilege_type, acl.is_grantable
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN LATERAL aclexplode(c.relacl) acl
+      WHERE acl.grantee = web_oid
+    )
+    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    UNION ALL
+    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+  ) THEN
+    RAISE EXCEPTION 'web_app relation ACL set is not exact';
+  END IF;
+
+  IF EXISTS (
+    WITH expected(nspname, privilege_type, is_grantable) AS (VALUES
+      ('public', 'USAGE', false),
+      ('web', 'USAGE', false),
+      ('auth', 'USAGE', false)
+    ), actual AS (
+      SELECT n.nspname::text, acl.privilege_type, acl.is_grantable
+      FROM pg_namespace n
+      CROSS JOIN LATERAL aclexplode(n.nspacl) acl
+      WHERE acl.grantee = web_oid
+    )
+    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    UNION ALL
+    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+  ) THEN
+    RAISE EXCEPTION 'web_app schema ACL set is not exact';
+  END IF;
+
+  IF EXISTS (
+    WITH expected(datname, privilege_type, is_grantable) AS (
+      VALUES (current_database()::text, 'CONNECT', false)
+    ), actual AS (
+      SELECT d.datname::text, acl.privilege_type, acl.is_grantable
+      FROM pg_database d
+      CROSS JOIN LATERAL aclexplode(d.datacl) acl
+      WHERE acl.grantee = web_oid
+    )
+    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    UNION ALL
+    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+  ) THEN
+    RAISE EXCEPTION 'web_app database ACL set is not exact';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_attribute a
+    CROSS JOIN LATERAL aclexplode(a.attacl) acl
+    WHERE acl.grantee = web_oid
+  ) OR EXISTS (
+    SELECT 1 FROM pg_proc p
+    CROSS JOIN LATERAL aclexplode(p.proacl) acl
+    WHERE acl.grantee = web_oid
+  ) OR EXISTS (
+    SELECT 1 FROM pg_type t
+    CROSS JOIN LATERAL aclexplode(t.typacl) acl
+    WHERE acl.grantee = web_oid
+  ) OR EXISTS (
+    SELECT 1 FROM pg_default_acl d
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
+    WHERE acl.grantee = web_oid
+  ) OR EXISTS (
+    SELECT 1 FROM pg_parameter_acl p
+    CROSS JOIN LATERAL aclexplode(p.paracl) acl
+    WHERE acl.grantee = web_oid
+  ) THEN
+    RAISE EXCEPTION 'web_app has unexpected column, function, type, default, or parameter ACLs';
+  END IF;
+
+  -- The invariant itself, independent of how the grants above are spelled
+  -- (and of PUBLIC grants, which has_table_privilege includes): outside the
+  -- `web` views and the account store, web_app cannot read any relation in
+  -- any schema that carries a user_id — tables, chunks, compressed chunks,
+  -- continuous-aggregate internals — nor `users` or `sources`.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND n.nspname NOT IN ('web', 'auth')
+      AND (EXISTS (SELECT 1 FROM pg_attribute a
+                   WHERE a.attrelid = c.oid AND a.attname = 'user_id'
+                     AND a.attnum > 0 AND NOT a.attisdropped)
+           OR c.oid IN ('public.users'::regclass, 'public.sources'::regclass))
+      AND (has_table_privilege(web_oid, c.oid, 'SELECT')
+           OR has_any_column_privilege(web_oid, c.oid, 'SELECT'))
+  ) THEN
+    RAISE EXCEPTION 'web_app can read a table holding per-user data directly';
+  END IF;
+
+  -- Schema `web` holds exactly the views puls_create_web_views() just made,
+  -- each a security barrier. Their definitions are that function's, rebuilt
+  -- above on every run, so a hand-edited or hand-added view cannot outlive
+  -- this check; the substring test is a last sanity check on the function
+  -- itself, not the proof (the integration test is:
+  -- web/lib/webapp.integration.test.ts).
+  IF EXISTS (
+    WITH expected(relname) AS (VALUES
+      ('users'), ('quantity_samples'), ('category_samples'), ('workouts'),
+      ('sources'), ('workout_route_points'), ('workout_series_points'),
+      ('activity_summaries'), ('metric_daily')
+    ), actual AS (
+      SELECT c.relname::text FROM pg_class c
+      WHERE c.relnamespace = 'web'::regnamespace
+        AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+    )
+    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    UNION ALL
+    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_class c
+    WHERE c.relnamespace = 'web'::regnamespace
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND (c.relkind <> 'v'
+           OR NOT coalesce(c.reloptions @> ARRAY['security_barrier=true'], false)
+           OR pg_get_viewdef(c.oid) NOT LIKE '%puls_viewer_user()%')
+  ) THEN
+    RAISE EXCEPTION 'schema web does not hold exactly the per-user security-barrier views';
   END IF;
 END
 $$;

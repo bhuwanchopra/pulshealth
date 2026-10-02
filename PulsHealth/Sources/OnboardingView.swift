@@ -1,480 +1,417 @@
 import SwiftUI
 import PulsHealthSync
 
-/// First-run flow. A fresh install has no server, no token and no data types,
-/// so every tab is empty and nothing points at the one screen (Settings) that
-/// would fix it. Five steps take the user from "what is this" to a running
-/// backfill:
+/// First-run flow: four pages the person swipes through, on iPhone and iPad.
 ///
-/// 1. what the app does and where the data goes,
-/// 2. the server — scanned from the pairing QR code or typed, then tested,
-/// 3. Health access, requested for the preselected Common set,
-/// 4. which types to sync (the real Data Types screen, not a copy),
-/// 5. a summary and the button that applies everything.
+/// 1. what the app does (explore, export, sync),
+/// 2. Health access for the starter set (`TypePresets.common`, preselected
+///    by `AppModel`), picked in iOS's own sheet,
+/// 3. one-time exports,
+/// 4. syncing to a database of your own, and the button that finishes.
 ///
-/// Nothing reaches the engine until step 5 — `model.config` is the same staged
-/// draft the Data Types tab edits, and `finishOnboarding()` is the same
-/// Save & Apply path. Backing out at any point leaves the install exactly as it
-/// was, and the flow reappears on the next launch until it is finished.
+/// Page 2 cannot be skipped (App Review rejected 1.4 under 5.1.1(iv) for a
+/// Skip). Until iOS has been asked about the starter set, the pager holds only
+/// the first two pages, so there is no page past it; a swipe forward there and
+/// its one button, Continue, both present the sheet, and the flow moves on
+/// once it has been answered. With nothing to ask (a replay after the
+/// question was settled) all four pages are there from the start.
+///
+/// Nothing reaches the engine until Start Exploring: `model.config` is the
+/// same staged draft the Synced Data screen edits, and `finishOnboarding()` is
+/// the same Save & Apply path. Leaving the app at any point leaves the install
+/// as it was, and the flow reappears on the next launch until it is finished.
+///
+/// A `puls://` pairing link can still arrive while this flow is up. It is
+/// confirmed here (the prompt cannot come from the covered RootView), and the
+/// accepted payload then waits in `AppModel.confirmedPairing` until the flow
+/// ends: `pairingAwaitsSyncTab` turns true, RootView opens Sync → Database,
+/// and that screen fills its fields from it.
 struct OnboardingView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
-    enum Step: Int, CaseIterable, Comparable {
-        case welcome, server, health, types, start
-
-        static func < (a: Step, b: Step) -> Bool { a.rawValue < b.rawValue }
-
-        var title: String {
-            switch self {
-            case .welcome: "Welcome"
-            case .server: "Your Server"
-            case .health: "Health Access"
-            case .types: "Data Types"
-            case .start: "Ready"
-            }
-        }
+    enum Page: Int, CaseIterable, Hashable {
+        case welcome, health, export, sync
     }
 
-    @State private var step: Step = .welcome
-
-    // Server step. Held locally until the step is left, exactly like Settings:
-    // the draft only changes when the user moves on.
-    @State private var serverURLText = ""
-    @State private var tokenText = ""
-    @State private var connectionTest: ConnectionTestResult?
-    @State private var testing = false
-    @State private var showScanner = false
-    @State private var scannedUserID: String?
-    /// Set when the user chose to move past an untested or failing server.
-    @State private var acceptedServerWarning = false
-
+    /// The page on screen. Optional because that is what
+    /// `scrollPosition(id:)` binds; nothing here sets it to nil.
+    @State private var page: Page? = .welcome
+    /// True once iOS has nothing left to ask about the draft: answered on
+    /// page 2 in this showing, or found settled when the flow opened. Never
+    /// goes back to false while the flow is up, so a swipe back to page 2
+    /// does not ask again.
+    @State private var healthSettled = false
     @State private var requestingHealthAccess = false
     @State private var finishing = false
 
+    /// Pages 3 and 4 are not in the pager until page 2 is settled: there is
+    /// no page past it to swipe to, and no other way to reach one.
+    private var pages: [Page] { healthSettled ? Page.allCases : [.welcome, .health] }
+
+    /// A readable line length on iPad, where the screen is far wider than
+    /// the text wants to be.
+    private let maxContentWidth: CGFloat = 560
+
     var body: some View {
+        // A NavigationStack only for the replay's Close button; nothing is
+        // pushed, and on a first run the bar is hidden.
         NavigationStack {
-            stepContent
-                .navigationTitle(step.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if model.onboardingIsRerun {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Close") { model.completeOnboarding() }
-                        }
+            VStack(spacing: 0) {
+                pager
+                // Always four dots, though the pager holds two until page 2
+                // is settled: the flow's length should not change under you.
+                pageDots
+            }
+            .background(Color(.systemBackground))
+            .toolbar {
+                if model.onboardingIsRerun {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { model.completeOnboarding() }
                     }
                 }
+            }
+            .toolbar(model.onboardingIsRerun ? .visible : .hidden, for: .navigationBar)
         }
-        // A pushed detail belongs to the step that pushed it. The Data Types
-        // step is the real picker, so it can be two levels deep (category →
-        // per-type config) when the footer's Back/Continue fires — and the
-        // footer sits outside the stack, so without this the pushed screen
-        // stayed on top of the next step's content. Re-identifying the stack
-        // per step drops whatever it had pushed.
-        .id(step)
-        .safeAreaInset(edge: .bottom) { footer }
         .interactiveDismissDisabled()
-        .onAppear {
-            serverURLText = model.config.serverURL?.absoluteString ?? ""
-            tokenText = model.config.authToken ?? ""
-        }
-    }
-
-    // MARK: - Steps
-
-    @ViewBuilder private var stepContent: some View {
-        switch step {
-        case .welcome: welcomeStep
-        case .server: serverStep
-        case .health: healthStep
-        case .types: TypePickerView()
-        case .start: startStep
-        }
-    }
-
-    private var welcomeStep: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.system(size: 52))
-                    .foregroundStyle(.tint)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 8)
-                Text("PulsHealth reads the health data on this iPhone and sends it to a server you run yourself.")
-                    .font(.title3.weight(.semibold))
-                Text("It goes nowhere else. There is no PulsHealth account, no analytics, and no third-party service in the path — the developer never receives your data.")
-                    .foregroundStyle(.secondary)
-
-                VStack(alignment: .leading, spacing: 14) {
-                    bullet(
-                        "heart.text.square", "Read-only",
-                        "PulsHealth only reads from Apple Health. It never writes or changes anything there.")
-                    bullet(
-                        "checklist", "You choose the data",
-                        "Pick the types to sync — and change the selection whenever you like.")
-                    bullet(
-                        "externaldrive.connected.to.line.below", "You need a server",
-                        "A machine running the PulsHealth server (Docker, one command). Without one there is nowhere to sync to.")
-                }
-                .padding(.top, 4)
-            }
-            .padding()
-        }
-    }
-
-    private func bullet(_ symbol: String, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+        // This flow covers RootView, so the prompt for an incoming `puls://`
+        // link has to come from here. Not over the iOS Health sheet, and not
+        // during the final Apply.
+        .pairingLinkPrompt(canPresent: !requestingHealthAccess && !finishing)
+        .task {
+            // Waits for the stored configuration and the preselected starter
+            // set, so "nothing to ask" is never the answer for an empty draft.
+            if await !model.onboardingHealthAccessPending() {
+                healthSettled = true
             }
         }
     }
 
-    private var serverStep: some View {
-        Form {
-            Section {
-                Button {
-                    showScanner = true
-                } label: {
-                    Label("Scan Pairing Code", systemImage: "qrcode.viewfinder")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-            } footer: {
-                Text("`scripts/bootstrap.sh` prints a QR code with the URL, token and user ID already in it. `make pairing` prints it again later.")
-            }
-
-            Section {
-                TextField("https://your-host:8443", text: $serverURLText)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                if let issue = serverURLIssue {
-                    Label(issue, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                SecureField("Bearer token", text: $tokenText)
-                Button {
-                    runConnectionTest()
-                } label: {
-                    HStack {
-                        Text(testing ? "Testing Connection…" : "Test Connection")
-                        if testing {
-                            Spacer()
-                            ProgressView()
-                        }
+    /// A horizontal paging scroll view rather than a paged TabView: a
+    /// TabView's pager keeps every drag to itself, so a swipe past its last
+    /// page could not be noticed, and on page 2 that swipe is what asks.
+    private var pager: some View {
+        ScrollViewReader { reader in
+            ScrollView(.horizontal) {
+                // Not lazy: with a LazyHStack, iOS 27 stopped the first swipe
+                // back after the move to page 3 about half a page short.
+                HStack(spacing: 0) {
+                    ForEach(pages, id: \.self) { each in
+                        pageView(each)
+                            .containerRelativeFrame(.horizontal)
+                            .id(each)
                     }
                 }
-                .disabled(testing || validatedServerURL == nil || enteredToken.isEmpty)
-                if let result = connectionTest {
-                    ConnectionTestResultRow(result: result)
-                }
-            } header: {
-                Text("Or enter it by hand")
-            } footer: {
-                Text("Use https://. Plain http:// is accepted only for hosts on your local network (localhost, *.local, 10.x, 172.16–31.x, 192.168.x).")
+                .scrollTargetLayout()
             }
-
-            if let scannedUserID {
-                Section("User ID") {
-                    Text(scannedUserID)
-                        .font(.footnote.monospaced())
-                        .foregroundStyle(.secondary)
-                    Text("From the pairing code. Everything stored for you on the server is tagged with this ID; you can change it later under Settings → User.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .sheet(isPresented: $showScanner) {
-            PairingScannerView { payload in
-                serverURLText = payload.serverURL.absoluteString
-                tokenText = payload.token
-                model.config.userID = payload.userID
-                scannedUserID = payload.userID
-                connectionTest = nil
-                acceptedServerWarning = false
-                // The code was printed by the server that is presumably right
-                // here — confirm it now rather than making the user tap again.
-                runConnectionTest()
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            .scrollIndicators(.hidden)
+            // No swiping while iOS's sheet is on its way or the final apply runs.
+            .scrollDisabled(requestingHealthAccess || finishing)
+            // Page 2 is the last page until iOS has been asked, so a swipe
+            // forward there only stretches past the end. That pull asks.
+            .onPullPastEnd(enabled: !healthSettled && page == .health) { continueFromHealth() }
+            // Rotating an iPad, or resizing its window, changes the page
+            // width, and the scroll view kept its old offset: on page 3 that
+            // left half of page 2 on screen. Put the current page back.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in
+                guard let current = page else { return }
+                Task { @MainActor in reader.scrollTo(current, anchor: .leading) }
             }
         }
     }
 
-    private var healthStep: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Image(systemName: "heart.text.square")
-                    .font(.system(size: 46))
-                    .foregroundStyle(.pink)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 8)
-                Text("Next, iOS will ask which health data PulsHealth may read.")
-                    .font(.title3.weight(.semibold))
-                Text("The sheet comes from iOS, not from this app, and it lists every type you are about to sync. PulsHealth asks for read access only — it can never write to or delete anything in Apple Health. You can change any of it later in Settings → Privacy & Security → Health.")
-                    .foregroundStyle(.secondary)
-                Text("A starter selection is already made for you; anything you add on the next step is requested when you finish.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    @ViewBuilder private func pageView(_ page: Page) -> some View {
+        switch page {
+        case .welcome: welcomePage
+        case .health: healthPage
+        case .export: exportPage
+        case .sync: syncPage
+        }
+    }
+
+    // MARK: - Pages
+
+    private var welcomePage: some View {
+        pageLayout {
+            VStack(spacing: 28) {
+                // The app's own mark (Assets.xcassets/Logo, the SVG the site
+                // uses, rendered as a template so it takes the tint).
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: logoSize, height: logoSize)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                pageTitle("Unlock your Health Data", font: .largeTitle.bold())
+                VStack(alignment: .leading, spacing: 18) {
+                    feature(
+                        "heart.text.square", "Explore",
+                        "See what Apple Health holds, how much, and where it came from.")
+                    feature(
+                        "square.and.arrow.up", "Export",
+                        "Save any of it to CSV or JSONL files.")
+                    feature(
+                        "arrow.triangle.2.circlepath", "Sync",
+                        "Keep a live copy in your own database.")
+                }
+            }
+        }
+    }
+
+    private var healthPage: some View {
+        pageLayout {
+            VStack(spacing: 20) {
+                pageIcon("heart.text.square", color: .pink)
+                pageTitle("Which Health data would you like to use?")
+                bodyText("iOS asks which data PulsHealth may read. Pick what you like. You can always add more later in the app.")
                 if let hint = model.authorizationHint {
                     Label(hint, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
                         .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if !model.needsAuthorization && model.authorizationRequested {
-                    // Deliberately NOT "access granted": HealthKit never tells an
-                    // app whether a read request was granted. Once the sheet has
-                    // been shown, statusForAuthorizationRequest answers
-                    // .unnecessary whether the user allowed everything or denied
-                    // everything, so the only honest claim is that iOS was asked.
-                    // Whether anything was actually granted shows up later, as
-                    // samples arriving — or not (see AppModel.readsLookBlocked).
-                    Label("iOS has been asked for the current selection.", systemImage: "checkmark.circle.fill")
+                if healthSettled {
+                    // Deliberately not "access granted": HealthKit never tells
+                    // an app whether a read request was granted, only that
+                    // iOS has asked.
+                    Label("iOS has already asked about this data.", systemImage: "checkmark.circle.fill")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding()
+        } footer: {
+            // App Review 5.1.1(iv): the one button on a pre-permission screen
+            // is a neutral Continue, and it leads to the sheet.
+            primaryButton("Continue", busy: requestingHealthAccess) { continueFromHealth() }
         }
     }
 
-    private var startStep: some View {
-        Form {
-            Section("Summary") {
-                LabeledContent("Server") {
-                    Text(serverSummary)
-                        .foregroundStyle(validatedServerURL == nil ? .orange : .secondary)
-                        .multilineTextAlignment(.trailing)
+    private var exportPage: some View {
+        pageLayout {
+            VStack(spacing: 24) {
+                pageIcon("square.and.arrow.up", color: .accentColor)
+                pageTitle("Export your data")
+                bodyText("Make a one-time export of any of your Health data, as CSV or JSONL files.")
+                VStack(alignment: .leading, spacing: 18) {
+                    feature(
+                        "list.bullet.rectangle", "Raw samples",
+                        "Every reading, as it was recorded.")
+                    feature(
+                        "chart.bar.xaxis", "Aggregates",
+                        "Hourly or daily summaries, like steps per day.")
                 }
-                LabeledContent("Data types", value: "\(model.config.enabledTypes.count) selected")
-                LabeledContent(
-                    "History from",
-                    value: model.config.startDate.formatted(date: .abbreviated, time: .omitted))
-                LabeledContent("User ID") {
-                    Text(model.config.userID)
-                        .font(.caption.monospaced())
+            }
+        }
+    }
+
+    private var syncPage: some View {
+        pageLayout {
+            VStack(spacing: 20) {
+                pageIcon("arrow.triangle.2.circlepath", color: .accentColor)
+                pageTitle("Sync to your own database")
+                bodyText("Keep a live copy of your Health data in a database you control. Connect your own, or set up the open-source PulsHealth example.")
+                // Opens in Safari, outside the app.
+                Link(destination: URL(string: "https://pulshealth.com/docs/server/")!) {
+                    Label("Learn more", systemImage: "arrow.up.right.square")
+                }
+                if model.confirmedPairing != nil {
+                    // Accepted during the flow; Sync → Database opens with it
+                    // filled in once the flow is done (RootView, on
+                    // `pairingAwaitsSyncTab`).
+                    Label("A pairing link is waiting. The Sync tab opens with it filled in when you finish.", systemImage: "qrcode")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Section {
-                Text(validatedServerURL == nil
-                    ? "No server is set, so nothing will be uploaded yet. Add one under Settings → Server whenever you are ready."
-                    : "Tapping Start uploads everything from the date above. The first pass is the largest — keep the app open and the phone on power for it. Progress is saved after every batch, so it is safe to interrupt.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Text("From here on, PulsHealth catches up whenever you open it, and in the background when iOS allows. The Dashboard shows what has been sent.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+        } footer: {
+            primaryButton("Start Exploring", busy: finishing) { finish() }
         }
     }
 
-    // MARK: - Footer
+    // MARK: - Building blocks
 
-    private var footer: some View {
-        VStack(spacing: 10) {
-            progressDots
-            if let warning = footerWarning {
-                Text(warning)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
-            HStack(spacing: 12) {
-                if step != .welcome {
-                    Button("Back") { back() }
-                        .buttonStyle(.bordered)
-                        .disabled(finishing || requestingHealthAccess)
-                }
-                Button {
-                    primaryAction()
-                } label: {
-                    if finishing || requestingHealthAccess {
-                        ProgressView().frame(maxWidth: .infinity)
-                    } else {
-                        Text(primaryTitle).frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(primaryDisabled)
-            }
-            if let secondary = secondaryTitle {
-                Button(secondary) { secondaryAction() }
-                    .font(.footnote)
-                    .disabled(finishing || requestingHealthAccess)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider() }
+    private var logoSize: CGFloat { sizeClass == .regular ? 128 : 104 }
+
+    /// Content centred in the page, scrolling when it does not fit (large
+    /// text sizes, iPad landscape), with the page's button, if it has one,
+    /// pinned below it.
+    private func pageLayout<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        pageLayout(content: content) { EmptyView() }
     }
 
-    private var progressDots: some View {
-        HStack(spacing: 6) {
-            ForEach(Step.allCases, id: \.self) { each in
+    private func pageLayout<Content: View, Footer: View>(
+        @ViewBuilder content: () -> Content, @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        let pageContent = content()
+        return VStack(spacing: 0) {
+            GeometryReader { proxy in
+                ScrollView {
+                    pageContent
+                        .frame(maxWidth: maxContentWidth)
+                        .padding(24)
+                        .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            footer()
+                .frame(maxWidth: maxContentWidth)
+                .padding(.horizontal, 24)
+        }
+    }
+
+    // Multi-line text says so (`fixedSize`): without it a title that needs
+    // two lines was cut to one with an ellipsis.
+
+    private func pageTitle(_ text: String, font: Font = .title.bold()) -> some View {
+        Text(text)
+            .font(font)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func bodyText(_ text: String) -> some View {
+        Text(text)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func pageIcon(_ symbol: String, color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 56))
+            .foregroundStyle(color)
+            .accessibilityHidden(true)
+    }
+
+    private func feature(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: symbol)
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 34)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(detail).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func primaryButton(_ title: String, busy: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                // The title keeps the button's size while the spinner shows.
+                Text(title).opacity(busy ? 0 : 1)
+                if busy { ProgressView() }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(requestingHealthAccess || finishing)
+        .accessibilityLabel(title)
+    }
+
+    private var pageDots: some View {
+        let current = page ?? .welcome
+        return HStack(spacing: 6) {
+            ForEach(Page.allCases, id: \.self) { each in
                 Capsule()
-                    .fill(each <= step ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
-                    .frame(width: each == step ? 22 : 7, height: 7)
+                    .fill(each == current ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
+                    .frame(width: each == current ? 22 : 7, height: 7)
             }
         }
-        .animation(.snappy, value: step)
-        .accessibilityLabel("Step \(step.rawValue + 1) of \(Step.allCases.count)")
+        .animation(.snappy, value: current)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement()
+        .accessibilityLabel("Page \(current.rawValue + 1) of \(Page.allCases.count)")
     }
 
-    private var primaryTitle: String {
-        switch step {
-        case .welcome: "Get Started"
-        case .server: "Continue"
-        // App Review 5.1.1(iv): the button on a pre-permission screen has to be
-        // a neutral "Continue"/"Next", never "Grant …", and there is no way past
-        // the screen that avoids the permission sheet.
-        case .health: "Continue"
-        case .types: "Continue"
-        case .start: validatedServerURL == nil ? "Finish" : "Start Syncing"
+    // MARK: - Actions
+
+    /// Continue on page 2, or a swipe forward there. Presents iOS's sheet
+    /// for whatever is still undetermined, then moves on — after Allow,
+    /// Don't Allow, or iOS 27's Don't Allow on the history page, which the
+    /// model takes as an answer. Already settled: just the next page.
+    private func continueFromHealth() {
+        guard !requestingHealthAccess, !finishing else { return }
+        guard !healthSettled else {
+            withAnimation { page = .export }
+            return
         }
-    }
-
-    private var primaryDisabled: Bool {
-        if finishing || requestingHealthAccess { return true }
-        switch step {
-        case .server:
-            // The result has to be on screen before Continue lights up; the
-            // secondary button below is the way past a failing or untested one.
-            return connectionTest?.isSuccess != true
-        case .types:
-            return model.config.observedTypeIdentifiers.isEmpty
-        default:
-            return false
-        }
-    }
-
-    /// The escape hatch under the primary button: moving on past a server that
-    /// did not answer. The Health step has none — App Review 5.1.1(iv) requires
-    /// that the permission request always follows the explanation.
-    private var secondaryTitle: String? {
-        switch step {
-        case .server:
-            if serverURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && enteredToken.isEmpty {
-                return "I'll Set This Up Later"
-            }
-            // An unusable URL cannot be carried forward — `commitServerFields`
-            // would store nothing and the typed text would vanish without a
-            // word. Fix it, or clear the field to skip the step outright.
-            if serverURLIssue != nil { return nil }
-            if connectionTest?.isSuccess == true { return nil }
-            return connectionTest == nil ? "Continue Without Testing" : "Continue Anyway"
-        default:
-            return nil
-        }
-    }
-
-    private var footerWarning: String? {
-        guard step == .server, acceptedServerWarning, connectionTest?.isSuccess != true else {
-            return nil
-        }
-        return "This server has not answered a test. Uploads will fail until it does — fix the URL or token in Settings → Server."
-    }
-
-    private func primaryAction() {
-        switch step {
-        case .welcome:
-            step = .server
-        case .server:
-            commitServerFields()
-            step = .health
-        case .health:
-            if model.authorizationRequested && !model.needsAuthorization {
-                step = .types
-            } else {
-                requestingHealthAccess = true
-                Task {
-                    await model.requestOnboardingHealthAccess()
-                    requestingHealthAccess = false
-                    step = .types
-                }
-            }
-        case .types:
-            step = .start
-        case .start:
-            finishing = true
-            Task {
-                await model.finishOnboarding()
-                finishing = false
-            }
-        }
-    }
-
-    private func secondaryAction() {
-        switch step {
-        case .server:
-            acceptedServerWarning = true
-            commitServerFields()
-            step = .health
-        default:
-            break
-        }
-    }
-
-    private func back() {
-        guard let previous = Step(rawValue: step.rawValue - 1) else { return }
-        step = previous
-    }
-
-    // MARK: - Server helpers (same rules as Settings)
-
-    private var serverURLValidation: Result<URL, ServerURLValidation.Failure>? {
-        let trimmed = serverURLText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : ServerURLValidation.validate(trimmed)
-    }
-
-    private var validatedServerURL: URL? {
-        if case .success(let url) = serverURLValidation { return url }
-        return nil
-    }
-
-    private var serverURLIssue: String? {
-        if case .failure(let failure) = serverURLValidation { return failure.errorDescription }
-        return nil
-    }
-
-    /// Same rules as Settings, so a `PULS_TOKEN=…` line pasted straight out of
-    /// the server's `.env` works here too.
-    private var enteredToken: String { ServerTokenField.normalize(tokenText) }
-
-    private var serverSummary: String {
-        guard let url = validatedServerURL else { return "Not set" }
-        return url.host().map { $0 + (url.port.map { ":\($0)" } ?? "") } ?? url.absoluteString
-    }
-
-    /// Moves the entered values into the staged draft. Still nothing applied —
-    /// the engine sees them only on the final step.
-    private func commitServerFields() {
-        model.config.serverURL = validatedServerURL
-        model.config.authToken = enteredToken.isEmpty ? nil : enteredToken
-    }
-
-    private func runConnectionTest() {
-        guard let url = validatedServerURL else { return }
-        let token = enteredToken
-        guard !token.isEmpty else { return }
-        testing = true
-        connectionTest = nil
-        acceptedServerWarning = false
+        requestingHealthAccess = true
         Task {
-            connectionTest = await model.testConnection(url: url, token: token)
-            testing = false
+            await model.requestOnboardingHealthAccess()
+            requestingHealthAccess = false
+            // Pages 3 and 4 join the pager first, then it moves to page 3.
+            healthSettled = true
+            try? await Task.sleep(for: .milliseconds(50))
+            // Only if still on page 2: someone who swiped back to page 1
+            // while the sheet came up stays there.
+            if page == .health {
+                withAnimation { page = .export }
+            }
         }
+    }
+
+    private func finish() {
+        guard !finishing else { return }
+        finishing = true
+        Task {
+            await model.finishOnboarding()
+            finishing = false
+        }
+    }
+}
+
+// MARK: - Pull past the last page
+
+private extension View {
+    /// Calls `action` when the person drags a horizontal scroll view past
+    /// its trailing end and lets go — a swipe forward on its last page.
+    /// Needs iOS 18's scroll geometry and phases; on iOS 17 the pull only
+    /// bounces, and the page's own button is the way on.
+    @ViewBuilder func onPullPastEnd(enabled: Bool, perform action: @escaping () -> Void) -> some View {
+        if #available(iOS 18.0, *) {
+            modifier(PullPastEndModifier(enabled: enabled, action: action))
+        } else {
+            self
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct PullPastEndModifier: ViewModifier {
+    let enabled: Bool
+    let action: () -> Void
+    /// Set while a drag has stretched far enough past the end to count.
+    @State private var pulled = false
+
+    /// How far past the end, in points, a drag has to stretch: more than a
+    /// nudge, less than a deliberate swipe.
+    private static let threshold: CGFloat = 40
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.visibleRect.maxX - geometry.contentSize.width
+            } action: { _, beyondEnd in
+                if beyondEnd > Self.threshold { pulled = true }
+            }
+            .onScrollPhaseChange { old, new in
+                // The finger lifted: a pull that went far enough asks.
+                guard old == .interacting, new != .interacting else { return }
+                if pulled, enabled { action() }
+                pulled = false
+            }
     }
 }

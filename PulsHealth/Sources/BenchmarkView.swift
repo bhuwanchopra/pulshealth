@@ -80,9 +80,12 @@ struct BenchmarkView: View {
                 .appendingPathComponent("puls-benchmark-\(UUID())", isDirectory: true)
             // Throwaway state: an in-memory token store keeps the benchmark's
             // engine away from the app's Keychain item.
+            // No recent-window pass: it would send a month twice and the
+            // throughput figure would count only the second time.
             let engine = HealthSyncEngine(
                 store: SyncStateStore(directory: tmp, tokenStore: InMemoryTokenStore()),
-                eventLog: SyncEventLog(directory: tmp)
+                eventLog: SyncEventLog(directory: tmp),
+                recentWindowFirst: false
             )
             var benchConfig = config
             benchConfig.serverURL = nil

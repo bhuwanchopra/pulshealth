@@ -10,7 +10,7 @@ const GITHUB = "https://github.com/PulsHealth/pulshealth";
 export const metadata = {
   title: "Documentation - PulsHealth",
   description:
-    "The PulsHealth documentation: setting up the self-hosted server, the Puls Sync Protocol specification, the database guide, exports, and using your health data with AI assistants.",
+    "The PulsHealth documentation: setting up the self-hosted stack, the Puls Sync Protocol specification, the database guide, exports, and using your health data with AI assistants.",
   alternates: {
     canonical: "/docs/",
   },

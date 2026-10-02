@@ -865,8 +865,8 @@
       "options": {
         "basemap": {
           "config": {},
-          "name": "Layer 0",
-          "type": "default"
+          "name": "OpenStreetMap",
+          "type": "osm-standard"
         },
         "controls": {
           "mouseWheelZoom": true,

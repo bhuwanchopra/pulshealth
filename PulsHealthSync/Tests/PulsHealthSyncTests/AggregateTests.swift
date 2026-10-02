@@ -24,7 +24,7 @@ import Testing
     }
 
     // Mapping verified empirically by the app-hosted AggregateMatrixTests
-    // (probes all 372 type×function combos against HealthKit).
+    // (probes all 378 type×function combos against HealthKit).
     @Test func aggregationStylesMapToExpectedFunctions() {
         // Cumulative: sum (plus mostRecent/duration) but never average/min/max.
         let steps = HealthTypeCatalog.allowedAggregateFunctions(
@@ -106,13 +106,13 @@ import Testing
             userInfo: [
                 NSLocalizedDescriptionKey: "Unable to invalidate interval: no data source available."
             ])
-        #expect(HealthSyncEngine.isHealthKitMissingDataSourceError(error))
+        #expect(AggregateQuery.isHealthKitMissingDataSourceError(error))
 
         let unrelated = NSError(
             domain: "com.apple.healthkit",
             code: 3,
             userInfo: [NSLocalizedDescriptionKey: "Invalid argument"])
-        #expect(!HealthSyncEngine.isHealthKitMissingDataSourceError(unrelated))
+        #expect(!AggregateQuery.isHealthKitMissingDataSourceError(unrelated))
     }
 
     @Test func legacyInitialFullPassProgressMigratesButScheduledPassDoesNot() {

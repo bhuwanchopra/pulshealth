@@ -1,483 +1,215 @@
-# Open-sourcing PulsHealth — requirements and plan
+# Open-sourcing PulsHealth — decisions and requirements
 
-Status: approved 2026-09-04. Phases 0-4 are complete — the repository is
-public, the protocol is specified, the stack self-hosts, the MCP server ships,
-and the app is on the App Store (see Phase 4 below). This file stays as the
-record of what was decided and why; **what is still outstanding lives in
-[`roadmap.md`](roadmap.md)**, which is the list to work from.
+Status: approved 2026-09-04. Its five phases (scrub and go public; protocol
+v1 and app safety; self-host v1; the AI layer; the App Store) were complete
+by 2026-09-19: the repository went public on 2026-09-07, the server stack's
+v0.1.0 shipped on 2026-09-14, and the app's 1.4 reached the store on
+2026-09-19. This file records what was decided and why, and defines the
+requirement IDs that code and documents cite. **What is still open is in
+[`roadmap.md`](roadmap.md).**
 
 ## 1. Goal
 
-Turn Puls from a personal HealthKit → Postgres sync into an open-source
-project that lets anyone get their Apple Health data into a backend they
-control, and use it with AI tools. Three deliverables, each with a clear
-owner boundary:
+Let anyone get their Apple Health data into a backend they control and use
+it with AI tools. Three deliverables:
 
-| Deliverable | What it is | Who ships it |
-|---|---|---|
-| **PulsHealth app** | Official App Store app. Reads HealthKit, syncs to a backend the user configures. Source is open; the store listing and name are Sean's. | Sean, via App Store + TestFlight |
-| **Puls Sync Protocol** | The versioned wire contract between the app and *any* backend: one gzip NDJSON `POST`, optional read endpoints. Spec + JSON Schema + conformance fixtures + a tiny reference receiver. | Open source, the thing third parties implement |
-| **Reference backend** | The Docker Compose stack: TimescaleDB, Go ingest, product API, web viewer, Grafana, plus a new MCP server. "Batteries included" self-host. | Open source, `docker compose up` |
+| Deliverable | What it is |
+|---|---|
+| **PulsHealth app** | The App Store app. Reads HealthKit, syncs to a backend the user configures, exports files. The source is open; the store listing and the name are the maintainer's. |
+| **Puls Sync Protocol** | The versioned wire contract between the app and *any* backend: one gzip NDJSON `POST`, optional read endpoints. Spec, JSON Schema, conformance fixtures and a small reference receiver (`docs/protocol/`). |
+| **Reference backend** | The Docker Compose stack: TimescaleDB, Go ingest, product API, MCP server, web viewer, Grafana. |
 
-The analogies to keep in mind are Bitwarden and Immich: an official app on
-the store that anyone can point at their own server, with the server and app
-both open. The closest in-domain product is Health Auto Export, which is
-closed source and does the same "POST to any URL" job.
+The model is Bitwarden or Immich: an official store app anyone can point at
+their own server, with app and server both open. "Use it with AI" means a
+user connects PulsHealth to Claude, ChatGPT or Cursor over MCP and asks "how
+did I sleep this week", or drops an export into a chat.
 
-"Use it with AI" concretely means: after syncing, a user can open Claude
-Desktop, Claude Code, ChatGPT or Cursor, connect PulsHealth via MCP, and ask
-"how did I sleep this week" or "compare my runs this month to last month",
-or drop a CSV export into a chat. That is the launch demo.
-
-## 2. Where the code stands today
-
-Three audits (client, server, repo hygiene) on 2026-09-04. Full file:line
-lists are in the appendix. The short version:
-
-**Already in good shape**
-
-- The sync engine is the asset: anchor-after-ack, idempotent uploads,
-  merged incremental batches, background wake handling, locked-device
-  skips. None of that needs to change.
-- `SyncTransport` is a public single-method protocol with two shipped
-  alternates (`DryRunTransport`, `InstrumentedTransport`), so alternative
-  sinks are cheap.
-- The Swift package has zero dependencies. All Go and web dependencies are
-  MIT/BSD/Apache. No copied code, no attribution debt.
-- No secrets were ever committed. `.env` files were never tracked.
-- The product API already serves an OpenAPI 3.1 document and runs as a
-  read-only role with its own token. `metric_daily` already solves the
-  iPhone+Watch double-counting trap. `docs/database-guide.md` reads like an
-  agent system prompt already.
-- Compose is credential-clean (`${VAR:?}`), loopback-bound, log-rotated.
-  The `validate` CI job (vet, tests, lint, shellcheck, actionlint) is
-  generic and reusable.
-
-**Hard blockers for publishing**
-
-1. `PulsDefaultUser` compiles Sean's name, email, date of birth, sex and
-   user UUID into the library as the default for every install, and they
-   are also the decode fallbacks. A stranger's fresh install would upload
-   Sean's identity to their own server.
-2. `db/init/000_users.sql` seeds the same PII into every fresh database.
-3. The bearer token is persisted in cleartext JSON with no file protection
-   and no backup exclusion. There is no Keychain use anywhere.
-4. No `LICENSE`. Without one the code is all-rights-reserved.
-5. The tailnet FQDN of a live, internet-reachable personal health ingest
-   endpoint is hardcoded in the deploy script and runbook, and lives
-   throughout git history.
-
-**Structural gaps for "bring your own backend"**
-
-- No protocol version anywhere. Compatibility today is "deploy server
-  first" plus tolerant decoding. That does not work when someone else owns
-  the server.
-- The protocol exists only as prose in three READMEs and the source.
-- Default ATS blocks plain `http://` to a LAN box, which is how most
-  self-hosters start.
-- Sync state is not keyed by server. Changing the URL keeps the old anchors,
-  so the new backend silently receives only data after the old high-water
-  mark.
-- Reconciliation and stats are hardwired to `ServerAPIClient`; a custom
-  transport survives only until the next cold background launch.
-- `America/Los_Angeles` is baked into `metric_daily` DDL, the product API's
-  day math and the Grafana `tz` constant. Everything else honors
-  `PULS_TIME_ZONE`.
-
-**Structural gaps for "a stranger self-hosts it"**
-
-- No migration framework: schema applies only to an empty volume.
-- No backups.
-- No published images; every install builds two Go services and a Next.js
-  app from source.
-- No quickstart: six secrets generated by hand before compose will start.
-- Ingest runs as the Postgres superuser by default.
-- One static shared token, and `X-User-ID` is unauthenticated tenant
-  selection. No rate limiting.
-- The web viewer has no auth at all; the bind address is the access control.
-- Two hand-maintained copies of the HealthKit catalog (Swift and
-  `web/lib/catalog.ts`), no drift test.
-
-**Nothing exists for AI yet.** No MCP server, no export, no bulk endpoint.
-The product API also lacks what an analyst asks for first: sleep stages,
-intra-day samples, workout series, state of mind.
-
-## 3. Decisions to make
-
-Each with a recommendation. These shape everything downstream, so settle
-them before Phase 0 work starts.
+## 2. Decisions
 
 ### D1. License
 
-**Recommend Apache-2.0 for everything, plus a `TRADEMARK.md`.**
+**Apache-2.0 for everything, plus `TRADEMARK.md`.** The goal is adoption of
+the protocol and the app, and the Swift package is meant to be embedded in
+other apps, so the terms are permissive. Apache-2.0 carries a patent grant
+and, in section 6, withholds trademark rights: anyone may fork and ship,
+nobody may call it PulsHealth or use the icon. AGPL for the server was
+rejected: a closed hosted clone is a small risk for data people self-host to
+avoid hosted services, copyleft slows adoption by AI tooling, and GPL code on
+the App Store would need a CLA from every contributor. Contributions carry a
+DCO sign-off instead.
 
-The goal is adoption of the protocol and the app, which argues for
-permissive. Apache-2.0 carries an explicit patent grant and, in section 6,
-an explicit *non*-grant of trademark rights, which is exactly the "official
-app" positioning: anyone may fork and ship, nobody may call it PulsHealth or
-use the icon. The Swift package will be embedded in other people's apps,
-which needs permissive terms.
+### D2. Repository
 
-The alternative is AGPL-3.0 for the server to deter a closed hosted clone.
-That risk is small (people self-host health data precisely to avoid a hosted
-service), and copyleft makes corporate AI tooling adoption harder. GPL-family
-on the App Store is fine when the copyright holder publishes, but it would
-require a CLA from every contributor to keep that right. Apache with a DCO
-sign-off avoids that.
-
-### D2. Repo, org, and git history
-
-**Recommend `github.com/PulsHealth/pulshealth` as a monorepo with a fresh
-initial commit.**
-
-Sean already owns the `PulsHealth` GitHub org (created 2022, zero public
-repos, blog `pulshealth.com`, description "Everything AI needs to collect and
-understand wearable health data"). Publish there, not under the personal GitHub paths.
-
-Keep the monorepo: the wire-format-changes-touch-both-sides invariant is
-much easier to enforce in one repo with one CI matrix. Split later if the
-Swift package gains outside adopters.
-
-Squash history. The Team ID, email, tailnet FQDN and personal DOB are in
-every historical commit. A single-author repo loses nothing meaningful by
-starting fresh, and `git filter-repo` on 125 commits buys little over a
-clean cut. Keep the private repo as the archive.
+**One monorepo at `github.com/PulsHealth/pulshealth`, with a fresh history.**
+The rule that wire-format changes touch both sides is easiest to enforce in
+one repository with one CI. Split later if the Swift package gains outside
+adopters. History started from a single commit because personal identifiers
+were in every earlier one; the private repository is the archive.
 
 ### D3. What "bring your own backend" means
 
-**Recommend: exactly one transport (HTTPS), one open protocol, and an
-ecosystem of receivers.** Do not build native S3/Supabase/Sheets/Notion
-sinks into the app.
-
-The app posts to a URL. The spec says what a receiver must do. A minimal
-receiver is a hundred lines in any language. This keeps the app small,
-keeps App Review simple, and makes the protocol the thing people build on.
-
-One exception worth adding later: a local file export (share sheet, NDJSON
-or CSV) for people who just want a file to drop into a chat. It is a
-`DryRunTransport`-sized change and lands squarely on the AI positioning.
+**One transport (HTTPS), one open protocol, an ecosystem of receivers.** No
+native S3, Supabase, Sheets or Notion sinks in the app. The spec says what a
+receiver must do, and a minimal one is about a hundred lines in any language.
+That keeps the app small, App Review simple, and the protocol the thing
+people build on. The one addition, a local file export for people who want a
+file to hand to a chat, shipped as the Export tab, which is not a sink: it
+runs on a throwaway engine of its own (`docs/export.md`).
 
 ### D4. Auth between app and backend
 
-**Recommend keeping bearer tokens as the protocol-level contract, and
-fixing the client-side handling now.** Every hobbyist can check a header;
-mTLS, OAuth or signed requests would shrink the set of people who can write
-a receiver.
-
-Client-side, before anyone else's backend sees the app: Keychain storage
-with `kSecAttrAccessibleAfterFirstUnlock` so background wakes still work,
-HTTPS required except on the local network, a "Test connection" step before
-saving, and QR pairing (server prints a QR with `{url, token, userID}` on
-first boot; app scans it).
-
-Per-device tokens with approval, last-seen and revocation are a *reference
-server* feature, not a protocol change. The design from 2026-06-12 still
-stands; it becomes Phase 2 work. Binding a token to a user on the server
-also closes the unauthenticated `X-User-ID` hole.
+**Bearer tokens are the protocol contract.** Every hobbyist can check a
+header; mTLS, OAuth or signed requests would shrink the set of people who can
+write a receiver. On the client the token lives in the Keychain
+(`AfterFirstUnlock`, so background wakes still work), HTTPS is required except
+on the local network, a connection test runs before saving, and pairing reads
+a `puls://pair` QR code or link. Per-device tokens with revocation are a
+reference-server feature, not a protocol change; binding a token to a user
+closes the unauthenticated `X-User-ID` hole (SRV-8).
 
 ### D5. Identity model
 
-**Recommend: keep a fixed, neutral default user UUID; strip all PII
-defaults; make the user ID editable; let the server create users on first
-sight.**
-
-A per-install random UUID sounds cleaner but breaks reinstalls: a reinstall
-becomes a second user and a second full backfill. A fixed default UUID
-survives reinstalls, which is what a single-person self-host wants. Households
-set distinct IDs (or receive them via QR pairing). Name, email, DOB and sex
-default to nil on the client and NULL in the seed; the profile line already
-handles nulls.
-
-The API and web viewer should default to "the only user" when exactly one
-exists, and require `PULS_USER_ID` only when there are several.
+**A fixed, neutral default user UUID and no personal defaults.** A
+per-install random UUID would make every reinstall a second user and a second
+full backfill; a fixed one survives reinstalls, which is what a single-person
+self-host wants. Households set distinct IDs, by hand or through pairing.
+Name, email, date of birth and sex default to nil on the client and NULL in
+the seed, and the server creates a user the first time it sees one. The
+product API, the MCP server and the web viewer read `PULS_USER_ID`, else the
+default user.
 
 ### D6. The first AI surface
 
-**Recommend a read-only MCP server over the product API, in Go, as a fifth
-compose service that also runs standalone.**
+**A read-only MCP server over the product API, in Go.** Over the API rather
+than Postgres because the token boundary and the read-only role already
+exist, OpenAPI already describes every shape, and the API keeps the
+double-counting traps out of the model's hands. Go keeps the server side one
+language and distroless, and one binary serves both `stdio` (desktop clients)
+and streamable HTTP (the Compose service, for remote connectors). The raw-SQL
+tool that was to follow as an opt-in (AI-7) was dropped.
 
-Over the API rather than Postgres because the token boundary and the
-15-relation read-only role already exist, OpenAPI already describes every
-shape, and it keeps the double-counting gotchas out of the model's hands. A
-raw-SQL tool over the `grafana` role is more powerful but hands an agent
-arbitrary SQL against a table holding name and DOB; offer it later as an
-explicit opt-in. (That later offer, AI-7, was dropped: see the AI table.)
+### D7. Name
 
-Go keeps the server side single-language and distroless, reuses the API's
-types, and produces one binary for `stdio` (Claude Desktop, Claude Code,
-Cursor) while the compose service exposes streamable HTTP for remote
-connectors (claude.ai, ChatGPT). If `npx @pulshealth/mcp` distribution
-turns out to matter more than that, TypeScript is the fallback; the TS SDK
-is the most mature.
-
-### D7. Name and trademark
-
-**Recommend "PulsHealth" for the app and project, "Puls Sync Protocol" for
-the spec.** Confirm App Store name availability early; the name must be
-reserved in App Store Connect before the listing exists. `pulshealth.com`
-becomes the docs site and privacy-policy host.
+**"PulsHealth" for the app and the project, "Puls Sync Protocol" for the
+spec.** `pulshealth.com` hosts the documentation and the privacy policy.
 
 ### D8. What stays private
 
-Your production deployment (the production host, Tailscale, the exact-revision deploy
-script with rollback) is good engineering but it is *your* ops. Move it to
-a private ops repo or a clearly labelled `examples/deploy/tailscale/`
-directory with the hostname gate removed. `CLAUDE.md` splits: invariants and
-gotchas stay public (they are the best contributor docs in the repo),
-production details leave. the old agent-planning docs directory is deleted. The side-project-only
-`/v1/routes*` ingest endpoints move to the product API or go.
+**The maintainer's production operations** — host, network, deploy pipeline
+and rollback — are not in this repository. `CLAUDE.md` keeps the invariants
+and gotchas, which are the best contributor documentation in the tree.
 
-## 4. Requirements
+## 3. Requirements
 
 MoSCoW: **M**ust before public launch, **S**hould for v1.0, **C**ould later.
+"Done" means it is in the tree; open items are in [`roadmap.md`](roadmap.md),
+and so are the ones decided against (its "Not planned").
 
 ### App (R-APP)
 
-| # | Requirement | Pri |
-|---|---|---|
-| APP-1 | No personal defaults: name/email/DOB/sex nil; fixed neutral default user UUID; UUID editable under Advanced. Decode fallbacks match. | M |
-| APP-2 | Bearer token in Keychain (`AfterFirstUnlock`); `sync-state.json` and `event-log.json` get `FileProtectionType.completeUntilFirstUserAuthentication` and are excluded from backup. | M |
-| APP-3 | Server URL validation: scheme + host; `https` required unless local network; `NSAllowsLocalNetworking` + `NSLocalNetworkUsageDescription`. | M |
-| APP-4 | "Test connection" before save: `GET /v1/capabilities` (new) with fallback to `GET /v1/stats`; shows auth vs reachability vs TLS errors. | M |
-| APP-5 | Sync state keyed by server identity (hash of URL + user ID). Changing server prompts: start fresh backfill vs keep anchors. | M |
-| APP-6 | `project.yml`: `DEVELOPMENT_TEAM` and bundle-ID prefix from an untracked `Local.xcconfig` or env; BG task identifiers derived from the bundle ID; forks can sideload with their own team. | M |
-| APP-7 | `PrivacyInfo.xcprivacy` with required-reason API declarations (UserDefaults, file timestamps). | M |
-| APP-8 | Onboarding flow: explain → HealthKit permission → connect backend (scan QR / paste) → test → pick types → backfill. | S |
-| APP-9 | QR pairing: parse `puls://pair?url=&token=&user=` payload. | S |
-| APP-10 | Capabilities-driven UI: hide reconciliation/stats when the backend does not advertise `digest`/`uuids`. | S |
-| APP-11 | Transport factory persisted with config so a non-HTTP sink survives cold background launches; read side behind a protocol so reconciliation degrades gracefully. | S |
-| APP-12 | Local file export (NDJSON/CSV via share sheet) as a first-class sink. | C |
-| APP-13 | Event log never includes sample UUIDs; server error bodies truncated and scrubbed before persisting. | S |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| APP-1 | No personal defaults: name/email/DOB/sex nil; a fixed neutral default user UUID, editable; decode fallbacks match. | M | Done |
+| APP-2 | Bearer token in the Keychain (`AfterFirstUnlock`); `sync-state.json` and `event-log.json` protected until first unlock and excluded from backup. | M | Done |
+| APP-3 | Server URL validation: `https` required unless the host is on the local network. | M | Done (`ServerURLValidation`) |
+| APP-4 | "Test connection" before saving (`GET /v1/capabilities`), telling auth, reachability and TLS errors apart. | M | Done (`ConnectionTest`) |
+| APP-5 | Sync state keyed by server identity; changing server asks whether to start a fresh backfill or keep the anchors. | M | Done (`ServerIdentity`) |
+| APP-6 | Development team and bundle-ID prefix from an untracked `Local.xcconfig`; BG task identifiers derived from the bundle ID, so forks can sideload. | M | Done |
+| APP-7 | `PrivacyInfo.xcprivacy` with required-reason API declarations. | M | Done |
+| APP-8 | Onboarding: explain, Health permission, then on to syncing. | S | Done; since 1.6 the first run leaves connecting a database to the Sync tab |
+| APP-9 | Pairing from a `puls://pair?url=&token=&user=` payload. | S | Done: QR code, link, Camera app, clipboard |
+| APP-10 | Capabilities-driven UI: hide reconciliation and stats when the backend does not advertise them. | S | Done |
+| APP-11 | A non-HTTP sink persisted with the configuration so it survives cold background launches; read side behind a protocol so reconciliation degrades gracefully. | S | Not planned until a second sink exists — roadmap, Not planned |
+| APP-12 | Local file export (NDJSON/CSV via the share sheet). | C | Done: the Export tab (`HealthExporter`, `docs/export.md`) |
+| APP-13 | The event log never holds sample UUIDs; server error bodies are truncated and scrubbed before they are kept. | S | Done (`ErrorScrubber`) |
 
 ### Protocol (R-PROTO)
 
-| # | Requirement | Pri |
-|---|---|---|
-| PROTO-1 | `schemaVersion` (int) and `clientVersion` in the batch header; `X-Puls-Protocol: 1` request header. Servers reject unknown major with 400 + `{"error","supportedVersions"}`. | M |
-| PROTO-2 | `docs/protocol/` spec: transport (headers, gzip, limits), line types, canonical units, epoch-ms, idempotency contract (UUID no-op, aggregate upsert key, activity upsert key, explicit null clears), ack contract (any 2xx, body optional), retry contract (4xx never retried, 429/5xx retried, single retry on observer wakes, 60 s timeout). | M |
-| PROTO-3 | JSON Schema for the header and every line type, generated from or tested against `SyncModels.swift` and `parse.go`. | M |
-| PROTO-4 | Conformance corpus: gzip NDJSON fixtures + expected outcomes, runnable against any receiver URL (`puls-conformance <url> <token>`). | S — **done** under another name: `examples/receivers/python-sqlite/smoke_test.py --url <url> --token <token>` posts `docs/protocol/fixtures/` at any receiver and checks the `.expected.json` outcomes, replay idempotency and the documented rejections. `tools/protocol-check` is the offline half (corpus against the JSON Schemas). Both run in CI. |
-| PROTO-5 | Minimal reference receiver (~150 lines, Python or Go) writing to SQLite or JSONL, to prove the spec is implementable in an afternoon. | S |
-| PROTO-6 | Optional `GET /v1/capabilities` → `{"protocol":[1],"features":["digest","uuids","stats","aggregates","routes","series"]}`. | S |
-| PROTO-7 | Type vocabulary v1 = HealthKit identifiers + `HealthTypeCatalog` canonical units, published as a JSON file both Swift and web catalogs are generated from (kills the duplicate). | S |
-| PROTO-8 | Optional response body `{"accepted","duplicates",...}` surfaced in `UploadResult` for sinks that want to report. | C |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| PROTO-1 | `schemaVersion` and `clientVersion` in the batch header and an `X-Puls-Protocol: 1` header; an unknown major is a 400 with `supportedVersions`. | M | Done |
+| PROTO-2 | The `docs/protocol/` spec: transport, line types, canonical units, epoch-ms, and the idempotency, ack and retry contracts. | M | Done |
+| PROTO-3 | JSON Schema for the header and every line type. | M | Done (`docs/protocol/schema/`; `tools/protocol-check` runs the corpus against it in CI) |
+| PROTO-4 | A conformance corpus runnable against any receiver URL. | S | Done: `examples/receivers/python-sqlite/smoke_test.py --url … --token …` posts `docs/protocol/fixtures/` and checks the expected outcomes |
+| PROTO-5 | A minimal reference receiver, to prove the spec can be implemented in an afternoon. | S | Done (`examples/receivers/python-sqlite/`) |
+| PROTO-6 | Optional `GET /v1/capabilities`. | S | Done |
+| PROTO-7 | Type vocabulary v1 published as one JSON file, with no hand-kept second catalog. | S | Done, generated the other way round: `HealthTypeCatalog.swift` renders `docs/protocol/catalog.json`, which renders `web/lib/catalog.generated.ts` |
+| PROTO-8 | Optional response body (`accepted`, `duplicates`, …) surfaced in the upload result. | C | Done (`IngestReceipt`) |
 
 ### Reference server (R-SRV)
 
-| # | Requirement | Pri |
-|---|---|---|
-| SRV-1 | Neutral user seed; users auto-created on first batch; API/web default to the sole user. | M |
-| SRV-2 | Timezone from config everywhere: `metric_daily` reads a `settings` row or session GUC; API day math and Grafana `tz` follow `PULS_TIME_ZONE`. | M |
-| SRV-3 | Migration framework: numbered SQL embedded in ingest, `schema_migrations` table, applied at startup with a lock. `db/init` becomes the bootstrap only. | M |
-| SRV-4 | Quickstart: `scripts/bootstrap.sh` (or `make up`) generates `.env` secrets, starts the stack, prints the pairing QR and URLs. | M |
-| SRV-5 | Published images on `ghcr.io/pulshealth/{ingest,api,web,mcp}` with semver tags; compose pulls by default, `compose.build.yml` override for developers. | M |
-| SRV-6 | Ingest connects as the scoped `ingest` role by default on fresh installs. | M |
-| SRV-7 | Auth-failure rate limiting on ingest and API (per-IP token bucket). | S |
-| SRV-8 | Per-device tokens: enroll → pending → approve via CLI; hashed at rest; last-seen; revoke; token bound to user (closes the `X-User-ID` hole). Shared `PULS_TOKEN` stays valid during migration. | S — server side done 2026-09: CLI-issued (`make devices`), hashed, last-seen, revocable, bound to a user, shared token optional. Phone-side enroll/approve remains ([`roadmap.md`](roadmap.md) § 4). |
-| SRV-9 | Backups: opt-in `pg_dump` sidecar service with retention, and a documented restore drill. | S |
-| SRV-10 | Web viewer auth (basic auth or the API token) and a viewer-scoped DB role instead of `grafana`. | S |
-| SRV-11 | Second-user story without a volume wipe. | S — writes have always been multi-user (`ensureUser` creates any id the header carries), so no wipe is involved. Read side, API half done 2026-09: `?user=` on every `/v1` route behind `PULS_MULTI_USER`, `GET /v1/users`, `puls-export --user`. The web viewer's per-session switcher is in; the MCP server (tool argument) lands in a sibling change ([`roadmap.md`](roadmap.md) § 5). |
-| SRV-12 | Grafana contact point from `${GRAFANA_ALERT_EMAIL}`; alert thresholds documented as tunables. | S |
-| SRV-13 | Product API additions agents ask for first: `/v1/sleep/daily` (category daily), `/v1/samples` (bounded raw window), `/v1/workouts/{uuid}/series`, `/v1/state-of-mind`; pagination on daily metrics. | S |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| SRV-1 | Neutral user seed; users created on first batch; reads default to one user without configuration. | M | Done |
+| SRV-2 | Time zone from configuration everywhere (`PULS_TIME_ZONE`). | M | Done (`puls_time_zone()`) |
+| SRV-3 | Migration framework with a `schema_migrations` table. | M | Done, as the `migrate` Compose service (`server/db/migrate.sh`) |
+| SRV-4 | Quickstart: one command generates the secrets, starts the stack and prints the pairing QR code. | M | Done (`scripts/bootstrap.sh`) |
+| SRV-5 | Published images on `ghcr.io/pulshealth/{ingest,api,mcp,web}`; `compose.build.yml` for developers. | M | Done |
+| SRV-6 | Ingest connects as the scoped `ingest` role by default. | M | Done |
+| SRV-7 | Auth-failure rate limiting on ingest and the API. | S | Done |
+| SRV-8 | Per-device tokens: enroll → pending → approve; hashed at rest; last-seen; revocable; bound to a user. | S | Done server side (`make devices`); phone-side enrollment not planned — roadmap, Not planned |
+| SRV-9 | Opt-in backups with retention, and a documented restore drill. | S | Done (the `backup` profile) |
+| SRV-10 | Web viewer auth, and a viewer-scoped database role instead of `grafana`. | S | Done, in two forms: `WEB_AUTH_PASSWORD` (one shared password, the `grafana` role) and accounts mode (`WEB_ACCOUNTS`: invite-only accounts, and the `web_app` role, which the database limits to the signed-in person's records) |
+| SRV-11 | A second user without a volume wipe. | S | Writes, and reads through the API, viewer and MCP server, done; in the viewer's accounts mode each person signs in and reads only their own records. A per-user read token for the product API is not planned — roadmap, Not planned |
+| SRV-12 | Grafana contact point from `GRAFANA_ALERT_EMAIL`; alert thresholds documented as tunables. | S | Done |
+| SRV-13 | The API additions agents ask for first — sleep, raw samples, workout series, State of Mind — and pagination on daily metrics. | S | Done: `/v1/metrics/daily` pages in days across the requested types (`limit`, `offset`, `nextOffset`) |
 
 ### AI layer (R-AI)
 
-| # | Requirement | Pri |
-|---|---|---|
-| AI-1 | `server/mcp`: read-only MCP server over the product API. Tools: `get_profile`, `list_available_types`, `get_latest`, `get_daily_metrics`, `get_activity_rings`, `list_workouts`, `get_workout`, then `get_sleep`, `get_samples`. Resource: the database guide and the type catalog. `stdio` binary + streamable HTTP compose service behind `PULS_API_TOKEN`. | M |
-| AI-2 | Setup docs for Claude Desktop, Claude Code, Cursor, ChatGPT, with the "how did I sleep this week" demo. | M |
-| AI-3 | Export: `GET /v1/export?format=csv\|jsonl&types=&start=&end=` and a `puls export` CLI, for uploading to Claude Projects / ChatGPT / notebooks. Parquet later. | S |
-| AI-4 | `llms.txt` at the docs site and an `AGENTS.md` in the repo built from the database guide and the type catalog. | S |
-| AI-5 | ChatGPT Action / custom GPT recipe straight from `/openapi.json`. Near-free once the API is reachable. | S |
-| AI-6 | `GET /v1/summary?range=7d` returning compact markdown for paste-into-any-chat use. | C — **done** 2026-09: `range` of 7d/14d/30d/90d, `format=markdown\|json`, `get_summary` on the MCP server; `docs/ai.md` has the curl-and-paste recipe. |
-| AI-7 | Opt-in raw SQL MCP tool over a read-only role, off by default. | C — **dropped**: it contradicts the invariant that `server/mcp` is a read-only client of the product API and never holds a database URL. Anyone who wants SQL has `psql` and `docs/database-guide.md`. |
-| AI-8 | The existing exploration notebook reframed as "analyze your data" with an LLM section. | C — **done** 2026-09: six analyses over `metric_daily`, the rings, sleep and workouts, then the `/v1/summary` page rendered from the frames and an optional, skipped-by-default Claude cell. |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| AI-1 | `server/mcp`: a read-only MCP server over the product API, as a `stdio` binary and a streamable-HTTP Compose service. | M | Done |
+| AI-2 | Setup docs for Claude Desktop, Claude Code, Cursor and ChatGPT, with the "how did I sleep this week" demo. | M | Done (`docs/ai.md`) |
+| AI-3 | Export: `GET /v1/export` (CSV/JSONL) and a CLI. | S | Done (`tools/puls-export`) |
+| AI-4 | `llms.txt` on the docs site and an `AGENTS.md` in the repository. | S | Done: both in the repository, and `site/` renders `llms.txt` at https://pulshealth.com/llms.txt with its links pointed at the rendered documents |
+| AI-5 | ChatGPT custom GPT Action from `/openapi.json`. | S | Done (`docs/ai.md`) |
+| AI-6 | `GET /v1/summary` as compact markdown to paste into any chat. | C | Done, plus `get_summary` on the MCP server |
+| AI-7 | Opt-in raw-SQL MCP tool over a read-only role. | C | Dropped: `server/mcp` is a read-only client of the product API and never holds a database URL. SQL users have `psql` and `docs/database-guide.md` |
+| AI-8 | The exploration notebook reframed as "analyze your data", with an LLM section. | C | Done (`notebooks/healthkit_database_exploration.ipynb`) |
 
 ### OSS hygiene (R-OSS)
 
-| # | Requirement | Pri |
-|---|---|---|
-| OSS-1 | `LICENSE` (Apache-2.0), `NOTICE`, `TRADEMARK.md`. | M |
-| OSS-2 | `SECURITY.md` with a private disclosure path. Health data project with a public ingest surface; this is not optional. | M |
-| OSS-3 | `CONTRIBUTING.md` with DCO sign-off, `CODE_OF_CONDUCT.md`, issue + PR templates. | M |
-| OSS-4 | Root README rewritten for a stranger: what it is, 5-minute quickstart, screenshots, protocol link, AI demo, FAQ from the CLAUDE.md gotchas (Watch latency, locked device, hourly step delivery, force-quit). | M |
-| OSS-5 | Personal scrub complete (appendix checklist), verified by a CI grep gate for the known identifiers. | M |
-| OSS-6 | `CLAUDE.md` split: public invariants + gotchas; private ops elsewhere. Delete the old agent-planning docs directory. | M |
-| OSS-7 | CI: `ios-ci.yml` as-is; `validate` + `advisories` jobs moved to a generic `ci.yml`; release workflow builds and pushes images on tag. | M |
-| OSS-8 | `CHANGELOG.md` and tagged releases. | S — **done** 2026-09: `v0.1.0` published 2026-09-14, images public 2026-09-18, quickstart verified from them ([`roadmap.md`](roadmap.md) § 1). |
-| OSS-9 | Map tile usage-policy note in the web README (OSM/CARTO free endpoints discourage redistribution). | S |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| OSS-1 | `LICENSE` (Apache-2.0), `NOTICE`, `TRADEMARK.md`. | M | Done |
+| OSS-2 | `SECURITY.md` with a private disclosure path. | M | Done |
+| OSS-3 | `CONTRIBUTING.md` with DCO sign-off, `CODE_OF_CONDUCT.md`, issue and PR templates. | M | Done |
+| OSS-4 | A root README for a stranger: what it is, quickstart, screenshots, protocol, AI demo, FAQ. | M | Done. |
+| OSS-5 | No personal identifiers in the tree, enforced by a CI gate. | M | Done (`scripts/check-public-tree.sh`) |
+| OSS-6 | `CLAUDE.md` split: public invariants and gotchas; private operations elsewhere. | M | Done |
+| OSS-7 | Generic CI (`ci.yml`, `ios-ci.yml`, `advisories.yml`) and a release workflow that pushes images on tag. | M | Done |
+| OSS-8 | `CHANGELOG.md` and tagged releases. | S | Done |
+| OSS-9 | Map tile usage-policy note in the web README. | S | Done |
 
 ### App Store (R-STORE)
 
-| # | Requirement | Pri |
-|---|---|---|
-| STORE-1 | Privacy policy + support URLs on `pulshealth.com`; nutrition label "Data Not Collected" (developer never receives data; Health Auto Export precedent). | M — **done**, `site/` serves `/privacy`, `/support`, `/terms` |
-| STORE-2 | Review path: a throwaway hosted review backend (URL + token in review notes) so reviewers can exercise sync end to end. | M — **done**, `docs/appstore/review-backend.md` + the placeholders in `review-notes.md` |
-| STORE-3 | Reserve the app name in App Store Connect; screenshots; description that states plainly where data goes. | M — **done**, `docs/appstore/listing.md`; the screenshots themselves live in App Store Connect, not here |
-| STORE-4 | TestFlight public link as the beta channel before the store listing. | S — **skipped**, the app went straight to the store |
-| STORE-5 | Guideline 5.1.3 check: read-only HealthKit, no iCloud storage of health data, no advertising use. Already true; document it in the review notes. | M — **done**, the HEALTHKIT block in `docs/appstore/review-notes.md` |
+| # | Requirement | Pri | Status |
+|---|---|---|---|
+| STORE-1 | Privacy policy and support URLs on `pulshealth.com`; App Privacy "Data Not Collected". | M | Done (`/privacy`, `/support`) |
+| STORE-2 | A throwaway review backend, its URL and token in the review notes. | M | Done (`docs/appstore/review-backend.md`) |
+| STORE-3 | App name reserved, screenshots, and a description that says plainly where data goes. | M | Done (`docs/appstore/listing.md`) |
+| STORE-4 | A TestFlight public link as the beta channel before the listing. | S | Skipped: the app went straight to the store |
+| STORE-5 | Guideline 5.1.3: read-only HealthKit, no health data in iCloud, no advertising use, stated in the review notes. | M | Done |
 
-## 5. Phases
-
-Each phase ends in a shippable state. Estimates assume mostly solo work with
-agent help and are deliberately rough.
-
-### Phase 0 — Decide, scrub, go public (about a week)
-
-- Settle D1–D8.
-- Scrub everything in the appendix; add the CI grep gate.
-- `LICENSE`, `NOTICE`, `TRADEMARK.md`, `SECURITY.md`, `CONTRIBUTING.md`,
-  `CODE_OF_CONDUCT.md`, templates.
-- Fix the timezone bake-in (SRV-2) and neutral seed (SRV-1) so the very
-  first public install is not wrong.
-- Split `CLAUDE.md`; delete the old agent-planning docs directory; move the host-specific deploy tooling out.
-- Fresh initial commit into `PulsHealth/pulshealth`, marked pre-release.
-
-Exit: repo is public, builds in CI, contains nothing personal, and is
-honest in its README about what does not work yet.
-
-### Phase 1 — Protocol v1 and app safety (2–3 weeks)
-
-- PROTO-1..3, PROTO-6, PROTO-7 (single catalog source).
-- APP-1..7, APP-10, APP-13.
-- PROTO-5 reference receiver, written *from the spec* by someone (or an
-  agent) who has not read the Go ingest, as the spec's own test.
-
-Exit: someone can implement a receiver from `docs/protocol/` alone and
-the app syncs to it, with version negotiation and safe token handling.
-
-### Phase 2 — Self-host v1 (2–3 weeks, can overlap Phase 3)
-
-- SRV-3 migrations, SRV-4 quickstart, SRV-5 images + release workflow,
-  SRV-6 scoped role default, SRV-7 rate limit, SRV-9 backups, SRV-10 web
-  auth, SRV-12.
-- APP-9 QR pairing on the client side of SRV-4's printed QR.
-- Docs site on `pulshealth.com` (static, from `docs/`) — **done** (2026-09),
-  as a third content source in the existing `site/` export rather than a
-  second site: `/docs/` renders the protocol spec, `server/README.md`,
-  `docs/ai.md`, `docs/export.md` and `docs/database-guide.md` from the
-  repository (`site/src/lib/docs.ts`).
-
-Exit: a Linux box with Docker goes from nothing to paired and syncing in
-under ten minutes without editing a file by hand.
-
-### Phase 3 — AI layer (2 weeks, can overlap Phase 2)
-
-- AI-1 MCP server, AI-2 docs, SRV-13 API additions, AI-3 export, AI-4,
-  AI-5.
-
-Exit: the "how did I sleep this week" demo works in Claude Desktop and
-Claude Code against a self-hosted stack, and the README shows it.
-
-### Phase 4 — App Store (2 weeks elapsed, mostly waiting)
-
-- APP-8 onboarding, STORE-1..5.
-- TestFlight public beta first; invite the first self-hosters from Phases
-  2–3 as testers.
-- Submit. Expect one round of review questions about the local-network ATS
-  exception and the external server; the review backend and a plain
-  description answer both.
-
-Exit: the app is on the store and the README's quickstart starts with "install
-PulsHealth from the App Store".
-
-**Done** — the app is on the App Store:
-[PulsHealth](https://apps.apple.com/us/app/pulshealth/id6757657354), first
-released 2026-01-21. The listing material and the shipped record are in
-[`docs/appstore/`](appstore/README.md). STORE-4 (TestFlight as the beta
-channel) was skipped; the app went straight to the store.
-
-### Later
-
-- SRV-8 per-device tokens (server side done; phone-side enrollment remains),
-  SRV-11 multi-user reads (API, web viewer and MCP done; no per-user read token yet), APP-11 sink factory,
-  APP-12 file export.
-
-These, plus the release and submission work the phases above did not cover,
-are tracked with current status and sequencing in [`roadmap.md`](roadmap.md).
-
-## 6. Launch definition of done
-
-A stranger with an iPhone and a Linux box, having never seen the repo:
-
-1. Installs PulsHealth from the App Store.
-2. Runs one bootstrap command on the box and gets a QR code.
-3. Scans it, grants HealthKit, picks types, starts a backfill.
-4. Adds the MCP server to Claude Desktop from a copy-paste snippet.
-5. Asks "how did I sleep last week" and gets an answer from their own data.
-
-Under thirty minutes, no file edited by hand, nothing sent anywhere but
-their box.
-
-## 7. Risks
+## 4. Risks that remain
 
 | Risk | Mitigation |
 |---|---|
-| Support burden from HealthKit behavior that looks like bugs (Watch latency, hourly step delivery, locked device, force-quit). | FAQ from the CLAUDE.md gotchas in the README; in-app Background Activity screen already explains skipped wakes. |
-| App Review pushback on the local-network ATS exception or "needs a server". | Review backend with credentials in notes; plain description; Health Auto Export precedent. |
-| Publishing makes the ingest attack surface public. | `SECURITY.md`, rate limiting, scoped DB role by default, per-device tokens in the following release. |
-| Your production stack diverges from the public one. | The production host runs the public images plus a private compose overlay for Tailscale bindings; the private deploy script stays exact-revision. |
-| Migration framework arrives after early adopters have volumes. | Ship SRV-3 in Phase 2 *before* the first tagged release; pre-release installs are told to expect a wipe. |
-| Two catalogs drift. | PROTO-7 makes one JSON file the source and generates both. |
-| Scope creep into a hosted service. | Out of scope, stated in the README. |
+| HealthKit behaviour that looks like a bug (Watch latency, hourly step delivery, locked device, force-quit) turns into support load. | The README's FAQ, and the app's Background Activity screen, which explains skipped wakes. |
+| App Review pushes back on the local-network ATS exception or on needing a server. | A review backend with credentials in the notes, and a plain description (`docs/appstore/`). |
+| The ingest attack surface is public. | `SECURITY.md`, auth-failure rate limiting, the scoped database role, per-device tokens. |
 
-## 8. Out of scope
+## 5. Out of scope
 
-- Android / Health Connect. The protocol is platform-neutral in shape but
-  the v1 type vocabulary is HealthKit identifiers; say so and leave the door
-  open.
-- A hosted PulsHealth service.
+- Android / Health Connect. The protocol is platform-neutral in shape, but
+  the v1 type vocabulary is HealthKit identifiers.
+- A hosted PulsHealth service open to anyone. The maintainer runs one
+  invite-only instance of the viewer for family and friends, which is close
+  to a shared self-hosted install, and the privacy policy describes it.
+  Opening it to sign-ups would make the maintainer a vendor of personal
+  health records — in the US the FTC Health Breach Notification Rule likely
+  applies, the App Store "Data Not Collected" answer likely changes for those
+  users, and email verification, password reset and account deletion become
+  mandatory — so it needs a decision of its own, not a configuration change.
 - Writing data back into HealthKit.
 - Native non-HTTP sinks in the app (see D3).
-
-## 9. Appendix — scrub checklist
-
-Every item below was found on 2026-09-04 at HEAD `7645d80`. The CI grep gate
-(OSS-5) should fail on any reappearance of: the personal name and email, the
-Team ID, the tailnet FQDN, the bare production hostname outside `examples/`, and
-the owner's home-directory path.
-
-**Identity and PII**
-
-- `PulsHealthSync/Sources/PulsHealthSync/Models/SyncConfiguration.swift:6-21`, `:112-116`, `:225-235` — `PulsDefaultUser` and its decode fallbacks.
-- `server/db/init/000_users.sql:24-27` — seeded name/email/DOB/sex.
-- `server/grafana/provisioning/alerting/contact-points.yml:17` — alert recipient.
-- `server/ingest/integration_test.go:281,365-366`, `server/api/main_test.go:249,279-280` — fixtures with the real name.
-- `CLAUDE.md:41` — Team ID and account email.
-- Grafana `puls-health.json` `user` variable default and `tz` constant (`:1119-1131`).
-
-**Apple identifiers**
-
-- `PulsHealth/project.yml:43,64` — `DEVELOPMENT_TEAM`; regenerate `project.pbxproj`.
-- `PulsHealth/README.md:19` — Team ID in prose.
-- `PulsHealthSync/Tests/.../PulsHealthSyncTests.swift:490` — hardcoded bundle ID in a test.
-
-**Infrastructure**
-
-- the host-specific deploy script `:30` (hostname gate), `:40-44,371-373` (Tailscale IP), `:596-635,697-699` (tailnet FQDN), `:23` (audited baseline SHA).
-- the host-specific runbook — whole file, including the internal-platform references at `:7-11`.
-- `docs/database-guide.md:717-742` — `ssh` to the production host, the owner's home-directory path.
-- the host-specific deploy workflow `:146` — `runs-on: [self-hosted, …]` pinned to the production host; `.github/actionlint.yaml:1-2`.
-- `server/README.md:36,46-48,55,65,143`, `web/README.md:33-34`, `server/docker-compose.yml:83,95`, `web/lib/queries.ts:5` — production-hostname mentions.
-- `CLAUDE.md:188-230` — production deployment, backups, migration gate.
-
-**Repo identity**
-
-- `server/ingest/go.mod:1` (one of the personal GitHub paths) vs `server/api/go.mod:1` (`pulshealth-api`) vs OCI labels in `web/Dockerfile:22`, `server/ingest/Dockerfile:13`, `server/api/Dockerfile:13` (another of the personal GitHub paths). Unify on `github.com/PulsHealth/pulshealth`.
-
-**Timezone**
-
-- `server/db/init/009_metric_daily.sql:20,43,47,67`, `server/api/store.go:547-552`, `server/api/docs.go:85`, Grafana `tz` constant.
-
-**Remove**
-
-- the old agent-planning docs directory — stale artifacts duplicating shipped code.
-- `/v1/routes*` in `server/ingest/main.go:153-155` — used only by a private side project; move to the product API or drop.
-
-**Not a problem (verified)**
-
-- No committed secrets; `.env` never tracked; no `.p12`/`.mobileprovision`/`.pem` ever added.
-- Notebook has zero outputs and reads credentials from env.
-- `tests/test_healthkit_notebook.py` uses a throwaway container password.
-- Entitlements are clean (HealthKit + background delivery only).
-- All dependencies permissive; Geist font is OFL (ship its license with the font).

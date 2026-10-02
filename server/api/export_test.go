@@ -48,7 +48,7 @@ func TestExportCSVWritesAHeaderRowAndOneRowPerDay(t *testing.T) {
 	t.Parallel()
 
 	unit := "count"
-	srv := exportServer(t, &fakeStore{
+	store := &fakeStore{
 		daily: []DailyMetric{{
 			Identifier: "HKQuantityTypeIdentifierStepCount",
 			Unit:       &unit,
@@ -57,11 +57,17 @@ func TestExportCSVWritesAHeaderRowAndOneRowPerDay(t *testing.T) {
 				{Date: "2026-01-02", Value: nil},
 			},
 		}},
-	})
+	}
+	srv := exportServer(t, store)
 
-	rec := getExport(t, srv, "format=csv&dataset=daily_metrics&types=HKQuantityTypeIdentifierStepCount&"+exportRange)
+	rec := getExport(t, srv, "format=csv&dataset=daily_metrics&types=HKQuantityTypeIdentifierStepCount&limit=1&"+exportRange)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	// A file is the whole range: the JSON endpoint's page size does not
+	// apply, even when the query names one.
+	if store.lastDaily.Limit != 0 || store.lastDaily.Offset != 0 {
+		t.Errorf("export paged the store: %+v", store.lastDaily)
 	}
 	if got := rec.Header().Get("Content-Type"); got != "text/csv; charset=utf-8" {
 		t.Errorf("Content-Type = %q", got)

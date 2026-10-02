@@ -23,6 +23,19 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).pairing</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>puls</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -33,13 +46,13 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan the pairing code shown by your PulsHealth server.</string>
+	<string>PulsHealth uses the camera only to scan the pairing code for your database.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>PulsHealth reads your health data to sync it to your personal self-hosted database.</string>
+	<string>PulsHealth reads your health data to show it to you, export it to files you choose, and, if you set one up, sync it to your own database.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>PulsHealth does not write health data.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>PulsHealth connects to the health server you configure, which may be on your local network.</string>
+	<string>PulsHealth connects to the database you set up, which may be on your local network.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>

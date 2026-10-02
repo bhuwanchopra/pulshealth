@@ -1,6 +1,6 @@
 # Licence
 
-The 177 YAML type files in this directory, together with `schema.yaml`,
+The 178 YAML type files in this directory, together with `schema.yaml`,
 `schema.json`, `validate.py` and `README.md`, are covered by the repository's
 [Apache License 2.0](../LICENSE), like every other file here. Attribution is
 in [`NOTICE`](../NOTICE).

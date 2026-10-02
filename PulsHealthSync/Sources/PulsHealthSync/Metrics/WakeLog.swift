@@ -267,7 +267,7 @@ public actor WakeLog {
                 r.thermalState,
                 r.id.uuidString,
             ]
-            out += fields.map(Self.csvEscape).joined(separator: ",") + "\n"
+            out += CSVField.row(fields)
         }
         return out
     }
@@ -299,11 +299,6 @@ public actor WakeLog {
         case .critical: return "critical"
         @unknown default: return "unknown"
         }
-    }
-
-    private static func csvEscape(_ field: String) -> String {
-        guard field.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" }) else { return field }
-        return "\"" + field.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }
 }
 

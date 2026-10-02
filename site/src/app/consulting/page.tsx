@@ -49,7 +49,7 @@ const services = [
 
 const facts = [
   { value: "80", label: "HealthKit types in the protocol catalog" },
-  { value: "177", label: "Type references in the knowledge base" },
+  { value: "178", label: "Type references in the knowledge base" },
   { value: "11", label: "Read-only MCP tools over your data" },
   { value: "v1", label: "Sync protocol, specified with JSON Schema" },
 ];
@@ -60,7 +60,7 @@ export default function ConsultingPage() {
       <PageHero
         eyebrow="Consulting"
         title={<>Help setting up, self-hosting, and <span className="text-brand">building with PulsHealth</span></>}
-        lede="I wrote PulsHealth: the iOS app, the sync library, the server stack and the protocol. If you want it set up for you, adapted to a backend you already have, or built on, I do that work."
+        lede="I wrote PulsHealth: the iOS app, the sync library, the self-hosted stack and the protocol. If you want it set up for you, adapted to a database you already have, or built on, I do that work."
       >
         <QuoteRequestDialog>
           <Button size="lg">
@@ -88,12 +88,12 @@ export default function ConsultingPage() {
             <ul className="space-y-4 text-muted-foreground">
               <li>
                 <strong className="text-foreground">The whole project is Apache-2.0.</strong>{" "}
-                The app, the sync library, the server stack, the protocol specification and the
+                The app, the sync library, the self-hosted stack, the protocol specification and the
                 dashboards are all in one public repository. There are no paid features.
               </li>
               <li>
                 <strong className="text-foreground">The backend is pre-release.</strong>{" "}
-                Standing up the server still expects someone comfortable with Docker. The
+                Standing up the stack still expects someone comfortable with Docker. The
                 documentation covers it, but not everyone has the time.
               </li>
               <li>
@@ -157,7 +157,7 @@ export default function ConsultingPage() {
 
           <p className="text-center text-sm text-muted-foreground mt-10 max-w-2xl mx-auto">
             The README estimates a heavy five-year backfill at fifteen to twenty-five million
-            samples and the ingest server at 50 to 100 thousand rows per second, which is why the
+            samples and the ingest service at 50 to 100 thousand rows per second, which is why the
             phone, not the database, is the bottleneck. Those are planning figures, not benchmark
             results. The app includes a throughput benchmark so you can measure your own device.
           </p>

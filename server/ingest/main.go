@@ -75,6 +75,12 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "devices" {
 		os.Exit(runDevicesCLI(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	// `ingest qr` draws the pairing payload on stdin as a terminal QR code
+	// (qr.go). No database, no environment: scripts/bootstrap.sh falls back
+	// to it when the host has no qrencode.
+	if len(os.Args) > 1 && os.Args[1] == "qr" {
+		os.Exit(runQRCLI(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)

@@ -1,7 +1,7 @@
 import SwiftUI
 import PulsHealthSync
 
-/// Named starting selections. `common` is what the Data Types menu's "Enable
+/// Named starting selections. `common` is what the Synced Data menu's "Enable
 /// Common Set" applies and what first-run onboarding preselects, so the two
 /// cannot drift apart.
 enum TypePresets {
@@ -23,9 +23,9 @@ enum TypePresets {
     ]
 }
 
-/// Data Types tab, structured like Apple Health's Browse screen: a category
-/// list with colored icons that drills into per-category toggle pages, plus
-/// search across every type.
+/// Sync → Synced Data, structured like Apple Health's Browse screen: a
+/// category list with colored icons that drills into per-category toggle
+/// pages, plus search across every type.
 struct TypePickerView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
@@ -38,8 +38,10 @@ struct TypePickerView: View {
                 searchResultsSection
             }
         }
-        .navigationTitle("Data Types")
-        .searchable(text: $searchText, prompt: "Search data types")
+        .navigationTitle("Synced Data")
+        .searchable(
+            text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search data types")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -194,10 +196,7 @@ private struct TypeConfigLinkRow: View {
             TypeConfigView(descriptor: descriptor)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: descriptor.symbol)
-                    .font(.body)
-                    .foregroundStyle(descriptor.group.color)
-                    .frame(width: 28)
+                TypeIcon(descriptor)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(descriptor.displayName)
                     if showsCategory {
@@ -231,10 +230,7 @@ private struct TypeToggleRow: View {
     var body: some View {
         Toggle(isOn: binding) {
             HStack(spacing: 12) {
-                Image(systemName: descriptor.symbol)
-                    .font(.body)
-                    .foregroundStyle(descriptor.group.color)
-                    .frame(width: 28)
+                TypeIcon(descriptor)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(descriptor.displayName)
                     if showsCategory {
@@ -272,10 +268,7 @@ private struct WorkoutRoutesToggleRow: View {
     var body: some View {
         Toggle(isOn: binding) {
             HStack(spacing: 12) {
-                Image(systemName: "map.fill")
-                    .font(.body)
-                    .foregroundStyle(HealthTypeDescriptor.Group.workouts.color)
-                    .frame(width: 28)
+                TypeIcon(symbol: "map.fill", color: HealthTypeDescriptor.Group.workouts.color)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Workout Routes")
                     if showsCategory {
@@ -310,10 +303,7 @@ private struct WorkoutEnhancedDataToggleRow: View {
     var body: some View {
         Toggle(isOn: binding) {
             HStack(spacing: 12) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.body)
-                    .foregroundStyle(HealthTypeDescriptor.Group.workouts.color)
-                    .frame(width: 28)
+                TypeIcon(symbol: "waveform.path.ecg", color: HealthTypeDescriptor.Group.workouts.color)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Enhanced Data")
                     if showsCategory {
@@ -334,5 +324,58 @@ private struct WorkoutEnhancedDataToggleRow: View {
                 model.config.includeWorkoutEnhancedData = enabled
             }
         )
+    }
+}
+
+/// Floating Apply/Discard bar shown on the Sync tab while the staged
+/// configuration draft differs from what's applied to the engine. Nothing the
+/// user toggles on the Synced Data screen — raw types, aggregates, workout
+/// routes — reaches the sync engine or starts backfilling until they tap Apply.
+struct PendingChangesBar: View {
+    @Environment(AppModel.self) private var model
+    @State private var applying = false
+
+    var body: some View {
+        Group {
+            if model.hasPendingChanges {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Unapplied changes")
+                            .font(.subheadline.weight(.semibold))
+                        Text(model.pendingChangesSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Button("Discard", role: .destructive) {
+                        model.discardChanges()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(applying)
+                    Button {
+                        applying = true
+                        Task {
+                            await model.applyChanges()
+                            applying = false
+                        }
+                    } label: {
+                        if applying {
+                            ProgressView().frame(minWidth: 44)
+                        } else {
+                            Text("Apply").frame(minWidth: 44)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(applying)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+                .background(.bar)
+                .overlay(alignment: .top) { Divider() }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: model.hasPendingChanges)
     }
 }

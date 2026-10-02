@@ -5,10 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Check `docs/open-source-plan.md` first: it lists what is already planned, what has been decided,
-        and what is deliberately out of scope (a hosted service, Android, writing to HealthKit, native
-        non-HTTP sinks in the app). A request that overlaps the plan is still welcome — say which item it
-        relates to.
+        Check `docs/roadmap.md` and `docs/open-source-plan.md` first: the roadmap lists what is already
+        planned, and the plan records what has been decided and what is deliberately out of scope (a
+        hosted service, Android, writing to HealthKit, native non-HTTP sinks in the app). A request that
+        overlaps either is still welcome — say which item it relates to.
   - type: dropdown
     id: area
     attributes:
@@ -48,5 +48,5 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: I checked the plan and existing issues for overlap.
+        - label: I checked the roadmap, the plan and existing issues for overlap.
           required: true

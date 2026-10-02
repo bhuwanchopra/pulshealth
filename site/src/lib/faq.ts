@@ -13,27 +13,27 @@ export interface FaqItem {
 export const faq: FaqItem[] = [
   {
     q: "Is the app really free? What is the catch?",
-    a: "Free, no in-app purchases, no account. The catch is that you run the server yourself; there is no PulsHealth server to send data to. The reference stack comes up with one command on any Docker host.",
+    a: "Free, no in-app purchases, no account. The catch is that you run the database yourself; there is no PulsHealth service to send data to. The open-source stack sets one up with one command on any Docker host, and exploring and exporting work without one.",
     home: true,
   },
   {
     q: "Do I need a domain, a VPN or Tailscale?",
-    a: "No. On the same Wi-Fi the phone can reach the server over plain HTTP; the app allows that for local-network addresses only. From anywhere else you need HTTPS, which means a TLS proxy or a VPN such as Tailscale in front of the ingest port.",
+    a: "No. On the same Wi-Fi the phone can sync to your database over plain HTTP; the app allows that for local-network addresses only. From anywhere else you need HTTPS, which means a TLS proxy or a VPN such as Tailscale in front of the ingest port.",
     home: true,
   },
   {
     q: "Where does my data go?",
-    a: "To the URL you enter in the app, and nowhere else. The developer runs no server, has no account system and receives nothing. The app has zero third-party dependencies and no analytics SDK.",
+    a: "To the database URL you enter in the app, and nowhere else. The developer runs no server, has no account system and receives nothing. The app has zero third-party dependencies and no analytics SDK.",
     home: true,
   },
   {
-    q: "Can I sync to something other than the reference stack?",
-    a: "Yes. The wire format is the Puls Sync Protocol v1, specified with a JSON Schema per line type, a fixture corpus, a conformance checker and a complete receiver in one Python file. Anything that speaks it is a valid destination.",
+    q: "Can I sync to a database I already have?",
+    a: "Yes, through a receiver for the Puls Sync Protocol v1, the wire format the app speaks. It is specified with a JSON Schema per line type, a fixture corpus, a conformance checker and a complete receiver in one Python file. Anything that speaks it is a valid destination.",
     home: true,
   },
   {
     q: "How long does a first backfill take?",
-    a: "It depends on the phone, not the server, because reading HealthKit is the slow part. The app includes a benchmark that reads real data without uploading it, so you can measure your own device first. Progress is saved after every confirmed batch, so you can interrupt it safely.",
+    a: "It depends on the phone, not the database, because reading HealthKit is the slow part. The app includes a benchmark that reads real data without uploading it, so you can measure your own device first. Progress is saved after every confirmed batch, so you can interrupt it safely.",
     home: true,
   },
   {
@@ -59,7 +59,7 @@ export const faq: FaqItem[] = [
   },
   {
     q: "Blood pressure never shows up in the permission sheet.",
-    a: "On iOS 26.5 the Health permission sheet silently omits blood pressure systolic and diastolic, so they can never be granted from within the app (Apple Feedback FB22735935). Grant them yourself in Settings, Privacy & Security, Health, PulsHealth. The app shows a hint when it detects the situation and backfills the full history once access exists.",
+    a: "On iOS 26 the Health permission sheet silently omits blood pressure systolic and diastolic, so they can never be granted from within the app (Apple Feedback FB22735935; iOS 27 fixes it). Grant them yourself in Settings, Privacy & Security, Health, PulsHealth. The app shows a hint when it detects the situation and backfills the full history once access exists.",
   },
   {
     q: "Daily step totals in the database are higher than the Health app shows.",

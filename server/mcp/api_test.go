@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -447,6 +449,89 @@ func TestAPIClient_ErrorPropagation(t *testing.T) {
 	unreachable, _ := NewAPIClient(closed.URL, "t", nil)
 	if _, err = unreachable.Profile(ctx); err == nil || !strings.Contains(err.Error(), "unreachable") {
 		t.Errorf("closed server: %v", err)
+	}
+}
+
+func TestAPIClient_DailyMetricsFollowsPages(t *testing.T) {
+	f := newFakeAPI(t)
+	// Three pages of dailyPageSize day rows: the first ends inside
+	// StepCount, the second opens with the rest of it and all of BodyMass,
+	// the third is short.
+	day := func(i int) DailyPoint {
+		v := float64(i)
+		return DailyPoint{Date: fmt.Sprintf("2026-%02d-%02d", 1+i/28, 1+i%28), Value: &v}
+	}
+	steps := make([]DailyPoint, 0, dailyPageSize+5)
+	for i := 0; i < dailyPageSize+5; i++ {
+		steps = append(steps, day(i))
+	}
+	f.routes["/v1/metrics/daily"] = func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("limit") != strconv.Itoa(dailyPageSize) {
+			t.Errorf("limit = %q, want %d", r.URL.Query().Get("limit"), dailyPageSize)
+		}
+		var metrics []DailyMetric
+		switch r.URL.Query().Get("offset") {
+		case "0":
+			metrics = []DailyMetric{{Identifier: "HKQuantityTypeIdentifierStepCount", Days: steps[:dailyPageSize]}}
+		case strconv.Itoa(dailyPageSize):
+			body := make([]DailyPoint, 0, dailyPageSize)
+			body = append(body, steps[dailyPageSize:]...)
+			for len(body) < dailyPageSize {
+				body = append(body, day(len(body)))
+			}
+			metrics = []DailyMetric{
+				{Identifier: "HKQuantityTypeIdentifierStepCount", Days: steps[dailyPageSize:]},
+				{Identifier: "HKQuantityTypeIdentifierBodyMass", Days: body[5:]},
+			}
+		case strconv.Itoa(2 * dailyPageSize):
+			metrics = []DailyMetric{{Identifier: "HKQuantityTypeIdentifierBodyMass", Days: []DailyPoint{day(1)}}}
+		default:
+			t.Errorf("unexpected offset %q", r.URL.Query().Get("offset"))
+		}
+		n := 0
+		for _, m := range metrics {
+			n += len(m.Days)
+		}
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		writeJSON(w, http.StatusOK, map[string]any{"metrics": metrics, "nextOffset": offset + n})
+	}
+
+	got, err := f.client(t).DailyMetrics(context.Background(), []string{"HKQuantityTypeIdentifierStepCount", "HKQuantityTypeIdentifierBodyMass"}, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls := f.callsTo("/v1/metrics/daily"); len(calls) != 3 {
+		t.Fatalf("calls = %d, want 3: %v", len(calls), calls)
+	}
+	if len(got) != 2 || got[0].Identifier != "HKQuantityTypeIdentifierStepCount" || got[1].Identifier != "HKQuantityTypeIdentifierBodyMass" {
+		t.Fatalf("metrics = %d entries, want StepCount then BodyMass", len(got))
+	}
+	if len(got[0].Days) != dailyPageSize+5 {
+		t.Errorf("StepCount days = %d, want %d (the second page's rows appended)", len(got[0].Days), dailyPageSize+5)
+	}
+	if len(got[1].Days) != dailyPageSize-5+1 {
+		t.Errorf("BodyMass days = %d, want %d", len(got[1].Days), dailyPageSize-5+1)
+	}
+	if got[0].Days[dailyPageSize].Date != steps[dailyPageSize].Date {
+		t.Errorf("the boundary row is out of order: %+v", got[0].Days[dailyPageSize])
+	}
+
+	// An API without paging (no nextOffset, the whole range) is one call.
+	g := newFakeAPI(t)
+	g.respond("/v1/metrics/daily", http.StatusOK, map[string]any{"metrics": []DailyMetric{{Identifier: "HKQuantityTypeIdentifierStepCount", Days: steps[:3]}}})
+	got, err = g.client(t).DailyMetrics(context.Background(), []string{"HKQuantityTypeIdentifierStepCount"}, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g.callsTo("/v1/metrics/daily")) != 1 || len(got) != 1 || len(got[0].Days) != 3 {
+		t.Errorf("unpaged answer: %d calls, %+v", len(g.callsTo("/v1/metrics/daily")), got)
+	}
+
+	// An empty answer is an empty slice, never nil.
+	h := newFakeAPI(t)
+	h.respond("/v1/metrics/daily", http.StatusOK, map[string]any{"metrics": []DailyMetric{}, "nextOffset": 0})
+	if got, err = h.client(t).DailyMetrics(context.Background(), []string{"HKQuantityTypeIdentifierStepCount"}, 0, 1); err != nil || got == nil || len(got) != 0 {
+		t.Errorf("empty answer = %v, %v", got, err)
 	}
 }
 

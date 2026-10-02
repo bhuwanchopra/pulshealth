@@ -9,6 +9,14 @@ read-only and talks only to the product API, never to the database. This
 page is the client-side setup; the server's own README is
 [`server/mcp/README.md`](../server/mcp/README.md).
 
+For an assistant reading about the project rather than your data, the
+repository's [`llms.txt`](../llms.txt) indexes the documentation, and
+pulshealth.com serves it at <https://pulshealth.com/llms.txt>: the same file,
+rendered at build time with its links pointed at the pages the site renders
+under `/docs/` (the file on GitHub where there is none), so an assistant can
+follow them from either copy. [`AGENTS.md`](../AGENTS.md) is the companion
+for an assistant contributing to the code.
+
 ## What is available today
 
 | Ask about | Tool the assistant uses |
@@ -93,7 +101,7 @@ optional cell that sends it to Claude.
 # from a checkout
 go build -o pulshealth-mcp ./server/mcp && sudo mv pulshealth-mcp /usr/local/bin/
 
-# or, once a release is tagged (the binary lands as $(go env GOPATH)/bin/mcp)
+# or the latest commit on main (the binary lands as $(go env GOPATH)/bin/mcp)
 go install github.com/PulsHealth/pulshealth/server/mcp@latest
 ```
 
@@ -228,9 +236,8 @@ its database) is down.
 
 ChatGPT does not speak to the MCP server with a pasted bearer token. What it
 does take is an **Action**: an OpenAPI document plus a credential, from which
-it calls the HTTP API itself. The product API already publishes one, so no
-extra component is needed — but read the caveats first, because the shape of
-the feature is different from everything above.
+it calls the HTTP API itself. The product API already publishes the document.
+Read the caveats first: this route works differently from everything above.
 
 **OpenAI's servers, not your browser, fetch the document and call the
 endpoints.** A tailnet-only URL (`https://<machine>.<tailnet>.ts.net:8444`),
@@ -323,7 +330,7 @@ assistant that reads it as "today" is wrong by however far sync has lagged.)
 - **"How did I sleep last week?"** — one `get_sleep` call for the seven
   days; each row is a night, dated by the morning you woke up, with time
   asleep, time in bed and the core / deep / REM split in minutes. The
-  `weekly_summary` prompt now folds this in too.
+  `weekly_summary` prompt includes it.
 - **"When exactly did my heart rate spike during yesterday's meeting?"** —
   `get_samples` with `HKQuantityTypeIdentifierHeartRate` for that day; the
   individual readings, not a daily average.
@@ -370,12 +377,10 @@ assistant that reads it as "today" is wrong by however far sync has lagged.)
 - **HTTP mode only behind TLS.** The compose service binds to loopback;
   never publish port 8082 directly or over plain HTTP. See the security
   notes in `server/mcp/README.md`.
-- With the API's `PULS_MULTI_USER` off (the default) the assistant sees only
-  what the product API serves for its `PULS_USER_ID`; naming anyone else is
-  a 403 the tool reports as such. With it on, every user with data is
-  readable through `user`, and pinning the MCP instance (`PULS_USER_ID`,
-  `PULS_MCP_USER_ID` in Compose) is how you narrow a given connector back to
-  one person. Nothing here can write to the database or to Apple Health.
+- With the API's `PULS_MULTI_USER` off (the default) the assistant sees one
+  person only. With it on, pin each connector to its person (`PULS_USER_ID`;
+  see the multi-user note above). Nothing here can write to the database or
+  to Apple Health.
 
 ## Troubleshooting
 
@@ -386,4 +391,3 @@ assistant that reads it as "today" is wrong by however far sync has lagged.)
 | `PULS_MCP_TOKEN must be set to serve --http` at startup | HTTP mode refuses to run without its token — set it in `.env`. |
 | Daily figures are off by a day, or a day splits in two | `PULS_TIME_ZONE` on the MCP server does not match the stack's. |
 | Client shows the server as failed to start | Run it by hand with the same env: errors go to stderr as JSON. `pulshealth-mcp --version` checks the binary. |
-| `403 Forbidden: invalid Host header` | Only possible with an older build; the current server disables the SDK's loopback guard for exactly the reverse-proxy case. |

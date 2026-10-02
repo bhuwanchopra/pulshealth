@@ -435,9 +435,32 @@ final class RequestRecorder: @unchecked Sendable {
         }
         #expect(await tester.run() == .tokenRejected)
         #expect(recorder.all.count == 1)
+        #expect(ConnectionTestResult.tokenRejected.message.contains("rejected the token"))
+    }
 
-        let (forbidden, _) = makeTester { _ in .http(403, Data()) }
-        #expect(await forbidden.run() == .tokenRejected)
+    @Test func forbiddenIsAUserMismatchNotARejectedToken() async {
+        // The ingest's 403: a device token bound to another user than the
+        // X-User-ID sent. The token itself is fine, so the message must name
+        // the user ID, not the token, and the probe is not attempted.
+        let recorder = RequestRecorder()
+        let (forbidden, _) = makeTester { recorded in
+            recorder.append(recorded)
+            return .http(403, Data("X-User-ID does not match the token's user".utf8))
+        }
+        let result = await forbidden.run()
+        #expect(result == .userMismatch(userID: "user-1"))
+        #expect(result != .tokenRejected)
+        #expect(!result.isSuccess)
+        #expect(recorder.all.count == 1)
+        #expect(result.message.contains("different user ID"))
+        #expect(result.message.contains("user-1"))
+        #expect(result.message.contains("Settings → User"))
+
+        // The same on the probe, for a receiver without capabilities.
+        let (onProbe, _) = makeTester { recorded in
+            recorded.request.url?.path == "/v1/capabilities" ? .http(404, Data()) : .http(403, Data())
+        }
+        #expect(await onProbe.run() == .userMismatch(userID: "user-1"))
     }
 
     @Test func unsupportedProtocolIsReportedWithServerVersions() async {

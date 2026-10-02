@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { BookOpen, Briefcase, FileText, Menu, PenLine, Server, Smartphone, Star } from "lucide-react"
+import { BookOpen, Briefcase, Database, FileText, LogIn, Menu, PenLine, Smartphone, Star } from "lucide-react"
 import { GitHubIcon } from "@/components/brand-icons"
 
 import { cn } from "@/lib/utils"
@@ -35,12 +35,15 @@ type NavItem = {
  */
 const primary: NavItem[] = [
   { title: "App", href: "/ios", description: "The free iOS app", icon: Smartphone },
-  { title: "Server", href: "/server", description: "The self-hosted stack", icon: Server },
+  { title: "Database", href: "/server", description: "The self-hosted stack", icon: Database },
   { title: "Docs", href: "/docs", description: "Setup, protocol, database, AI", icon: FileText },
   { title: "Knowledge Base", href: "/knowledge-base", description: "What each Apple Health type measures", icon: BookOpen },
   { title: "Blog", href: "/blog", description: "Posts from the project", icon: PenLine },
   { title: "Consulting", href: "/consulting", description: "Setup, hosting and custom work, from the maintainer", icon: Briefcase },
 ]
+
+/** The hosted web viewer: another origin, so a plain link, not next/link. */
+const APP_URL = "https://app.pulshealth.com/"
 
 const secondary: { title: string; href: string }[] = [
   { title: "Support & FAQ", href: "/support" },
@@ -94,6 +97,9 @@ export function SiteHeader({ stars }: { stars: number | null }) {
               )}
             </a>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex">
+            <a href={APP_URL}>Sign in</a>
+          </Button>
           <ModeToggle />
 
           <Sheet open={open} onOpenChange={setOpen}>
@@ -144,11 +150,17 @@ export function SiteHeader({ stars }: { stars: number | null }) {
                   </div>
                 </div>
 
-                <div className="mt-auto border-t pt-4">
+                <div className="mt-auto space-y-2 border-t pt-4">
                   <Button asChild variant="outline" className="h-12 w-full text-base">
                     <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
                       <GitHubIcon className="mr-2 h-4 w-4" />
                       {starLabel ? `Star on GitHub · ${starLabel}` : "View on GitHub"}
+                    </a>
+                  </Button>
+                  <Button asChild variant="ghost" className="h-12 w-full text-base">
+                    <a href={APP_URL} onClick={() => setOpen(false)}>
+                      <LogIn className="mr-2 h-4 w-4" aria-hidden />
+                      Sign in
                     </a>
                   </Button>
                 </div>

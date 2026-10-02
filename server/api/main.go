@@ -31,7 +31,13 @@ const (
 	handlerTimeout = 30 * time.Second
 	defaultLimit   = 50
 	maxLimit       = 200
-	catalogTTL     = 5 * time.Minute
+	// /v1/metrics/daily pages in days across the requested types (see
+	// DailyFilters). The default holds a year of 27 types, or a decade of
+	// two, so a request that never names a limit gets what it always did;
+	// the cap keeps one answer well under a few megabytes.
+	defaultDailyLimit = 10000
+	maxDailyLimit     = 50000
+	catalogTTL        = 5 * time.Minute
 	// How many users' catalog answers are cached at once (see
 	// storeCatalogTypes). Far more than a household; small enough that a
 	// caller spraying ?user= values holds nothing worth mentioning.
@@ -52,7 +58,7 @@ type apiStore interface {
 	Profile(context.Context, string) (*Profile, error)
 	CatalogTypes(context.Context, string) ([]CatalogType, error)
 	LatestMetrics(context.Context, string, []string) ([]LatestMetric, error)
-	DailyMetrics(context.Context, string, []string, time.Time, time.Time) ([]DailyMetric, error)
+	DailyMetrics(context.Context, string, DailyFilters) ([]DailyMetric, error)
 	ActivitySummary(context.Context, string, time.Time, time.Time) ([]ActivityDay, error)
 	Workouts(context.Context, string, WorkoutFilters) ([]WorkoutSummary, error)
 	Workout(context.Context, string, string) (*WorkoutDetail, error)
@@ -432,18 +438,31 @@ func (s *Server) handleLatestMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDailyMetrics(w http.ResponseWriter, r *http.Request) {
-	types, start, end, err := dailyMetricsRequest(r)
+	filters, err := dailyFiltersFromRequest(r)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	metrics, err := s.store.DailyMetrics(r.Context(), s.requestUser(r), types, start, end)
+	metrics, err := s.store.DailyMetrics(r.Context(), s.requestUser(r), filters)
 	if err != nil {
 		s.log.Error("daily metrics query failed", "err", err.Error())
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "daily metrics failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string][]DailyMetric{"metrics": metrics})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"metrics":    metrics,
+		"nextOffset": filters.Offset + dailyPoints(metrics),
+	})
+}
+
+// dailyPoints is the number of day rows a daily-metrics answer carries — the
+// unit /v1/metrics/daily pages in.
+func dailyPoints(metrics []DailyMetric) int {
+	n := 0
+	for _, m := range metrics {
+		n += m.points()
+	}
+	return n
 }
 
 func (s *Server) handleActivitySummary(w http.ResponseWriter, r *http.Request) {
@@ -686,16 +705,37 @@ func parseLimitOffsetBounds(r *http.Request, def, max int) (limit, offset int, e
 	return limit, offset, nil
 }
 
-func dailyMetricsRequest(r *http.Request) ([]string, time.Time, time.Time, error) {
+// dailyTypesAndRange reads the types and range of a daily-metrics request.
+// Limit and Offset are left zero, which the store reads as the whole range
+// — what the export wants.
+func dailyTypesAndRange(r *http.Request) (DailyFilters, error) {
+	var f DailyFilters
 	types, err := parseTypesParam(r)
 	if err != nil {
-		return nil, time.Time{}, time.Time{}, err
+		return f, err
 	}
 	start, end, err := parseRange(r)
 	if err != nil {
-		return nil, time.Time{}, time.Time{}, err
+		return f, err
 	}
-	return types, start, end, nil
+	f.Types, f.Start, f.End = types, start, end
+	return f, nil
+}
+
+// dailyFiltersFromRequest reads GET /v1/metrics/daily: dailyTypesAndRange
+// plus the endpoint's paging (limit defaults to defaultDailyLimit, caps at
+// maxDailyLimit; both count days across the requested types).
+func dailyFiltersFromRequest(r *http.Request) (DailyFilters, error) {
+	f, err := dailyTypesAndRange(r)
+	if err != nil {
+		return f, err
+	}
+	limit, offset, err := parseLimitOffsetBounds(r, defaultDailyLimit, maxDailyLimit)
+	if err != nil {
+		return f, err
+	}
+	f.Limit, f.Offset = limit, offset
+	return f, nil
 }
 
 func workoutFiltersFromRequest(r *http.Request) (WorkoutFilters, error) {

@@ -7,19 +7,22 @@ needs to answer follow-up questions without inventing anything.
 ## Before you submit
 
 Fill in the four placeholders below with the values from the throwaway review
-backend. Standing that up is [`review-backend.md`](review-backend.md); do it
-first, because the notes are useless without it.
+backend ([`review-backend.md`](review-backend.md)). Stand that up first: the
+notes walk the reviewer through a sync. (The first run and the export path in
+WITHOUT A DATABASE need no database.) The placeholder names say "server"; the
+app and the notes say "database" — same thing.
 
 | Placeholder | What it is |
 |---|---|
 | `<<<REVIEW_SERVER_URL>>>` | The HTTPS URL of the review instance, e.g. `https://review.example.net`. Must be HTTPS and reachable from anywhere. |
-| `<<<REVIEW_TOKEN>>>` | Its `PULS_TOKEN`. Rotate it after review. |
+| `<<<REVIEW_TOKEN>>>` | Its `PULS_TOKEN`. Never reuse it after review: it ends up in Apple's notes. |
 | `<<<REVIEW_USER_ID>>>` | The user UUID, `5ea4d000-0000-4000-8000-000000000001` unless you changed it. |
 | `<<<REVIEW_EXPIRY>>>` | The date you intend to take the instance down. Keep it up until the app is approved. |
 
-The field's limit is 4000 characters and the filled-in block below is about
-3,940 (4,000 if line breaks count twice), so any addition needs a matching
-cut. Measure the filled copy before pasting.
+The field's limit is 4,000 characters. The block below is 3,797 with the
+placeholders and about 3,860 filled in — about 3,920 if each of its 55 line
+breaks counts as two, which is the reading to budget for. Any addition needs a
+matching cut; measure the filled copy before pasting.
 
 Do not paste a QR image into the notes — the reviewer cannot scan a picture on
 the same screen they are reading. The typed path below is the one they will
@@ -32,53 +35,59 @@ use; the QR scanner is offered for completeness.
 ```
 WHAT THIS APP IS
 
-PulsHealth copies the user's Apple Health data to a server that the USER runs. There is no PulsHealth service and no developer-operated backend. The app uploads only to the address the user enters. No health data — none — reaches the developer.
+PulsHealth copies the user's Apple Health data to a database that the USER runs. There is no developer-operated backend. The app uploads only to the address the user enters. No health data reaches the developer.
 
-So the app cannot be exercised without a server, and we have stood one up for you: a throwaway instance that exists only for this review, holds no real person's data, and will be destroyed afterwards.
+Syncing needs a database, so we stood up a throwaway one for this review. It holds no real person's data. The app also works with no database at all (WITHOUT A DATABASE, below).
 
-REVIEW SERVER
+REVIEW DATABASE
 
-  Server URL: <<<REVIEW_SERVER_URL>>>
-  Token:      <<<REVIEW_TOKEN>>>
-  User ID:    <<<REVIEW_USER_ID>>>
+  Database URL: <<<REVIEW_SERVER_URL>>>
+  Token:        <<<REVIEW_TOKEN>>>
+  User ID:      <<<REVIEW_USER_ID>>>
 
-The instance will stay up until at least <<<REVIEW_EXPIRY>>>. If it is unreachable, please contact us before rejecting; we will bring it back up the same day.
+Up until at least <<<REVIEW_EXPIRY>>>. If it is unreachable, please contact us before rejecting; we will bring it back the same day.
 
 HOW TO EXERCISE THE APP (about 5 minutes)
 
-1. Launch the app. A five-step first-run flow starts automatically.
-2. "Get Started".
-3. On "Your Server", type the Server URL above into the URL field and the Token into the Bearer token field. ("Scan Pairing Code" reads a QR code the server prints; it needs a physical code to point at, so please type the values instead.) iOS may offer to save the token as a password; either answer is fine.
-4. Tap "Test Connection". It should report success and list the server's features. Then tap "Continue".
-5. On "Health Access", tap "Continue". iOS shows its own permission sheet. Please tap "Turn On All" and Allow. The app requests READ access only — it never writes to Apple Health.
-6. On "Data Types", a starter selection of about 14 types is already made. Tap "Continue".
-7. On "Ready", tap "Start Syncing". The Dashboard appears and the initial upload begins.
+1. Launch the app. A four-page introduction starts; swipe left to turn pages.
+2. On page 2, tap "Continue" (a swipe left does the same). iOS shows its permission sheet: tap "Turn On All", then "Allow" (iOS 27: "Select All", "Continue", then "All Recorded Data and Future Data", "Allow"). The app requests READ access only. Page 3 follows.
+3. Swipe to page 4 and tap "Start Exploring". The Explore tab appears.
+4. Open the Sync tab and tap "Set Up". On the Database screen, type the Database URL and Token above into their fields. (Scanning needs a physical QR code.) iOS may offer to save the token; either answer is fine.
+5. Tap "Test Connection". It should report success. Then "Save & Apply". The Sync tab shows the database and the upload begins.
 
 WHAT YOU SHOULD SEE
 
-- The Dashboard's "Samples exported" counter rises if the device has any Health data. A brand-new device may have none; that is expected, not a failure.
-- To prove the round trip on an empty device: in Apple Health, tap the search button (magnifying glass), search for Weight and open it, tap + (Add Data), enter a value and tap the checkmark. Return to PulsHealth and pull down on the Dashboard: "Samples exported" rises within seconds.
-- The Log tab shows every upload as it happens.
+- The Sync tab's "Samples sent" counter rises if the device has Health data. A new device may have none; that is expected.
+- On an empty device: in Apple Health, search for Weight, open it, tap + (Add Data), enter a value and save. Back in PulsHealth, pull down on the Sync tab: the counter rises within seconds.
+- Sync > Activity shows every upload.
+
+WITHOUT A DATABASE
+
+The Export tab writes the selected Health data to CSV or JSONL files on the device; "Share or Save to Files" opens the iOS share sheet. No network request is made. From a fresh install: do steps 1-3 above and open Export. The files are deleted once shared, and at every launch.
 
 WHY WE DECLARE NSAllowsLocalNetworking
 
-Self-hosted servers often sit on the user's own network (a NAS, a Raspberry Pi) where a publicly trusted TLS certificate is impractical. The exception permits plain HTTP to local-network hosts ONLY, and the app enforces the same rule itself (ServerURLValidation): a URL is accepted only if it is https://, or http:// to localhost, a *.local name, an unqualified hostname, or a private IP range (10.x, 172.16-31.x, 192.168.x, 169.254.x). Plain http:// to a public host is refused before it can be saved or tested. We do not set NSAllowsArbitraryLoads. The review server is HTTPS, so this path is not involved in your test.
+The user's database often runs on their own network, where a public TLS certificate is impractical. The exception permits plain HTTP to local-network hosts ONLY, and the app enforces the same rule itself: http:// is accepted only for localhost, *.local, an unqualified hostname or a private IP range. We do not set NSAllowsArbitraryLoads. The review database is HTTPS.
 
 HEALTHKIT (Guideline 5.1.3)
 
-- Read-only. The app requests HKObjectType read access and never calls any HealthKit write API. NSHealthUpdateUsageDescription states plainly: "PulsHealth does not write health data."
-- Health data is not used for advertising, marketing, or data mining, and is not shared with any third party. The only recipient is the server the user configured.
-- Health data is never written to iCloud. On the device it stays in the app's private container.
+- Read-only. The app never calls a HealthKit write API.
+- Health data is not used for advertising, marketing or data mining, and is not shared with any third party. It leaves the app only as uploads to the user's database, or as export files the user sends through the share sheet.
+- Never written to iCloud. The app keeps none, except an export the user asked for, in its temporary directory (never backed up) until shared.
 
 CAMERA
 
-Used only to read the pairing QR code the server prints. No frame is stored or transmitted. Declining is handled: the same screen offers "Type It Instead" and the app is fully usable without the camera.
+Used only to read the pairing QR code. No frame is stored or sent. Declining is handled: the same screen offers "Type It Instead".
+
+URL SCHEME (puls://)
+
+One custom scheme, for pairing links (puls://pair?...) — the text a database's pairing QR code encodes, so the iOS Camera app can open it. Any page or app can fire such a URL, so a link configures nothing by itself: the app shows a confirmation naming the host, and accepting only fills in the fields on Sync > Database — the user still has to tap Save & Apply.
 
 BACKGROUND MODES
 
-UIBackgroundModes "processing" plus HealthKit background delivery, so new samples upload without the user opening the app. Nothing else runs in the background. There are no accounts, so there is no demo account.
+"processing" plus HealthKit background delivery, so new samples upload without opening the app. There are no accounts, so no demo account.
 
-The app is open source (Apache-2.0): https://github.com/PulsHealth/pulshealth
+Source (Apache-2.0): https://github.com/PulsHealth/pulshealth
 Privacy policy: https://pulshealth.com/privacy
 ```
 
@@ -86,26 +95,58 @@ Privacy policy: https://pulshealth.com/privacy
 
 ## Background for follow-up questions
 
-### "Why does the app need an external server at all?"
+### "Why does the app need an external database at all?"
 
-It is a data-export tool. The point is that the user's health data ends up in a
-database they control, so they can query it with SQL, chart it in Grafana, or
-feed it to their own tools. Without a destination there is nothing to export
-to. This is the same shape as other HealthKit exporters on the store; the
-difference is that the destination here is the user's own machine rather than a
+It does not, for a one-off: the Export tab writes the selected Health
+data to CSV or JSONL files on the device and hands them to the share sheet,
+with no database and no network request, and the Explore tab shows what Apple
+Health holds without either. The database is for the thing a file
+cannot do — *continuous* sync into a database the user controls, so they can
+query it with SQL, chart it in Grafana, or feed it to their own tools as new
+data arrives. This is the same shape as other HealthKit exporters on the store;
+the difference is that the destination is the user's own machine rather than a
 vendor's cloud, which is the feature, not a limitation.
 
-### "The app is unusable without one — is that acceptable?"
+### "Is the app usable without a database?"
 
-The first-run flow is explicit about it. The welcome screen's third bullet says
-"You need a server — a machine running the PulsHealth server (Docker, one
-command). Without one there is nowhere to sync to." The App Store description
-says the same thing in its third paragraph. A reviewer or a buyer learns it
-before installing, and the review server removes the obstacle for review.
+Yes, since 1.5 added the on-device export, and since 1.6 the first-run
+flow does not ask for a database at all. Its four pages are "Unlock your
+Health Data" (Explore, Export, Sync), Health access, one-time exports ("No
+account and no database needed"), and syncing to your own database, which
+says it can be set up any time from the Sync tab and links to
+pulshealth.com/docs/server/ in Safari. The Sync tab of an install with no
+database carries a setup card ("Keep a copy in your own database", with a Set
+Up button that opens the Database screen) instead of looking broken. The App
+Store description says the same.
 
-The flow also lets a user continue without a server ("I'll Set This Up Later"),
-and the app then behaves like a picker with nothing to upload to — it does not
-dead-end.
+What such an install does *not* do is anything in the background: exports run
+only when the user taps Export, in the foreground.
+
+### "Where do exported files go, and what is in them?"
+
+Into the app's temporary directory (never backed up), then to the iOS share
+sheet. The app deletes its copy when the share sheet reports completion, on
+Delete Export, when another export starts, and at every launch. The files hold
+the selected health data plus a manifest with the user ID, the app's random
+device ID, the time zone and row counts — no token, no database URL, and none of
+the name/e-mail/date-of-birth fields from Settings → User. The share sheet's
+Copy action is excluded. `docs/privacy-policy.md` § Exports is the public
+statement of all this.
+
+### "The permission sheet asked how much data to share"
+
+That is iOS 27's second page. *Past 30 Days and Future Data* works too: the app
+then reads, syncs and exports only from 30 days back, says so on the Sync tab,
+an analysis and an export result, never treats the older history as deleted
+or empty in the database, and reads the rest by itself if access is widened
+later under Settings → Privacy & Security → Health → PulsHealth. *Don't Allow*
+on that page is taken as the user's answer: no error, nothing read. The notes
+ask for All Recorded Data only so the reviewer sees a whole history arrive.
+
+### "Does the app read the clipboard?"
+
+Only when the user taps Paste Pairing Code, which is the system paste button
+(`PasteButton`): iOS shows no paste prompt, and nothing is read otherwise.
 
 ### "Prove the local-network exception is narrow"
 
@@ -124,13 +165,11 @@ The app does not interpret any of them; it copies them.
 
 ### If review asks for a video
 
-Record the seven steps above on a device with a little Health data in it. Show
-the Test Connection success row and the Dashboard counter moving. Do not use a
+Record the five steps above on a device with a little Health data in it. Show
+the Test Connection success row and the Sync tab's counter moving, then the
+Export tab through to the share sheet. Do not use a
 real person's health history.
 
 ### After approval
 
-1. Take the review instance down (`docker compose down -v` in its directory).
-2. Rotate `PULS_TOKEN` even so, in case the notes are cached anywhere.
-3. Update `<<<REVIEW_EXPIRY>>>` here for the next submission rather than
-   leaving a stale date.
+Take the review instance down ([`review-backend.md`](review-backend.md) § 6).

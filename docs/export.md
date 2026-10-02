@@ -32,7 +32,7 @@ curl -fL -H "Authorization: Bearer $PULS_API_TOKEN" -OJ \
 | `types` | `daily_metrics` only | comma-separated HealthKit identifiers |
 | `type` | `samples` only | exactly one HealthKit identifier |
 | `activityType` | `workouts` only | keep one activity type |
-| `user` | no | the user to export, a UUID; absent means the server's `PULS_USER_ID`. Anyone else needs the server to run with `PULS_MULTI_USER=true`, or the answer is a `403` |
+| `user` | no | the user to export, a UUID (see *Whose data* below) |
 
 `limit` and `offset` do not apply: an export is bounded by its range, not by a
 page size, and `workouts` returns the whole range rather than one page.
@@ -47,16 +47,14 @@ default user's data under another name. A value that is not a UUID is a
 
 **Range caps.** `samples` keeps the **31 days** `/v1/samples` enforces — a
 busy type runs to hundreds of thousands of rows a month. Every other dataset
-is capped at **366 days**: the same cap `/v1/sleep/daily` and
-`/v1/state-of-mind` already apply, and deliberately *stricter* than
-`/v1/metrics/daily`, `/v1/activity/summary` and `/v1/workouts`, which have no
-range cap because a page is bounded by its page size. A file is bounded only
-by its range, so it needs one. Over the cap is a `400` naming the limit, in
-the shape the JSON endpoints use:
-`{"error": "range must not exceed 31 days"}`. The cap above measures the
-instant span; the day-grained datasets additionally reject a range that
-touches more than 366 local calendar days, with their own message. Either way
-it is a clean `400` before a single byte of the file.
+is capped at **366 days**, like `/v1/sleep/daily` and `/v1/state-of-mind`.
+That is stricter than `/v1/metrics/daily` and `/v1/workouts`, which page
+instead (and `/v1/activity/summary`, one small row per day): a file is
+bounded only by its range, so it needs a cap. The cap measures the instant span; the day-grained datasets also
+reject a range that touches more than 366 local calendar days, with their own
+message. Either way it is a `400` naming the limit, before the first byte of
+the file, in the JSON endpoints' shape:
+`{"error": "range must not exceed 31 days"}`.
 
 **At most two exports run at once.** Each holds a database connection for the
 length of the download, and the pool is small, so a third request is refused
@@ -153,6 +151,147 @@ download; the output file named by `-o` is created only once the server has
 answered `200`, so a rejected request never truncates the previous export.
 A `403` is explained the way a `401` is: the server only exports its
 `PULS_USER_ID` unless it runs with `PULS_MULTI_USER=true`.
+
+## On-device export (no server)
+
+Everything above needs a server the phone has synced to. The app can also
+write files **straight from HealthKit**, with no server involved:
+`HealthExporter` in the `PulsHealthSync` package
+([`PulsHealthSync/README.md`](../PulsHealthSync/README.md), "On-device export")
+runs the ordinary sync sweep — the same queries, the same canonical-unit
+conversion, the same aggregate math — against a throwaway engine whose
+transport appends to files instead of POSTing. The files are staged in the
+app's temporary directory for the share sheet.
+
+**In the app it is the Export tab**, a builder. Pick the data types, add any
+aggregate series (hourly, daily, weekly or monthly values for a quantity
+type), a time range (last 30 days, 90 days, a year, all time, or your own
+start and end date), CSV or JSONL, and whether to zip it. The draft starts
+from the selection applied under Sync → Synced Data — the same types,
+aggregate series and workout route/stream switches. What you change in it is
+this export's alone, never the sync's, and the sync start date in Settings
+plays no part.
+
+An end date is exclusive: samples that start before it, activity-ring days
+before its local day, and routes and streams of workouts that started before
+it. An aggregate bucket that straddles the end date is left out rather than
+written as a partial value, so a daily series ends on the last whole day
+before it.
+
+When it finishes, **Share or Save to Files** opens the iOS share sheet with
+every file of the export, manifest included. With **Zip into one file** on,
+it shares one `puls-export-<yyyyMMdd-HHmmss>.zip` holding a folder of that
+name with the same files, unchanged. iOS's own archiver (`NSFileCoordinator`)
+builds the zip after the files are written, so the manifest's byte counts are
+the uncompressed sizes. The app deletes its staged copy once the share sheet
+reports the files were handed over, when you tap Delete Export, when you
+start another export, and at every launch — so save the files somewhere
+before moving on.
+
+Keep the app open and the phone unlocked while it runs: HealthKit cannot be
+read on a locked phone, and an export that runs into a lock finishes
+**incomplete** and says which types it could not read. For scale: 340,000
+samples came to 41 MB as CSV and 212 MB as JSONL (the wire format carries
+each sample's time-zone context and source), written in 5–7 seconds on a
+simulator. A phone is slower, and years of Apple Watch heart rate run to
+millions of samples.
+
+It offers the same two formats, and they are not symmetrical:
+
+**JSONL is the complete one, and it is replayable.** The file
+(`puls-export-<yyyyMMdd-HHmmss>.jsonl`) is a concatenation of
+[Puls Sync Protocol](protocol/README.md) batches exactly as they would have
+gone over the wire, uncompressed: each batch's header line, then its sample,
+deletion, route, series, aggregate and activity-summary lines. Nothing about it
+is export-specific — it is the format `docs/protocol/schema/` specifies and the
+fixture corpus tests — so every field of every kind is there, and a file can be
+fed to a server later: split it before each header line (the only lines whose
+top-level object has a `batchID`), gzip each piece if you like, and `POST` it to
+`/v1/batches` with the bearer token and `X-User-ID`. Ingest is idempotent, so
+replaying into a server that already holds some of it is safe. Three things to
+know:
+
+- The user is an HTTP header on the wire, not part of the body, so the JSONL
+  does not say whose data it is. The manifest (below) does.
+- There is no `{"profile":…}` line. The name, e-mail, date of birth and sex on
+  that line are the app's settings rather than HealthKit data, and an export
+  leaves them out of a file that is about to be shared.
+- Deletion lines are kept. HealthKit can return the tombstones it still holds
+  even to a first query, and a replay should apply them.
+
+[`tools/protocol-check`](../tools/protocol-check) validates one batch per file,
+so split an export the same way before checking it.
+
+**CSV is a flattened view**, one file per dataset that has rows
+(`puls-export-<yyyyMMdd-HHmmss>-<dataset>.csv`; a dataset with no rows gets no
+file). Where a dataset also exists on the server the file is the same file:
+same header row, same order, epoch-millisecond instants, `YYYY-MM-DD` local
+days, canonical units, a null as an empty cell, a list comma-joined inside its
+quoted cell, lowercase UUIDs, floats without an exponent — and the same
+spreadsheet-formula caveat, because cells are written verbatim here too.
+
+| `dataset` | On the server too? | Columns |
+|---|---|---|
+| `samples` | yes | `type`, `unit`, `uuid`, `start`, `end`, `value`, `label`, `source` |
+| `workouts` | yes | `uuid`, `activityType`, `start`, `end`, `durationS`, `distanceM`, `energyKcal`, `hasRoute`, `availableMetrics` |
+| `activity` | yes | `date`, `moveKcal`, `moveGoalKcal`, `exerciseMin`, `exerciseGoalMin`, `standHours`, `standGoalHours`, `moveMode`, `moveTimeMin`, `moveTimeGoalMin` |
+| `state_of_mind` | yes | `uuid`, `date`, `timestamp`, `kind`, `valence`, `valenceClassification`, `labels`, `associations` |
+| `aggregates` | no — device only | `type`, `func`, `intervalValue`, `intervalUnit`, `deviceFilter`, `bucketStart`, `bucketEnd`, `value`, `unit` |
+| `workout_routes` | no — device only | `workoutUUID`, `t`, `lat`, `lon`, `alt`, `hAcc`, `vAcc`, `speed`, `course` |
+| `workout_series` | no — device only | `workoutUUID`, `type`, `unit`, `t`, `value` |
+| `medication_doses` | no — device only | `uuid`, `start`, `end`, `medication`, `status`, `scheduledAt`, `doseQuantity`, `doseUnit`, `source` |
+
+The device-only files use the wire format's own keys, in wire order, one row
+per bucket, GPS fix, stream datapoint or dose. How the two sides differ:
+
+- **`samples` holds every selected quantity and category type in one file**,
+  where the server exports one type per request. `label` — the server's name
+  for a category value, joined from its `category_labels` table — is always
+  empty: the app has no such table, and the column is kept so the header
+  matches. A category sample's `value` is HealthKit's raw integer on both sides.
+- **`daily_metrics` and `sleep` do not exist on the device.** Both are views the
+  server computes over what it has stored (per-day totals deduplicated across
+  devices; nights assembled from sleep-stage samples). The device's counterpart
+  to `daily_metrics` is `aggregates`, the statistics HealthKit itself computes
+  for whatever aggregate series are configured; sleep stages are rows of
+  `samples`.
+- **Local days are the phone's.** `activity.date` and `state_of_mind.date` are
+  computed in the phone's time zone, which is what the server's
+  `PULS_TIME_ZONE` is required to match anyway.
+- **What CSV leaves out.** Metadata, device, source bundle and version, the
+  per-sample time-zone context, and a workout's statistics, events and
+  sub-activities have no column. ECG voltage traces, beat-to-beat heartbeat
+  series and deletion tombstones have no file at all; the result the package
+  returns counts them so the app can say so and suggest JSONL.
+
+Both formats come with `puls-export-<yyyyMMdd-HHmmss>-manifest.json`: the user
+ID, the device ID, the requested range (`startDate`, `null` = all time;
+`endDate`, `null` = now), the format, the protocol `schemaVersion` and the app
+version, the time zone local days were computed in, the exported `types` and
+`aggregates` (each series as `type|func|intervalValue|intervalUnit|deviceFilter`),
+and per-file and per-dataset row counts. Its main job is `"complete": false`
+with a `failures` list whenever a selected type could not be read to the end
+(access never granted for it, the phone locked part-way through) or a sample
+could not be converted to its canonical unit. A file that stops short looks
+exactly like the file of someone with less data; the manifest tells them
+apart.
+
+On iOS 27, Health access can be limited to recent history (the permission
+sheet's "Past 30 Days and Future Data", or Limited Access under Settings →
+Privacy & Security → Health). HealthKit then reads a type only from an
+earliest date on, and `limitedHistory` maps each type whose date falls after
+the export's start to that date (epoch milliseconds). The files hold nothing
+of those types before it, so that export is incomplete too; choose Full
+Access and export again to get the rest.
+
+One caveat for replaying **aggregate** lines. Bucket boundaries are counted
+from the start of the series, so an export aligns each series to the grid the
+app's own sync uses, and a replay overwrites the server's buckets rather than
+adding a second, offset set. That alignment is exact for day, week and month
+buckets and for hour or minute intervals that divide a day evenly. It can be
+off for intervals that do not (5 hours, 7 minutes) and for a month series that
+starts on the 29th–31st; replay those with the aggregate lines filtered out and
+let the phone's next sync recompute them.
 
 ## See also
 

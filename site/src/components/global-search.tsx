@@ -13,7 +13,7 @@ import {
   BookOpen,
   Search,
   Newspaper,
-  Server,
+  Database,
   Shield,
   FileText,
   LucideIcon,
@@ -40,7 +40,7 @@ const PAGE_ICONS: Record<string, LucideIcon> = {
   BookOpen,
   Search,
   Newspaper,
-  Server,
+  Database,
   Shield,
   FileText,
 };

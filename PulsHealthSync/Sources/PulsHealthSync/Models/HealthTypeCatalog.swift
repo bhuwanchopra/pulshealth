@@ -142,6 +142,11 @@ public enum HealthTypeCatalog {
     /// is `@available(iOS 18, *)` and `definitions` must build on every runtime.
     /// `CatalogTests.gatedIdentifiersMatchTheSDK` pins it to the SDK constant.
     public static let sleepApneaEventIdentifier = "HKCategoryTypeIdentifierSleepApneaEvent"
+    /// iOS 27 quantity type ("Recovery HRV" in the Health app), spelled out
+    /// because `HKQuantityTypeIdentifier.heartRateVariabilityRMSSD` exists only
+    /// in the iOS 27 SDK and CI also builds with Xcode 26.5.
+    /// `CatalogTests.gatedIdentifiersMatchTheSDK` pins it to the SDK constant.
+    public static let heartRateVariabilityRMSSDIdentifier = "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD"
 
     /// Every type the catalog defines, on every iOS PulsHealth supports, in
     /// declaration order. Never depends on the running OS: this is the
@@ -284,8 +289,19 @@ public enum HealthTypeCatalog {
         )
     }
 
-    /// Quantity types the running OS exposes (today: every definition — none
-    /// is gated above the deployment target).
+    private static func q(
+        _ identifier: String, _ name: String, _ unit: String,
+        _ group: HealthTypeDescriptor.Group, perDay: Int,
+        minimumIOS: HealthTypeDescriptor.IOSVersion
+    ) -> HealthTypeDescriptor {
+        HealthTypeDescriptor(
+            identifier: identifier, displayName: name, kind: .quantity,
+            unitString: unit, group: group, estimatedSamplesPerDay: perDay,
+            minimumIOS: minimumIOS
+        )
+    }
+
+    /// Quantity types the running OS exposes.
     public static let quantityTypes: [HealthTypeDescriptor] =
         quantityDefinitions.filter(\.isAvailableOnThisOS)
 
@@ -325,6 +341,8 @@ public enum HealthTypeCatalog {
         q(.restingHeartRate, "Resting Heart Rate", "count/min", .heart, perDay: 1),
         q(.walkingHeartRateAverage, "Walking HR Average", "count/min", .heart, perDay: 1),
         q(.heartRateVariabilitySDNN, "HRV (SDNN)", "ms", .heart, perDay: 8),
+        q(heartRateVariabilityRMSSDIdentifier, "HRV (RMSSD)", "ms", .heart, perDay: 100,
+          minimumIOS: HealthTypeDescriptor.IOSVersion(27)),
         q(.heartRateRecoveryOneMinute, "HR Recovery (1 min)", "count/min", .heart, perDay: 1),
         q(.atrialFibrillationBurden, "AFib Burden", "%", .heart, perDay: 1),
         q(.peripheralPerfusionIndex, "Perfusion Index", "%", .heart, perDay: 1),

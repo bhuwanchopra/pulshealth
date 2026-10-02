@@ -419,8 +419,11 @@ line **replaces** what is stored: a null or absent field clears that value,
 `{"profile":{}}` clears all four, and the only way to leave the profile
 unchanged is to send no profile line. `{"profile":null}` and a line without
 the wrapper are malformed (400). The app attaches a profile line to the next
-upload after the user edits these settings; date of birth and sex are what a
-receiver needs for heart-rate zones.
+upload after the user edits these settings, and sends none while it has no
+profile to report — an empty one goes out only when the user has just emptied
+a filled one, so a reinstall pairing with its old server does not erase what
+is stored there. Date of birth and sex are what a receiver needs for
+heart-rate zones.
 
 ## 5. Type vocabulary and canonical units
 
@@ -451,7 +454,7 @@ unit; `catalog.json` is the copy to trust.
 | `WalkingSpeed`, `RunningSpeed`, `CyclingSpeed` | `m/s` |
 | `WalkingDoubleSupportPercentage`, `WalkingAsymmetryPercentage`, `AtrialFibrillationBurden`, `PeripheralPerfusionIndex`, `BodyFatPercentage`, `OxygenSaturation`, `BloodAlcoholContent` | `%` (fraction) |
 | `RunningPower`, `CyclingPower` | `W` |
-| `RunningGroundContactTime`, `HeartRateVariabilitySDNN` | `ms` |
+| `RunningGroundContactTime`, `HeartRateVariabilitySDNN`, `HeartRateVariabilityRMSSD` | `ms` |
 | `RunningVerticalOscillation` | `cm` |
 | `CyclingCadence`, `HeartRate`, `RestingHeartRate`, `WalkingHeartRateAverage`, `HeartRateRecoveryOneMinute`, `RespiratoryRate` | `count/min` |
 | `VO2Max` | `ml/kg*min` |
@@ -649,10 +652,10 @@ behave this way and a receiver MAY depend on it.
   know what arrival order to expect — but the two consequences below are
   normative.
 - **A type's first line MAY be an aggregate or activity-summary line rather
-  than a sample line.** Aggregate-only types (aggregates enabled for a type
-  whose raw samples are not) have always been able to do this; since the
-  recent-aggregate phase it is the ordinary case on a first backfill for every
-  type that has an aggregate configured. A receiver MUST therefore be able to
+  than a sample line.** That is true of aggregate-only types (aggregates
+  enabled for a type whose raw samples are not) and, because the recent window
+  of aggregates runs before the raw samples, of every type with an aggregate
+  configured on a first backfill. A receiver MUST therefore be able to
   register a type from an aggregate line, and MUST NOT assume the canonical
   unit from §5 has been established by an earlier sample line — a `duration`
   aggregate carries `s` whatever the type's own unit is, so a receiver that
@@ -707,8 +710,8 @@ user). The minimal Python receiver advertises
 
 ### 9.2 `GET /v1/stats`
 
-Per-type row counts and batch bookkeeping for the app's dashboard, so it can
-compare what it exported with what the receiver holds.
+Per-type row counts and batch bookkeeping for the app's per-type sync detail,
+so it can compare what it exported with what the receiver holds.
 
 ```json
 [{"type":"HKQuantityTypeIdentifierHeartRate","rows":1834021,"earliest":1580515200000,"latest":1718000005000,"lastBatchAt":1718000400000,"batches":2103}]

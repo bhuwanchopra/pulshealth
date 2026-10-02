@@ -51,12 +51,14 @@ not in the canonical layout.
 
 The rendering runtime matters in one way. `aggregationStyle` and
 `allowedAggregateFunctions` are read from HealthKit at render time (the app
-derives the legal function set from `HKQuantityType.aggregationStyle` rather
-than hand-maintaining it — see the gotchas in `CLAUDE.md`), so a **quantity**
-type gated above the simulator that renders the file cannot be published until
-the test runs on that iOS; the test says so. Every other fact, including
-`minimumIOS`, is declared in the catalog and renders identically on any
-runtime.
+derives the legal function set from `HKQuantityType.aggregationStyle` — see the
+gotchas in `CLAUDE.md`), so a **quantity** type gated above the simulator that
+renders the file cannot be published until the test runs on that iOS. Today
+that is HRV RMSSD (iOS 27): regenerate on an iOS 27 simulator. On an older
+runtime the three rendering tests are skipped (CI's Xcode 27 job runs them),
+and a `PULS_WRITE_CATALOG=1` run fails naming the runtime it needs. Every
+other fact, including `minimumIOS`, is declared in the catalog and renders
+identically on any runtime.
 
 ## Layout
 
@@ -94,7 +96,7 @@ order), so adding a type is a contiguous insertion in the diff.
 | `source` | The Swift file the vocabulary is rendered from. |
 | `groups` | The Apple-Health-style display groups in the app's order: `key` is the stable machine name used by `types[].group`, `label` the display text. |
 | `types[].identifier` | The string in `type` on the wire and in `sample_types.identifier` in the reference schema: the HealthKit identifier for quantity and category types; the fixed strings `HKWorkoutTypeIdentifier`, `HKDataTypeIdentifierHeartbeatSeries`, `HKDataTypeIdentifierElectrocardiogram`, `HKDataTypeIdentifierStateOfMind`, `HKMedicationDoseEventTypeIdentifierMedicationDoseEvent` and `HKActivitySummaryTypeIdentifier` for the rest. |
-| `types[].kind` | The app's `SampleKind`: `quantity`, `category`, `workout`, `heartbeatSeries`, `ecg`, `stateOfMind`, `medicationDose` or `activitySummary`. `activitySummary` is the activity rings, which travel on their own `activitySummary` line and are never a sample ([spec §4.6](README.md#46-activitysummary)); the identifier appears only in `/v1/stats` bookkeeping. |
+| `types[].kind` | The app's `SampleKind`: `quantity`, `category`, `workout`, `heartbeatSeries`, `ecg`, `stateOfMind`, `medicationDose` or `activitySummary`. `activitySummary` is the activity rings, which travel on their own `activitySummary` line and are never a sample ([spec §4.6](README.md#46-activity-summary)); the identifier appears only in `/v1/stats` bookkeeping. |
 | `types[].unit` | The canonical unit every value of a quantity type is converted to on the phone, as an `HKUnit` string; `null` for every other kind. `%` is a **fraction** (blood oxygen 0.97, not 97), `count/min` is per minute. `duration` aggregates carry `s` instead, which is not a catalog unit. |
 | `types[].aggregationStyle` | HealthKit's `HKQuantityAggregationStyle` case name for quantity types (`cumulative`, `discreteArithmetic`, `discreteTemporallyWeighted`, `discreteEquivalentContinuousLevel`); `null` otherwise. Cumulative types add up over a period (steps, energy); discrete ones are readings (heart rate, weight). |
 | `types[].allowedAggregateFunctions` | The `func` values an `aggregate` line ([spec §4.5](README.md#45-aggregate)) can carry for this type — the functions HealthKit accepts for its aggregation style: cumulative types allow `sum`, `mostRecent`, `duration`; discrete types `average`, `min`, `max`, `mostRecent`, `duration`. Empty for non-quantity kinds. |

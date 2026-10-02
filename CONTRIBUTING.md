@@ -5,11 +5,9 @@ to get each component building, the rules that keep the app and the server in
 step, and what to run before opening a pull request.
 
 The iOS app is [on the App Store](https://apps.apple.com/us/app/pulshealth/id6757657354);
-the self-hosted backend is still pre-release. `docs/roadmap.md` is what is
-still outstanding; `docs/open-source-plan.md` records the decisions and the
-requirements behind it.
-For anything bigger than a bug fix, open an issue first so the design can be
-agreed before the code exists.
+the self-hosted backend is pre-release (0.x). `docs/roadmap.md` lists what is
+still outstanding. For anything bigger than a bug fix, open an issue first so
+the design can be agreed before the code exists.
 
 ## Developer Certificate of Origin
 
@@ -79,20 +77,29 @@ xcodebuild test -scheme PulsHealth \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-### `server/ingest` and `server/api` (Go)
+### Go: `server/ingest`, `server/api`, `server/mcp`, `tools/`
 
-Unit tests need no database:
+Each is its own Go module. Unit tests need no database:
 
 ```bash
 cd server/ingest && go vet ./... && go test ./...
 cd ../api      && go vet ./... && go test ./...
+cd ../mcp      && go vet ./... && go test ./...   # against a fake product API
+cd ../../tools/puls-export && go vet ./... && go test ./...
 ```
 
-Integration tests are gated on `DATABASE_URL` and need the schema applied.
-The database image's own initdb hooks only run on an empty volume, so the
-schema is owned by the `migrate` service — start that, not `db`. And there is
-no module at `server/`: `ingest`, `api` and `mcp` are each their own Go
-module, so run the tests from the module directory.
+The protocol corpus is checked against the JSON Schemas, then posted at the
+Python reference receiver (both from the repository root):
+
+```bash
+(cd tools/protocol-check && go test ./... && go run . ../../docs/protocol/fixtures/*.ndjson)
+python3 examples/receivers/python-sqlite/smoke_test.py
+```
+
+Integration tests are gated on `DATABASE_URL` and need the schema applied by
+the `migrate` service — start that, not `db`. There is no module at
+`server/`, so run them from the module directory. CI's `db-integration` job
+runs them on every push.
 
 ```bash
 cd server
@@ -120,10 +127,10 @@ npm run dev                     # demo data when DATABASE_URL is unset
 ### `site` (pulshealth.com marketing site)
 
 Built with **bun**, not npm, and distinct from `web/`. It reads
-`knowledge-base/` and `blog/` as repository-root siblings by relative path, so
-a full export is 190 static pages — 177 of them knowledge-base types. CI
-asserts that source count and built count match, because a moved content
-directory makes the build emit fewer pages instead of failing.
+`knowledge-base/`, `blog/` and eleven repository Markdown files by relative
+path, so a moved file makes the build emit fewer pages instead of failing. CI
+compares the built knowledge-base, blog and docs pages with their sources
+(`site/README.md` has the details).
 
 ```bash
 cd site
@@ -180,16 +187,21 @@ in the same pull request:
 - server: `server/ingest/parse.go` and `server/ingest/store.go`;
 - schema: a new `NNN_name.sql` under `server/db/migrations/`;
 - tests: the fixtures in `server/ingest/parse_test.go`;
-- docs: the wire-format description and curl example in `server/README.md`;
+- docs: the curl example in `server/README.md`;
+- protocol: the spec `docs/protocol/README.md`, the JSON Schemas in
+  `docs/protocol/schema/`, and the fixture corpus in `docs/protocol/fixtures/`
+  with its `.expected.json` counts (`tools/protocol-check` and the Python
+  receiver's smoke test fail until they agree);
 - for a catalog change (a new type, a changed unit): the rendered vocabulary
   `docs/protocol/catalog.json` and `web/lib/catalog.generated.ts`, both
   regenerated rather than edited (`docs/protocol/catalog.md`).
 
-The server deploys first. An old server rejects batches carrying new line
-types with a 400; the client never retries 4xx and leaves its anchors in
+The header's `schemaVersion` (and `X-Puls-Protocol`) moves only for a change
+a v1 receiver written from the spec would reject, such as a new sample kind or
+line type; new optional fields, type identifiers and read endpoints keep it.
+The server deploys first: an old server rejects batches carrying new line
+types with a 400, and the client never retries 4xx and leaves its anchors in
 place, so nothing is lost, but syncing stalls until the server is updated.
-Until the protocol is versioned (see the plan), keep changes additive and
-keep the server tolerant of old clients.
 
 **Schema changes are new files; applied files are immutable.** The Compose
 `migrate` service applies `server/db/migrations/` in order on every
@@ -227,11 +239,15 @@ order they must ship in.
   `SyncStateStore`, and `SyncEventLog` are actors and views reach them through
   the `@MainActor` `AppModel`. Gate new OS features with `#available` the way
   existing code does (iOS 18 for State of Mind and effort scores, iOS 26 for
-  medication doses and `BGContinuedProcessingTask`). Only construct aggregate
+  medication doses and `BGContinuedProcessingTask`); an API only in the iOS 27
+  SDK also needs `#if compiler(>=6.4)`, because CI still builds with Xcode
+  26.5. Only construct aggregate
   queries from `HealthTypeCatalog.allowedAggregateFunctions(for:)`; illegal
   combinations crash inside HealthKit.
-- **Go:** `gofmt`, `go vet`, and the race detector clean. The servers use only
-  the standard library plus `pgx`; think twice before adding a dependency.
+- **Go:** `gofmt`, `go vet`, and the race detector clean. Dependencies are
+  few and deliberate — `pgx` for the servers, `go-qrcode` in ingest, the MCP
+  SDK in `server/mcp`, a JSON Schema validator in `tools/protocol-check` — so
+  think twice before adding one.
 - **TypeScript:** `eslint` with zero warnings and `tsc --noEmit` clean.
 - **Shell:** `shellcheck` clean, `set -euo pipefail`.
 - **SQL:** idempotent DDL, and predicates on compressed hypertables must

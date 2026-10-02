@@ -1,4 +1,4 @@
-identifier: "HKCategoryTypeIdentifierHandwashing"
+identifier: "HKCategoryTypeIdentifierHandwashingEvent"
 source: "HealthKit"
 type: "HKCategoryType"
 category: "Other"
@@ -40,7 +40,7 @@ primary_source: "Apple Watch"
 description: |
   ## Overview
 
-  HKCategoryTypeIdentifierHandwashing tracks handwashing events, introduced during the COVID-19 pandemic
+  HKCategoryTypeIdentifierHandwashingEvent tracks handwashing events, introduced during the COVID-19 pandemic
   as part of Apple's public health features. Apple Watch Series 4 and later can automatically detect
   handwashing using a combination of motion sensors (detecting scrubbing movements) and the microphone
   (detecting water sounds). The watch provides real-time feedback with a 20-second countdown timer to
@@ -111,12 +111,12 @@ metadata_keys:
   - key: "HKMetadataKeySyncVersion"
     description: "Version number for sync conflict resolution"
 related_types:
-  - identifier: "HKCategoryTypeIdentifierToothbrushing"
+  - identifier: "HKCategoryTypeIdentifierToothbrushingEvent"
     relationship: "related_hygiene_behavior"
   - identifier: "HKQuantityTypeIdentifierAppleExerciseTime"
     relationship: "same_device_source"
 references:
-  - title: "Apple Developer Documentation - HKCategoryTypeIdentifierHandwashing"
+  - title: "Apple Developer Documentation - HKCategoryTypeIdentifierHandwashingEvent"
     url: "https://developer.apple.com/documentation/healthkit/hkcategorytypeidentifierhandwashing"
     type: "official"
   - title: "Apple Support - Use handwashing timer on Apple Watch"

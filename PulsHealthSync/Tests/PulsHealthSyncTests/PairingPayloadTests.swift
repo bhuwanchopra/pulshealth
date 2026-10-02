@@ -82,6 +82,64 @@ import Testing
         #expect(try failure("   ") == .notAPairingCode)
     }
 
+    // MARK: - Pasted and linked payloads
+
+    /// A paste comes with whatever surrounded the payload in the terminal.
+    @Test func toleratesSurroundingWhitespaceAndNewlines() throws {
+        let payload = try success("\n  \tpuls://pair?url=https://puls.example.test&token=t&user=\(user)  \r\n")
+        #expect(payload.serverURL == URL(string: "https://puls.example.test"))
+        #expect(payload.token == "t")
+    }
+
+    /// Mail clients wrap links in angle brackets; chat messages and READMEs
+    /// quote or back-tick them.
+    @Test func unwrapsBracketsAndQuotes() throws {
+        let bare = "puls://pair?url=https://puls.example.test&token=t0k&user=\(user)"
+        for wrapped in ["<\(bare)>", "\"\(bare)\"", "'\(bare)'", "`\(bare)`", "“\(bare)”", "(\(bare))"] {
+            let payload = try success(wrapped)
+            #expect(payload.token == "t0k", "token must not keep a wrapper: \(wrapped)")
+            #expect(payload.userID == user, "user must not keep a wrapper: \(wrapped)")
+        }
+    }
+
+    /// Copying the whole block `bootstrap.sh` prints, label and all.
+    @Test func findsThePayloadInsideThePairingBlock() throws {
+        let block = """
+             Pairing payload (what the QR code encodes):
+             puls://pair?url=https%3A%2F%2Fpuls.example.test%3A8443&token=s3cr3t&user=\(user)
+
+             Later: make pairing re-prints this block.
+            """
+        let payload = try success(block)
+        #expect(payload.serverURL == URL(string: "https://puls.example.test:8443"))
+        #expect(payload.token == "s3cr3t")
+        #expect(payload.userID == user)
+    }
+
+    /// `URL.absoluteString` of an opened link, scheme in whatever case the
+    /// sender used.
+    @Test func acceptsAnUppercaseSchemeAnywhereItIsFound() throws {
+        #expect(try success("Payload: PULS://pair?url=https://puls.example.test&token=t&user=\(user)").token == "t")
+    }
+
+    /// The payload has to stand on its own. One smuggled into another URL's
+    /// query string is that URL's business, not a pairing code.
+    @Test func ignoresAPayloadBuriedInAnotherURL() throws {
+        #expect(
+            try failure("https://example.test/?next=puls://pair?url=https://puls.example.test&token=t&user=\(user)")
+                == .notAPairingCode)
+        #expect(try failure("xpuls://pair?url=https://puls.example.test&token=t&user=\(user)") == .notAPairingCode)
+    }
+
+    /// Tolerance is about the wrapping only — every field is still re-validated.
+    @Test func aWrappedPayloadIsStillValidated() throws {
+        #expect(
+            try failure("<puls://pair?url=http%3A%2F%2Fpuls.example.test&token=t&user=\(user)>")
+                == .invalidServerURL(.insecureRemoteHost("puls.example.test")))
+        #expect(try failure("  puls://pair?url=https://puls.example.test&token=t&user=me\n") == .invalidUserID)
+        #expect(try failure("puls://elsewhere?url=https://puls.example.test&token=t&user=\(user)") == .notAPairingCode)
+    }
+
     @Test func rejectsABadUserID() throws {
         #expect(try failure("puls://pair?url=https://puls.example.test&token=t&user=me") == .invalidUserID)
         #expect(

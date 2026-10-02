@@ -158,7 +158,8 @@ const descGetDailyMetrics = `One value per local calendar day for each requested
 	`between iPhone and Apple Watch — and otherwise from a single-source rollup, so it never double counts the way a naive sum of raw ` +
 	`samples does. Values are in the type's canonical unit ("%" is a fraction). Days without data are omitted, not zero. ` +
 	`Only quantity types the phone aggregates daily appear here (list_available_types shows aggregate_rows > 0); for sleep use ` +
-	`get_sleep, which knows about nights and stages. Weekly or monthly figures: fetch the days and add or average them yourself. ` + descUserSuffix
+	`get_sleep, which knows about nights and stages. The whole range comes back in one answer (the tool follows the API's pages ` +
+	`itself). Weekly or monthly figures: fetch the days and add or average them yourself. ` + descUserSuffix
 
 const descGetActivityRings = `Apple Watch Activity rings for each local calendar day in an inclusive date range (start_date and ` +
 	`end_date as YYYY-MM-DD in the server's time zone; equal for a single day; at most 366 days per call): move_kcal against ` +

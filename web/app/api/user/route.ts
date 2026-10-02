@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { UUID_RE } from "@/lib/config";
+import { viewerMode } from "@/lib/mode";
 import { getDataSource, getUsers } from "@/lib/queries";
 import { safeReturnPath, USER_COOKIE, userCookieOptions } from "@/lib/viewer";
 
@@ -18,6 +19,9 @@ import { safeReturnPath, USER_COOKIE, userCookieOptions } from "@/lib/viewer";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  // Accounts mode has no switcher: the session decides the user, and this
+  // route does not exist.
+  if (viewerMode() === "accounts") return new NextResponse("Not found\n", { status: 404, headers: TEXT });
   const form = await request.formData();
   const user = String(form.get("user") ?? "").trim().toLowerCase();
   const next = safeReturnPath(String(form.get("next") ?? ""));

@@ -74,6 +74,15 @@ jobs:
           npm test
           npm run build
 
+      - name: Check the app's bundled knowledge base
+        # PulsHealth/Sources/Resources/knowledge.json is rendered from
+        # knowledge-base/**/*.yaml by scripts/gen-knowledge-json.py and
+        # checked in (the app has no YAML parser). Fails when the YAML or
+        # the generator changed without the JSON being regenerated.
+        run: |
+          python3 -m pip install --quiet pyyaml
+          scripts/check-knowledge-json.sh
+
       - name: Validate Compose, workflows and shell scripts
         env:
           # Validation-only placeholders: `docker compose config` refuses to
@@ -90,11 +99,12 @@ jobs:
         run: |
           # Every way the stack is run: pulling the published images, the
           # developer overlay that builds them from the checkout, and the
-          # opt-in `backup` profile (which a plain `up -d` never starts, so
-          # nothing else would render it).
+          # opt-in `backup` and `tunnel` profiles (which a plain `up -d` never
+          # starts, so nothing else would render them).
           docker compose -f server/docker-compose.yml config --quiet
           docker compose -f server/docker-compose.yml -f server/compose.build.yml config --quiet
           docker compose -f server/docker-compose.yml --profile backup config --quiet
+          docker compose -f server/docker-compose.yml --profile tunnel config --quiet
           scripts=(server/db/migrate.sh server/db/migrations/*.sh server/backup/*.sh scripts/*.sh)
           for script in "${scripts[@]}"; do
             bash -n "$script"
@@ -136,7 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           # site/ reads knowledge-base/, blog/ and the documentation manifest's
-          # five markdown files as repository-root siblings, by relative path
+          # markdown files as repository-root siblings, by relative path
           # (src/lib/api.ts, src/lib/blog.ts, src/lib/docs.ts). Break that and
           # the loaders log and return nothing: the build still SUCCEEDS, it
           # just exports far fewer pages. So assert the counts.
@@ -157,6 +167,10 @@ jobs:
           test -f site/out/index.html
           test -f site/out/docs/index.html
           test -f site/out/sitemap.xml
+          # llms.txt is rendered from the repository root's llms.txt by
+          # site/scripts/gen-llms-txt.ts (prebuild), never copied by hand.
+          test -f site/out/llms.txt
+          grep -q 'https://pulshealth.com/docs/protocol/' site/out/llms.txt
 
   # The four app images build for linux/amd64 (no push) so a broken
   # Dockerfile fails a pull request instead of the next release. Same
@@ -183,10 +197,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build ${{ matrix.image }} (linux/amd64, not pushed)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           platforms: linux/amd64
@@ -271,7 +285,8 @@ jobs:
               -v "${MIGRATIONS_SRC:-$PWD/server/db/migrations}:/puls/migrations:ro" \
               -e PGHOST=puls-ci-db -e PGPASSWORD=ci-secret -e MIGRATIONS_DIR=/puls/migrations \
               -e GRAFANA_DB_PASSWORD=ci-grafana -e API_DB_PASSWORD=ci-api \
-              -e INGEST_DB_PASSWORD=ci-ingest -e PULS_TIME_ZONE=Europe/Berlin \
+              -e INGEST_DB_PASSWORD=ci-ingest -e WEB_DB_PASSWORD=ci-web \
+              -e PULS_TIME_ZONE=Europe/Berlin \
               --entrypoint bash "$DB_IMAGE" /puls/migrate.sh "$@"
           }
           sql() {
@@ -320,6 +335,10 @@ jobs:
           sql 'SELECT count(*) FROM metric_daily'
           test "$(sql 'SELECT count(*) FROM category_labels')" -gt 0
           test "$(sql "SELECT string_agg(rolname, ',' ORDER BY rolname) FROM pg_roles WHERE rolname IN ('grafana','api_reader','ingest')")" = "api_reader,grafana,ingest"
+          # The web viewer's accounts-mode role (WEB_DB_PASSWORD), with the
+          # per-user views first on its search_path; its isolation is proven
+          # by web/lib/webapp.integration.test.ts in db-integration.
+          test "$(sql "SELECT rolcanlogin::text || ' ' || array_to_string(rolconfig, ';') FROM pg_roles WHERE rolname = 'web_app'")" = "true search_path=web, public"
           echo "::endgroup::"
 
       - name: Remove the throwaway database
@@ -336,7 +355,8 @@ jobs:
   # TimescaleDB's decompression limit and stalls sync). The schema is applied
   # by server/db/migrate.sh against the pinned TimescaleDB, the same path a
   # self-hoster takes, and each suite connects as the scoped role it uses in
-  # production — `ingest` writes, `api_reader` reads — with ADMIN_DATABASE_URL
+  # production — `ingest` writes, `api_reader` reads, `web_app` reads one
+  # user at a time — with ADMIN_DATABASE_URL
   # for the few steps those roles are deliberately not allowed to perform
   # (applying DDL, compress_chunk, inserting fixtures). Running the suites as
   # the superuser instead would pass while a real deployment 500s on a
@@ -397,7 +417,8 @@ jobs:
             -v "$PWD/server/db/migrations:/puls/migrations:ro" \
             -e PGHOST=puls-integration-db -e PGPASSWORD=ci-secret -e MIGRATIONS_DIR=/puls/migrations \
             -e GRAFANA_DB_PASSWORD=ci-grafana -e API_DB_PASSWORD=ci-api \
-            -e INGEST_DB_PASSWORD=ci-ingest -e PULS_TIME_ZONE="$PULS_TIME_ZONE" \
+            -e INGEST_DB_PASSWORD=ci-ingest -e WEB_DB_PASSWORD=ci-web \
+            -e PULS_TIME_ZONE="$PULS_TIME_ZONE" \
             --entrypoint bash "$DB_IMAGE" /puls/migrate.sh
 
       - name: Ingest, as the scoped `ingest` role
@@ -415,6 +436,34 @@ jobs:
           # the grants under test are the ones production uses.
           PULS_API_WRITE_INTEGRATION_TESTS: "1"
         run: go test -race -count=1 -run Integration ./...
+
+      # The web viewer's accounts mode reads through the web_app role, which
+      # may see health data only through the per-user views in schema `web`
+      # (015_web_accounts.sql). The test seeds two users as the superuser —
+      # compressing the old half of each hypertable — and proves, as web_app,
+      # that a transaction scoped to one user reads only that user's rows,
+      # an unscoped one reads nothing, and nothing beneath the views is
+      # reachable. accounts.integration.test.ts then drives accounts mode
+      # through the viewer's own route handlers and proxy: invite, sign-in,
+      # a scoped read, password change, sign-out, throttling. Last of the
+      # suites on this database, so their fixtures cannot disturb the Go
+      # tests' counts.
+      - name: Set up Node for the web viewer
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Web viewer, as the per-user `web_app` role
+        working-directory: web
+        env:
+          WEB_APP_DATABASE_URL: postgres://web_app:ci-web@127.0.0.1:55432/postgres
+          # The test throws instead of skipping when this is set without both URLs.
+          PULS_WEB_INTEGRATION: "1"
+        run: |
+          npm ci
+          npx vitest run lib/webapp.integration.test.ts lib/accounts.integration.test.ts
 
       # The exploration notebook, executed end to end against a seeded schema.
       # The test brings up its own throwaway TimescaleDB (the same pinned

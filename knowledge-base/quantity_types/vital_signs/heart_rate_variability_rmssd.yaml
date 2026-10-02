@@ -1,0 +1,290 @@
+# ============================================
+# HEALTHKIT DATA TYPE: Heart Rate Variability RMSSD
+# ============================================
+
+# --- CORE IDENTIFICATION ---
+identifier: "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD"
+source: "HealthKit"
+type: "HKQuantityType"
+category: "Vital Signs"
+human_readable_name: "Heart Rate Variability (RMSSD)"
+short_description: "Measures the root mean square of successive differences between normal heartbeat intervals (RMSSD), a short-term heart rate variability metric that mainly reflects vagal (parasympathetic) activity; the Health app calls it Recovery HRV."
+
+# --- APPLE HEALTH UI ---
+icon: "waveform.path.ecg"
+color: "#FF2D55"
+
+# --- UNITS & MEASUREMENT ---
+default_unit: "ms"
+supported_units:
+  - "ms"
+  - "s"
+unit_description: "Milliseconds - the root mean square of the differences between successive normal-to-normal (NN) heartbeat intervals"
+
+# --- STATISTICS ---
+aggregation_type: "discrete"
+statistics_options:
+  - "discreteAverage"
+  - "discreteMin"
+  - "discreteMax"
+  - "separateBySource"
+  - "mostRecent"
+
+# --- TYPICAL VALUES ---
+typical_range:
+  min: 10
+  max: 100
+  unit: "ms"
+  notes: "Covers most healthy adults at rest in short recordings: 5-minute resting means fall from about 40 ms at 25-34 to about 19 ms at 65-74 (Voss 2015), and pooled studies report a mean of 42 ms (Nunan 2010). Higher values are common in young and endurance-trained people. Values depend heavily on age, posture, time of day and breathing, so compare against the person's own baseline."
+
+clinical_ranges:
+  - population: "Healthy adults, short-term resting recordings (pooled literature)"
+    normal: "42 ± 15 ms (mean ± SD); individual study means 19-75 ms"
+    description: "Nunan et al. 2010 systematic review (15 studies reporting RMSSD), as tabulated by Shaffer & Ginsberg 2017. Short-term values in the literature were lower than the 1996 Task Force norms."
+  - population: "Adults 25-34 (5-min supine ECG, population sample)"
+    normal: "Women 42.9 ± 22.8 ms; men 39.7 ± 19.9 ms"
+    description: "Voss et al. 2015, KORA S4 cohort (1,906 healthy adults), mean ± SD"
+  - population: "Adults 35-44 (5-min supine ECG)"
+    normal: "Women 35.4 ± 18.5 ms; men 32.0 ± 16.5 ms"
+    description: "Voss et al. 2015, mean ± SD"
+  - population: "Adults 45-54 (5-min supine ECG)"
+    normal: "Women 26.3 ± 13.6 ms; men 23.0 ± 10.9 ms"
+    description: "Voss et al. 2015, mean ± SD"
+  - population: "Adults 55-64 (5-min supine ECG)"
+    normal: "Women 21.4 ± 11.9 ms; men 19.9 ± 11.1 ms"
+    description: "Voss et al. 2015, mean ± SD"
+  - population: "Adults 65-74 (5-min supine ECG)"
+    normal: "Women 19.1 ± 11.8 ms; men 19.1 ± 10.7 ms"
+    description: "Voss et al. 2015, mean ± SD. Women and men did not differ significantly in any age decade."
+  - population: "Adults, 24-hour Holter recording (clinical reference)"
+    normal: "27 ± 12 ms"
+    description: "1996 ESC/NASPE Task Force normal value. A 24-hour figure is not comparable with short-term or overnight wearable readings."
+
+# --- PLATFORM & AVAILABILITY ---
+ios_introduced:
+  version: "27.0"
+  year: 2026
+  notes: "New in the iOS 27 SDK (also iPadOS, macOS, Mac Catalyst and visionOS 27.0). Before iOS 27, SDNN was HealthKit's only heart rate variability type."
+watchos_introduced:
+  version: "27.0"
+  year: 2026
+  notes: "Recorded by Apple Watch Series 12 and Apple Watch Ultra 4 running watchOS 27"
+deprecated: false
+deprecated_in: null
+
+# --- PERMISSIONS & ACCESS ---
+writable: true
+requires_authorization: true
+sensitive_data: false
+
+# --- DATA SOURCES ---
+devices:
+  - name: "Apple Watch"
+    capability: "Apple Watch Series 12 and Ultra 4 record Recovery HRV with their new Health Sensing System. Apple says these models measure HRV as often as every five minutes, about 24 times more often than earlier models, and that overnight Vitals compares Recovery HRV with a personal baseline. Apple has not published the window length behind each sample, how beats are detected and cleaned, or when a reading is skipped."
+    series: "Series 12 and Ultra 4 (watchOS 27)"
+    accuracy: "Apple has published no validation data for this type. Wrist-worn HRV is usually derived from optical (PPG) pulse intervals. Pulse rate variability matches ECG well at rest, but it tends to overestimate short-term variability somewhat, and agreement worsens with movement (Schäfer & Vagedes 2013)."
+  - name: "iPhone"
+    capability: "Displays Recovery HRV but cannot measure it without an external sensor"
+  - name: "Chest strap heart rate monitors"
+    capability: "ECG-based straps give the most accurate RR intervals. An iPhone app that reads them can compute RMSSD and, on iOS 27 or later, write it to this type."
+    examples: ["Polar H10", "Garmin HRM-Pro", "Wahoo TICKR X"]
+  - name: "Third-party wearables and apps"
+    capability: "Many recovery-focused wearables already report RMSSD-based HRV. On iOS 27 or later, their companion apps can write it to this type instead of, or as well as, SDNN. Whether a given app does so is up to that app."
+    examples: ["Oura Ring", "WHOOP", "Garmin"]
+primary_source: "Apple Watch"
+
+# --- DETAILED DESCRIPTION ---
+description: |
+  ## Overview
+  Heart rate variability (HRV) is the beat-to-beat variation in the time between heartbeats. RMSSD, the root mean square of successive differences, is the standard time-domain measure of its short-term, high-frequency component. That component is driven mainly by the vagus nerve (parasympathetic, "rest and digest") and by breathing (respiratory sinus arrhythmia). Shaffer & Ginsberg (2017) call RMSSD "the primary time-domain measure used to estimate the vagally mediated changes reflected in HRV". It is also the HRV measure most recovery-focused wearables report.
+
+  HealthKit added this type in iOS 27. Until then, SDNN (`HKQuantityTypeIdentifierHeartRateVariabilitySDNN`) was the only HRV type. The Health app calls this one **Recovery HRV**. In HealthKit's own iOS 27 description it is the variation between heartbeats measured "using the RMSSD formula", which is "commonly used to monitor day-to-day recovery and, when combined with other information, estimate readiness". In the same strings, SDNN is described as the overall variation between heartbeats, "better for understanding your underlying, long-term health". Apple's watchOS 27 announcements present the pair as Recovery HRV (daily signals of stress and recovery) and overall HRV (broader health, including cardiovascular health).
+
+  ## How It's Measured
+
+  **The calculation:**
+  - Start from normal-to-normal (NN) intervals: the times between consecutive normal beats, with ectopic beats and artifacts removed
+  - Take each successive difference: NN(i+1) − NN(i)
+  - Square the differences, average them, and take the square root: RMSSD = √( Σ (NN(i+1) − NN(i))² / (N − 1) )
+  - Because it uses only adjacent beats, slow trends in heart rate (posture changes, circadian rhythm, activity) largely cancel out. What remains is fast, beat-to-beat modulation.
+  - It carries the same information as the Poincaré-plot measure SD1 (SD1 ≈ RMSSD/√2)
+
+  **Why short windows are enough (unlike SDNN):**
+  - SDNN measures all variability in a recording, so it grows as the window lengthens and takes in slower rhythms. Short-term and 24-hour SDNN are not comparable.
+  - RMSSD reaches a stable value quickly. In 3,387 adults, a single 10-second recording gave a valid RMSSD; 120 s agreed almost perfectly with 4-5 minutes; and RMSSD beat SDNN at every recording length (Munoz et al. 2015).
+  - In a pulse-sensor (PPG) study of 467 people, about 30 s was needed to estimate 5-minute RMSSD, versus about 240 s for SDNN (Baek et al. 2015, as reviewed by Shaffer & Ginsberg 2017)
+  - This is what makes frequent, short wrist measurements practical for RMSSD
+
+  **Apple Watch measurement (what Apple has and hasn't said):**
+  - Recorded by Apple Watch Series 12 and Ultra 4 on watchOS 27. Apple says the feature needs these models, so there is no Apple Watch Recovery HRV history from before watchOS 27.
+  - Apple says HRV is measured "as often as every five minutes", 24 times more often than before. Results appear in a new section of the Heart Rate app and in Vitals, which now has a daytime view.
+  - Overnight Vitals analyses Recovery HRV against the user's personal baseline
+  - **Not documented:** how many seconds each sample covers, the sensor signal and beat-detection method, artifact handling, motion gating, and whether a five-minute cadence holds through the day or only during sleep and rest. Apple's developer documentation for the identifier is still a bare declaration. Don't assume a fixed number of samples per day.
+  - Apple's own Health description says measuring during sleep "tends to more accurately reflect the level of strain on your body because you're not active"
+
+  ## RMSSD vs. SDNN
+
+  | | RMSSD (this type) | SDNN |
+  |---|---|---|
+  | Health app name (iOS 27) | Recovery HRV | Heart Rate Variability |
+  | Measures | Beat-to-beat (short-term) variability | Total variability over the recording |
+  | Main physiological driver | Vagal (parasympathetic) activity, breathing | Both autonomic branches plus slower rhythms |
+  | Sensitivity to window length | Low: valid from very short recordings | High: values grow with recording length |
+  | Typical use | Day-to-day recovery, stress, readiness | Long-term health, clinical risk (24-hour SDNN) |
+  | HealthKit availability | iOS 27 / watchOS 27 | iOS 11 / watchOS 4 |
+
+  The two are correlated but **not interchangeable**, and they have different scales. A short-term RMSSD is usually smaller than an SDNN taken over the same window. Never chart them on one axis or substitute one for the other in a trend.
+
+  ## Health Significance
+  - **Vagal activity:** RMSSD is more influenced by the parasympathetic system than SDNN is (Shaffer & Ginsberg 2017). Higher resting values generally mean stronger vagal modulation of the heart.
+  - **Stress and recovery:** Acute stressors such as hard training, poor or short sleep, alcohol, illness or psychological stress typically lower it. Apple puts it this way: higher Recovery HRV "usually means your body is more adaptable and ready to respond", while lower values can mean the body "is under stress or tired".
+  - **Training monitoring:** Athlete-monitoring research tracks the natural log of RMSSD (lnRMSSD) with averaging over several days rather than single readings, and reads the trend against the athlete's own history (Plews et al. 2013)
+  - **Ageing:** RMSSD falls steeply through early and middle adulthood. In 24-hour recordings it dropped to about 47% of its second-decade value by the sixth decade, then levelled off (Umetani et al. 1998). Some studies see it rise again after about 70 (Almeida-Santos et al., via Shaffer & Ginsberg 2017).
+  - **Clinical risk:** The 1996 Task Force's risk-stratification evidence centres on 24-hour measures of overall HRV, such as SDNN and the HRV triangular index. Wrist-measured RMSSD is a wellness and trend metric, not a diagnostic test.
+
+  ## Clinical Interpretation Guidelines
+
+  ### Normal Values
+  Values depend on:
+  1. Age (see the clinical ranges above)
+  2. Measurement conditions: sleep, lying, sitting or standing; paced or free breathing
+  3. Time of day (overnight values usually differ from daytime ones)
+  4. Heart rate: slower heart rates leave more room for intervals to vary ("cycle-length dependence")
+  5. Fitness and training state
+
+  **Reference points:**
+  - Short-term resting recordings in healthy adults: 42 ± 15 ms pooled across studies (Nunan et al. 2010)
+  - By decade in a population sample (Voss et al. 2015): about 40-43 ms at 25-34, about 32-35 ms at 35-44, about 23-26 ms at 45-54, about 20-21 ms at 55-64, about 19 ms at 65-74. The spread within each decade is large (SD 11-23 ms).
+  - 24-hour Holter: 27 ± 12 ms (Task Force 1996). This is not comparable with wearable readings.
+  - None of these were measured with an Apple Watch. Apple publishes no population norms for Recovery HRV and judges it against the user's own baseline instead.
+
+  ### Lower Values (Reduced RMSSD) May Reflect
+  **Acute or transient:**
+  - Short or poor-quality sleep
+  - Alcohol, especially in the evening
+  - Acute illness or fever
+  - Heavy or unaccustomed training load
+  - Psychological stress
+  - Travel to high altitude
+
+  **Chronic:**
+  - Normal ageing
+  - Low cardiorespiratory fitness
+  - Conditions associated with reduced vagal HRV, such as diabetes with autonomic neuropathy, heart failure and other cardiovascular disease
+  - Some medications (Apple notes that certain medications can affect it)
+
+  ### Higher Values (Elevated RMSSD) Generally Indicate
+  - Good recovery and parasympathetic predominance at rest
+  - Aerobic fitness (often higher in endurance-trained people)
+  - **Caution:** A sudden jump, or a very high value with an irregular rhythm, can be a measurement or rhythm problem rather than good news. Ectopic beats and arrhythmias create large successive differences and inflate RMSSD.
+
+  ### Red Flags for Consultation
+  - A sustained fall from personal baseline over several days together with a rising resting heart rate, fever or new symptoms
+  - Persistently low values with symptoms that suggest autonomic dysfunction, such as lightheadedness on standing, fainting or exercise intolerance
+  - Erratic or unusually high values together with Irregular Rhythm notifications, AFib History, or palpitations. The rhythm needs evaluating, and RMSSD cannot be read as vagal activity until it is.
+  - A downward trend over weeks or months that lifestyle factors don't explain
+
+  ## Caveats & Limitations
+
+  ### Measurement Limitations
+  - **Artifacts and ectopic beats:** Successive differences amplify single mis-detected or premature beats. Even two artifacts in a 5-minute segment can significantly distort RMSSD (Shaffer & Ginsberg 2017).
+  - **Optical sensing:** Pulse intervals from PPG are not ECG RR intervals. At rest the agreement is generally adequate, though short-term variability tends to be somewhat overestimated, and movement degrades it (Schäfer & Vagedes 2013).
+  - **Breathing:** Changes in breathing rate and depth can change RMSSD without changing vagal tone (Shaffer & Ginsberg 2017)
+  - **Undocumented algorithm:** Apple has not published how each sample is computed, so values may not match RMSSD computed by another device, or from raw beat-to-beat data, over the same period
+  - **No back-history:** Apple Watch samples start with watchOS 27 on Series 12 and Ultra 4. Existing SDNN history cannot be converted to RMSSD. Where an app has beat-to-beat heartbeat series samples (HKHeartbeatSeriesSample), it can compute RMSSD from them directly.
+
+  ### Interpretation Caveats
+  - **Personal baseline first:** The spread between healthy people is wide, so one person's value means more against their own history than against a population norm
+  - **Overnight and daytime are different measurements:** Daytime samples carry posture, activity, caffeine and mental load. Don't average them with overnight readings and call the result a recovery score.
+  - **Skewed distribution:** RMSSD is right-skewed. Research usually analyses ln(RMSSD), and percentage changes are easier to compare than raw milliseconds.
+  - **Older adults:** In Umetani et al. (1998), 12% of healthy people over 65 had 24-hour rMSSD below published mortality-risk cut-points, so a low value alone is not diagnostic
+
+  ### What RMSSD Cannot Tell You
+  - A diagnosis of any specific disease
+  - Whether a rhythm is normal (it assumes one)
+  - Sympathetic ("fight or flight") activity: RMSSD mainly indexes the parasympathetic side
+  - Blood pressure, glucose or structural heart disease
+
+  ## Additional Notes
+
+  **For health consultants and coaches:**
+  - Track a rolling multi-day average (often 7 days) of overnight values against the person's own baseline, not single readings
+  - A drop that persists for several days, together with a higher resting heart rate, is a more useful signal than one low night
+  - Expect values to fall with age; compare people only with themselves
+
+  **For developers:**
+  - The identifier exists only in the iOS 27 SDK. Gate it with `#available(iOS 27, watchOS 27, *)`. If you also build with an older Xcode, guard the symbol at compile time too, or spell the identifier string out.
+  - Discrete (arithmetic) aggregation, in ms. Daily statistics average every sample, so a full-day mean mixes sleep and waking readings. For recovery use, restrict queries to the sleep window.
+  - Third-party apps can write this type, so filter by source when you need Apple Watch readings only (`separateBySource`)
+  - Keep it separate from SDNN in storage, charts and analysis
+
+  **Comparing devices:**
+  - Oura, WHOOP, Garmin and other RMSSD-based devices use different windows (for example whole-night averages versus short readings), so their numbers are not directly comparable with Apple Watch Recovery HRV or with each other
+  - Compare values from the same device over time
+
+# --- METADATA KEYS ---
+metadata_keys: null
+
+# --- RELATED TYPES ---
+related_types:
+  - identifier: "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+    relationship: "Sibling HRV type: SDNN measures overall variability; RMSSD measures beat-to-beat, vagally driven variability and stays stable over short windows. Apple Watch Series 12 and Ultra 4 record both; they are not interchangeable."
+  - identifier: "HKQuantityTypeIdentifierHeartRate"
+    relationship: "Source signal: RMSSD is computed from the intervals between beats, and slower heart rates allow more variation (cycle-length dependence)"
+  - identifier: "HKQuantityTypeIdentifierRestingHeartRate"
+    relationship: "Correlated: both track parasympathetic tone. A falling RMSSD alongside a rising resting heart rate is a common sign of strain or illness."
+  - identifier: "HKQuantityTypeIdentifierRespiratoryRate"
+    relationship: "Influence factor: breathing rate and depth change RMSSD without necessarily changing vagal tone"
+  - identifier: "HKCategoryTypeIdentifierSleepAnalysis"
+    relationship: "Context: overnight Vitals compares Recovery HRV taken during sleep with a personal baseline; sleep quality and alcohol affect it"
+  - identifier: "HKQuantityTypeIdentifierAppleSleepingWristTemperature"
+    relationship: "Companion overnight vital: Vitals reviews it alongside Recovery HRV, respiratory rate and sleeping heart rate"
+  - identifier: "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute"
+    relationship: "Complementary: heart rate recovery after exercise also reflects parasympathetic reactivation"
+
+# --- REFERENCES ---
+references:
+  - title: "Apple Developer Documentation - heartRateVariabilityRMSSD"
+    url: "https://developer.apple.com/documentation/healthkit/hkquantitytypeidentifier/heartratevariabilityrmssd"
+    type: "official"
+  - title: "Apple advances health and fitness capabilities using Apple Intelligence - Apple Newsroom (September 9, 2026)"
+    url: "https://www.apple.com/newsroom/2026/09/apple-advances-health-and-fitness-capabilities-using-apple-intelligence/"
+    type: "official"
+  - title: "Apple Watch Recovery HRV and Overall HRV are not the same thing - Gadgets & Wearables (September 11, 2026)"
+    url: "https://gadgetsandwearables.com/2026/09/11/apple-watch-recovery-hrv-overall-hrv-rmssd/"
+    type: "tutorial"
+  - title: "Heart Rate Variability: Standards of Measurement, Physiological Interpretation, and Clinical Use - Task Force of the ESC and NASPE, Circulation (1996)"
+    url: "https://www.ahajournals.org/doi/10.1161/01.cir.93.5.1043"
+    type: "research"
+  - title: "An Overview of Heart Rate Variability Metrics and Norms - Shaffer & Ginsberg, Frontiers in Public Health (2017)"
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5624990/"
+    type: "research"
+  - title: "A quantitative systematic review of normal values for short-term heart rate variability in healthy adults - Nunan et al., PACE (2010)"
+    url: "https://pubmed.ncbi.nlm.nih.gov/20663071/"
+    type: "research"
+  - title: "Short-Term Heart Rate Variability - Influence of Gender and Age in Healthy Subjects - Voss et al., PLoS ONE (2015)"
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC4378923/"
+    type: "research"
+  - title: "Validity of (Ultra-)Short Recordings for Heart Rate Variability Measurements - Munoz et al., PLoS ONE (2015)"
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC4586373/"
+    type: "research"
+  - title: "Twenty-four hour time domain heart rate variability and heart rate: relations to age and gender over nine decades - Umetani et al., JACC (1998)"
+    url: "https://pubmed.ncbi.nlm.nih.gov/9502641/"
+    type: "research"
+  - title: "How accurate is pulse rate variability as an estimate of heart rate variability? - Schäfer & Vagedes, International Journal of Cardiology (2013)"
+    url: "https://pubmed.ncbi.nlm.nih.gov/22809539/"
+    type: "research"
+  - title: "Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring - Plews et al., Sports Medicine (2013)"
+    url: "https://pubmed.ncbi.nlm.nih.gov/23852425/"
+    type: "research"
+
+# --- KNOWLEDGE BASE METADATA ---
+last_updated: "2026-10-02"
+research_notes: |
+  - Availability: Apple's documentation JSON lists iOS, iPadOS, Mac Catalyst, macOS, visionOS and watchOS 27.0. The Xcode 27 SDK header (HKTypeIdentifiers.h) declares API_AVAILABLE(ios(27.0), watchos(27.0), macCatalyst(27.0), macos(27.0), visionos(27.0)) with the comment "ms, Discrete (Arithmetic)". As of 2026-10-02 the documentation page is a bare declaration with no discussion.
+  - Verified on the iOS 27.0 simulator runtime (24A434): HKQuantityType(.heartRateVariabilityRMSSD).aggregationStyle is discreteArithmetic, and the type is compatible with ms and s. requestAuthorization(toShare:) passes HealthKit's share-disallowed check for it, while the same check rejects AppleExerciseTime, so third-party apps can write it.
+  - The "Recovery HRV" name and the "using the RMSSD formula" wording come from HealthKit's own English strings in that runtime (Localizable-AllDayHRV.strings: HEART_RATE_VARIABILITY_RMSSD = "Recovery HRV"). The same strings still name SDNN "Heart Rate Variability"; "overall HRV" is Apple's wording in the watchOS 27 announcements. Press coverage (Gadgets & Wearables, 2026-09-11) noted Apple had not confirmed the RMSSD/SDNN mapping in its announcements; HealthKit's strings confirm the RMSSD side.
+  - Device support (Series 12 and Ultra 4) and the "as often as every five minutes ... 24x" cadence come from Apple Newsroom (2026-09-09). Per-sample window length, algorithm, motion gating and daytime cadence are undocumented, and this file deliberately makes no claim about them. Whether older watches on watchOS 27 write any RMSSD samples is also undocumented. Apple says Recovery HRV needs Series 12 or Ultra 4.
+  - Normal values: Nunan 2010 via the table in Shaffer & Ginsberg 2017 (Table 6), Voss 2015 (Tables 3-4, KORA S4, 5-min supine ECG) and the Task Force 1996 24-hour value (27 ± 12 ms). No population norms exist for Apple Watch Recovery HRV. typical_range (10-100 ms) is a display band chosen from these, not a clinical cut-off.
+  - The Health app's exact glyph and tint for Recovery HRV were not verified; icon and color mirror the SDNN entry (Heart category).
+  - Metadata keys attached to Apple Watch RMSSD samples are undocumented, hence null.

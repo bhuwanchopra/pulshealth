@@ -209,6 +209,29 @@ extension HealthSyncEngine {
         let now = Date()
         let budget = config.maxEnrichmentPointsPerBatch
         var state = await store.workoutEnrichmentState(kind)
+        // iOS 27 limited history access: nothing to clamp here — this phase
+        // only follows workouts HealthKit returns, and routes and streams
+        // insert without overwriting — but the workouts older than the
+        // earliest readable date were invisible to it, and its watermark is
+        // past them. A widened grant therefore starts the phase over from
+        // the start date (`ReadableHistory`).
+        let readable = await readableLimit(for: typeID, recorded: state.readableSince)
+        let since = ReadableHistory.effectiveLimit(readable.since, readingFrom: startDay)
+        if readable.isFresh {
+            switch ReadableHistory.change(from: state.readableSince, to: since) {
+            case .widened:
+                await store.resetWorkoutEnrichment(kind)
+                await eventLog.log(
+                    .info, type: typeID,
+                    "Workout \(kind.rawValue): Health access widened — re-reading every workout from the start date")
+                fallthrough
+            case .narrowed:
+                await store.updateWorkoutEnrichment(kind) { $0.readableSince = since }
+                state = await store.workoutEnrichmentState(kind)
+            case .unchanged:
+                break
+            }
+        }
         let fullPassDue = state.computedThrough == nil
             || state.lastFullRecomputeAt.map {
                 now.timeIntervalSince($0) > AggregateSchedule.fullRecomputeInterval
@@ -363,10 +386,18 @@ extension HealthSyncEngine {
     /// anchored one) over `HKWorkoutType`; the enrichment phases re-cover a trailing
     /// window each run for self-heal.
     private func fetchWorkouts(endedAfter: Date) async throws -> [HKWorkout] {
+        var predicates = [
+            HKQuery.predicateForSamples(withStart: endedAfter, end: nil, options: .strictEndDate),
+        ]
+        if let readEnd {
+            // An export's engine: follow only the workouts its raw sweep
+            // exported, which are the ones that started before the bound.
+            predicates.append(
+                HKQuery.predicateForSamples(withStart: nil, end: readEnd, options: .strictStartDate))
+        }
         let predicate = HKSamplePredicate<HKSample>.sample(
             type: HKWorkoutType.workoutType(),
-            predicate: HKQuery.predicateForSamples(
-                withStart: endedAfter, end: nil, options: .strictEndDate)
+            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
         )
         let descriptor = HKSampleQueryDescriptor(
             predicates: [predicate],

@@ -299,7 +299,7 @@ public final class BackgroundSyncScheduler: Sendable {
         let request = BGContinuedProcessingTaskRequest(
             identifier: backfillTaskIdentifier,
             title: "Syncing health history",
-            subtitle: "Uploading to your server"
+            subtitle: "Uploading to your database"
         )
         // .fail (not .queue): the user just tapped the button, so if the system
         // can't run it now we want to fall back to an in-app sync immediately.
@@ -335,10 +335,18 @@ public final class BackgroundSyncScheduler: Sendable {
             while !Task.isCancelled {
                 let statuses = await engine.snapshot()
                 guard !Task.isCancelled else { break }
-                let total = max(1, statuses.count)
-                let done = statuses.filter {
-                    $0.activity != .backfilling && $0.state.anchorData != nil
-                }.count
+                // Two units a type: its recent window, then its whole history.
+                // Counting only the second held the bar at zero through the
+                // recent-window pass that now opens every backfill — minutes on
+                // a heavy account — and a task whose progress stalls is
+                // force-expired.
+                let total = 2 * max(1, statuses.count)
+                let done = statuses.reduce(0) { units, status in
+                    let swept = status.activity != .backfilling && status.state.anchorData != nil
+                    let recent = swept || status.state.backfillComplete
+                        || status.state.recentAnchorData != nil
+                    return units + (recent ? 1 : 0) + (swept ? 1 : 0)
+                }
                 let updated = completionGate.performIfUnclaimed {
                     box.task.progress.totalUnitCount = Int64(total)
                     box.task.progress.completedUnitCount = Int64(min(done, total - 1))

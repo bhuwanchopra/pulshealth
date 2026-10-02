@@ -1,5 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
-import { Activity, ArrowRight, BarChart3, Bot, Database, Dumbbell, Ear, FileJson, FileSpreadsheet, Footprints, Gauge, Heart, History, Lock, Moon, QrCode, RefreshCw, Scale, Server, Terminal, Utensils, Wind } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Bot, Compass, Database, Dumbbell, Ear, FileJson, FileSpreadsheet, Footprints, Gauge, Heart, History, Lock, Moon, QrCode, RefreshCw, Scale, Share2, Terminal, Utensils, Wind } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +12,37 @@ import { getCatalog, getCatalogByGroup } from "@/lib/catalog";
 const GITHUB = "https://github.com/PulsHealth/pulshealth";
 
 export const metadata = {
-  title: "PulsHealth for iOS - Apple Health, Synced to Your Own Server",
-  description: "A free, open-source iOS app that reads Apple Health read-only and streams every sample to a backend you run yourself. Full historical backfill, then continuous near-real-time sync. On the App Store, Apache-2.0.",
+  title: "PulsHealth for iOS - Apple Health, Synced to Your Own Database",
+  description: "A free, open-source iOS app that reads Apple Health read-only. Explore and export it on the phone, or stream every sample to a database you run yourself: full historical backfill, then continuous near-real-time sync. On the App Store, Apache-2.0.",
   alternates: {
     canonical: '/ios/',
   },
 };
+
+const phoneFeatures = [
+  {
+    title: "Explore What You Have",
+    description: "Every Apple Health type, by category. Open one to see its past year: how many samples, from which apps and devices, how the values spread against the type's typical range, and how much arrives each day. Summaries stay on the phone so a type opens instantly next time; Delete Analysis removes them.",
+    icon: Compass,
+  },
+  {
+    title: "Export on Demand",
+    description: "Pick the types and any hourly or daily series, a preset range or your own start and end dates, and write CSV or JSONL files, zipped into one if you like. They go to the share sheet, nothing is uploaded, and the app deletes its copy once they are shared.",
+    icon: Share2,
+  },
+  {
+    title: "Sync When You Are Ready",
+    description: "Setup is four short pages, and none of them asks for a database. Connect one from the Sync tab whenever you like. On iOS 27, share only the past 30 days and PulsHealth says so, leaves older data in your database untouched, and catches up once you allow the rest.",
+    icon: RefreshCw,
+  },
+];
+
+const screenshots = [
+  { src: "/screenshots/app-unlock.webp", alt: "First run: Unlock your Health Data, with Explore, Export and Sync", caption: "First run" },
+  { src: "/screenshots/app-explore.webp", alt: "Explore tab: Apple Health types by category, each with its sample count over the past year", caption: "Explore" },
+  { src: "/screenshots/app-type-page.webp", alt: "Heart Rate's Type page: description, analysis over the past year, sample counts, sources and the value distribution", caption: "A Type page" },
+  { src: "/screenshots/app-export.webp", alt: "Export tab: data types, aggregate series, a date range, CSV or JSONL and a zip option", caption: "Export" },
+];
 
 const syncFeatures = [
   {
@@ -36,7 +62,7 @@ const syncFeatures = [
   },
   {
     title: "Pair by Scanning",
-    description: "Your server prints a pairing block with the URL, bearer token and user ID, plus a QR code that encodes all three. Scan it, or type the values in by hand.",
+    description: "The PulsHealth stack prints a pairing block with the URL, bearer token and user ID, plus a QR code that encodes all three. Scan it from the Sync tab or with the Camera app, paste the pairing code, or type the values in. The app always asks before it uses one.",
     icon: QrCode,
   },
   {
@@ -99,7 +125,7 @@ const appJsonLd = {
   codeRepository: GITHUB,
   isAccessibleForFree: true,
   description:
-    "Syncs Apple Health, read-only, to a server you run. Full historical backfill, then continuous background sync. No account, no PulsHealth service.",
+    "Explores, exports and syncs Apple Health, read-only, to a database you run. Full historical backfill, then continuous background sync. No account, no PulsHealth service.",
 };
 
 export default function AppPage() {
@@ -109,13 +135,13 @@ export default function AppPage() {
       <PageHero
         eyebrow={<>Free on the App Store &middot; Open source</>}
         title={<>Apple Health, <span className="text-brand">in your own database</span></>}
-        lede="PulsHealth for iOS reads Apple Health and sends every sample to a server you run. It never writes back to Apple Health. It syncs the full history first, then keeps up in the background. There is no PulsHealth account and no PulsHealth cloud."
+        lede="PulsHealth for iOS lets you explore and export your Apple Health data, and sync every sample to a database you run. It never writes back to Apple Health. It syncs the full history first, then keeps up in the background. There is no PulsHealth account and no PulsHealth cloud."
       >
         <AppStoreBadge />
         <Button asChild size="lg" variant="outline">
           <Link href="/server">
-            <Server className="mr-2 h-4 w-4" />
-            Set Up the Server
+            <Database className="mr-2 h-4 w-4" />
+            Set Up Your Database
           </Link>
         </Button>
         <Button asChild variant="outline" size="lg">
@@ -136,26 +162,28 @@ export default function AppPage() {
             <ul className="space-y-4 text-muted-foreground">
               <li>
                 <strong className="text-foreground">It is on the App Store.</strong> Free, for
-                iPhone. You can also build it yourself with Xcode 26 and XcodeGen. Running your own
+                iPhone and iPad. You can also build it yourself with Xcode 26.5 or later and XcodeGen. Running your own
                 build on a real iPhone needs a paid Apple Developer team, because the HealthKit
                 background-delivery entitlement requires one.
               </li>
               <li>
-                <strong className="text-foreground">You need a server first.</strong> The app has
-                nowhere to sync until a backend exists. The reference stack comes up with one
-                command; anything that speaks the documented protocol works just as well.
+                <strong className="text-foreground">Syncing needs a database of your own.</strong>{" "}
+                Exploring and exporting work without one: the app shows what Apple Health holds and
+                writes it to CSV or JSONL files on the phone. To sync, run the open-source
+                PulsHealth stack, which comes up with one command, or put a receiver for the
+                documented protocol in front of a database you already have.
               </li>
               <li>
                 <strong className="text-foreground">All of it is open source.</strong> The app,
-                the sync library, the server stack, the protocol and the dashboards are in one
+                the sync library, the self-hosted stack, the protocol and the dashboards are in one
                 Apache-2.0 repository.
               </li>
             </ul>
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <Button asChild variant="outline">
                 <Link href="/server">
-                  <Server className="mr-2 h-4 w-4" />
-                  Set Up the Server
+                  <Database className="mr-2 h-4 w-4" />
+                  Set Up Your Database
                 </Link>
               </Button>
               <Button asChild variant="outline">
@@ -169,14 +197,55 @@ export default function AppPage() {
         </Card>
       </section>
 
+      {/* On the phone */}
+      <section id="app" className="container mx-auto max-w-7xl px-4 pb-24">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold tracking-tight mb-4">On the Phone</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Four tabs: Explore, Export, Sync and Settings. Exploring and exporting need no
+            database, no account and no network.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-5xl mx-auto mb-12">
+          {screenshots.map((shot) => (
+            <figure key={shot.src} className="overflow-hidden rounded-2xl border bg-[#0b0b0c] shadow-lg shadow-black/10">
+              <Image src={shot.src} alt={shot.alt} width={600} height={1304} className="w-full" />
+              <figcaption className="border-t border-white/10 px-3 py-2 text-center text-xs text-white/60">
+                {shot.caption}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {phoneFeatures.map((feature) => (
+            <Card key={feature.title} className="h-full">
+              <CardHeader>
+                <div className="p-3 rounded-xl bg-brand-muted text-brand w-fit mb-4">
+                  <feature.icon className="h-6 w-6" />
+                </div>
+                <CardTitle>{feature.title}</CardTitle>
+                <CardDescription className="text-base">
+                  {feature.description}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Screenshots from the iOS simulator with the app&apos;s built-in demo data, nobody&apos;s real health data.
+        </p>
+      </section>
+
       {/* Sync Features Section */}
       <section id="features" className="container mx-auto max-w-7xl px-4 pb-24">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold tracking-tight mb-4">How the Sync Works</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Each HealthKit type has its own cursor, saved only after your server confirms the
-            batch. A failed upload re-sends the same page and the server deduplicates by sample
-            UUID, so nothing is lost or duplicated.
+            Each HealthKit type has its own cursor, saved only after your database confirms the
+            batch. A failed upload re-sends the same page, and the database keeps one row per
+            sample UUID, so nothing is lost or duplicated.
           </p>
         </div>
 
@@ -226,7 +295,7 @@ export default function AppPage() {
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold tracking-tight mb-4">What You Can Sync</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            80 HealthKit types, grouped the way Apple Health groups them. Turn on a starter
+            81 HealthKit types, grouped the way Apple Health groups them. Turn on a starter
             set in one tap, or choose type by type. Nothing is read until you enable it and iOS
             grants permission.
           </p>
@@ -403,10 +472,11 @@ X-User-ID: <your user id>
       <section className="cta-gradient text-white">
         <div className="container mx-auto max-w-7xl px-4 py-24 text-center">
           <h2 className="text-3xl font-bold tracking-tight mb-4">
-            Install it, then point it at your server
+            Install it, then point it at your database
           </h2>
           <p className="text-lg opacity-90 max-w-2xl mx-auto mb-8">
-            You need an iPhone on iOS 17 or later and a server you can reach. Apple Watch data
+            You need an iPhone on iOS 17 or later and, for syncing, a database you can reach;
+            exploring and exporting work without one. Apple Watch data
             arrives once iOS syncs it to the phone. If you would rather build it yourself, the
             repository has the Xcode instructions.
           </p>
@@ -419,8 +489,8 @@ X-User-ID: <your user id>
               className="border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white dark:bg-transparent dark:border-white/40 dark:hover:bg-white/10"
             >
               <Link href="/server">
-                <Server className="mr-2 h-4 w-4" />
-                Set Up the Server
+                <Database className="mr-2 h-4 w-4" />
+                Set Up Your Database
               </Link>
             </Button>
           </div>

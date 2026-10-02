@@ -15,7 +15,8 @@
 #                PULS_BOOTSTRAP_BUILD=1 environment variable turns it on
 #
 # THIS DESTROYS THE CURRENT CONTENTS OF THE DATABASE. Everything in the `public`
-# schema is dropped and replaced by the dump. There is no undo and no second
+# schema, and the web viewer's `auth` and `web` schemas (015_web_accounts.sql),
+# is dropped and replaced by the dump. There is no undo and no second
 # copy; if the live database still holds anything you want, dump it first
 # (`make backup`).
 #
@@ -25,7 +26,10 @@
 #      destroyed.
 #   2. Stops ingest, api, mcp, web and grafana, so nothing writes to — or
 #      caches from — the database while it is being replaced.
-#   3. Drops and recreates the `public` schema WHILE TIMESCALEDB IS LIVE, so its
+#   3. Drops the `web` and `auth` schemas (the viewer's per-user views, which
+#      depend on public, and its accounts) — the dump recreates them, and a
+#      schema that survived would stop pg_restore at "already exists" — then
+#      drops and recreates the `public` schema WHILE TIMESCALEDB IS LIVE, so its
 #      event triggers clean up hypertable chunks and continuous-aggregate
 #      catalog rows properly, then reinstalls the extension. (It lives in the
 #      public schema, so the drop takes it too — which is exactly the reset you
@@ -208,6 +212,13 @@ db_psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname
 # extension is still live — so its event triggers dismantle hypertable chunks
 # and continuous-aggregate catalog rows on the way out instead of leaving the
 # catalog describing tables that no longer exist.
+# The viewer's schemas go first: `web` holds views over public's tables, and
+# `auth` references public.users. Both are in the dump; left in place, the
+# restore's CREATE SCHEMA would fail (--exit-on-error) with public already
+# gone. A dump from before 015 has neither, and the next migrate run
+# recreates them empty.
+db_psql -c "DROP SCHEMA IF EXISTS web CASCADE" >/dev/null
+db_psql -c "DROP SCHEMA IF EXISTS auth CASCADE" >/dev/null
 db_psql -c "DROP SCHEMA IF EXISTS public CASCADE" >/dev/null
 db_psql -c "CREATE SCHEMA public AUTHORIZATION pg_database_owner" >/dev/null
 db_psql -c "GRANT USAGE ON SCHEMA public TO public" >/dev/null

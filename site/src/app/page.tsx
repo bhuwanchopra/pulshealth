@@ -14,7 +14,6 @@ import {
   Minus,
   PenLine,
   QrCode,
-  Server,
   Smartphone,
   Star,
   Terminal,
@@ -33,15 +32,15 @@ const BLOB = `${GITHUB_URL}/blob/main`;
 const steps = [
   {
     n: "1",
-    title: "Run the server",
+    title: "Set up your database",
     icon: Terminal,
-    body: "One script on any Docker host. It generates every secret, starts Postgres, ingest, the API, Grafana and the viewer, and prints a pairing code.",
+    body: "One script on any Docker host. It generates every secret, starts PostgreSQL with ingest, the API, Grafana and the viewer, and prints a pairing code.",
   },
   {
     n: "2",
     title: "Scan to pair",
     icon: QrCode,
-    body: "Install the free app, scan the code, pick the Apple Health types you want and a start date. The full history goes first; then it keeps up on its own.",
+    body: "Install the free app and scan the code from its Sync tab. Pick the Apple Health types you want and a start date. The full history goes first; then it keeps up on its own.",
   },
   {
     n: "3",
@@ -56,7 +55,7 @@ const pieces = [
     title: "iOS app",
     href: "/ios",
     icon: Smartphone,
-    description: "Reads Apple Health read-only and streams every sample to your server: full backfill first, then background sync. 80 types, workouts with GPS, activity rings.",
+    description: "Reads Apple Health read-only. Explore and export it on the phone, or stream every sample to your database: full backfill first, then background sync. 81 types, workouts with GPS, activity rings.",
   },
   {
     title: "PostgreSQL + TimescaleDB",
@@ -116,7 +115,7 @@ const comparison: { name: string; href?: string; cells: Cell[] }[] = [
   { name: "FreeReps", href: "https://freereps.meltforce.org/", cells: [true, true, "MIT", "Your server (Tailscale)", false, true, "Free"] },
   { name: "Apple's export", cells: [false, false, "—", "A zip of XML", false, false, "Free"] },
 ];
-const comparisonColumns = ["Open-source app", "Open-source server", "License", "Where data lives", "Wire format specified", "AI assistant access", "Price"];
+const comparisonColumns = ["Open-source app", "Open-source backend", "License", "Where data lives", "Wire format specified", "AI assistant access", "Price"];
 
 function CellValue({ value }: { value: Cell }) {
   if (value === true) return <Check className="mx-auto h-4 w-4 text-brand" aria-label="Yes" />;
@@ -139,21 +138,21 @@ export default async function HomePage() {
           </Badge>
 
           <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-foreground text-balance md:text-6xl">
-            Apple Health, on a server <span className="text-brand">you</span> run.
+            Apple Health, in a database <span className="text-brand">you</span> run.
           </h1>
 
           <p className="max-w-2xl text-lg leading-relaxed text-muted-foreground text-pretty md:text-xl">
-            A free iPhone app that syncs 80 HealthKit types into your own PostgreSQL. Query it
-            in SQL, chart it in Grafana, or ask Claude about it. There is no PulsHealth service
-            in the middle.
+            A free iPhone app to explore and export your Apple Health data, and to sync 80
+            HealthKit types into your own database. Query it in SQL, chart it in Grafana, or ask
+            Claude about it. There is no PulsHealth service in the middle.
           </p>
 
           <div className="flex flex-col items-center gap-4 pt-2 sm:flex-row">
             <AppStoreBadge />
             <Button asChild size="lg">
               <Link href="/server">
-                <Server className="mr-2 h-4 w-4" />
-                Run the server
+                <Database className="mr-2 h-4 w-4" />
+                Set up your database
               </Link>
             </Button>
           </div>
@@ -190,7 +189,7 @@ export default async function HomePage() {
               className="w-full"
             />
             <figcaption className="border-t border-white/10 px-4 py-2 text-xs text-white/50">
-              The web viewer that ships with the server stack, against demo data.
+              The web viewer that ships with the self-hosted stack, against demo data.
             </figcaption>
           </figure>
         </div>
@@ -238,7 +237,7 @@ scripts/bootstrap.sh --time-zone Europe/Berlin`}</code>
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild variant="outline">
               <Link href="/server">
-                The server, in detail
+                The self-hosted stack, in detail
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -395,7 +394,7 @@ scripts/bootstrap.sh --time-zone Europe/Berlin`}</code>
                 </div>
                 <CardTitle className="transition-colors group-hover:text-brand">Knowledge base</CardTitle>
                 <CardDescription className="text-base">
-                  What each of the 177 Apple Health types measures: sampling, typical ranges, how
+                  What each of the 178 Apple Health types measures: sampling, typical ranges, how
                   devices differ, and the limits of the number.
                 </CardDescription>
               </CardHeader>

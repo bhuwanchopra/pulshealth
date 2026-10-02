@@ -45,20 +45,32 @@ targets:
         CFBundleDisplayName: PulsHealth
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSHealthShareUsageDescription: PulsHealth reads your health data to sync it to your personal self-hosted database.
+        NSHealthShareUsageDescription: PulsHealth reads your health data to show it to you, export it to files you choose, and, if you set one up, sync it to your own database.
         NSHealthUpdateUsageDescription: PulsHealth does not write health data.
-        # Onboarding (and Settings → Server) can read the pairing QR code the
-        # server prints instead of making the user type a URL, a token and a
-        # UUID. Nothing else uses the camera and no frame is ever stored.
-        NSCameraUsageDescription: Scan the pairing code shown by your PulsHealth server.
-        # The server may live on the LAN (a NAS, a Raspberry Pi) — reachable over
+        # Sync → Database can read the pairing QR code a database's setup
+        # prints instead of making the user type a URL, a token and a UUID.
+        # Nothing else uses the camera and no frame is ever stored.
+        NSCameraUsageDescription: PulsHealth uses the camera only to scan the pairing code for your database.
+        # `puls://pair?url=…&token=…&user=…` — the same string the pairing QR
+        # code encodes. Registering the scheme is what lets the iOS Camera app
+        # offer "Open in PulsHealth" for that code, and lets a pairing link be
+        # tapped. A custom scheme authenticates nobody: any page or app can
+        # fire one, so an incoming link only ever raises a confirmation naming
+        # the host (AppModel.handleIncomingURL) — it fills nothing by itself.
+        # The URL name derives from the bundle ID, so a fork needs no edit here.
+        CFBundleURLTypes:
+          - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER).pairing
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - puls
+        # The database may live on the LAN (a NAS, a Raspberry Pi) — reachable over
         # plain http only with this ATS exception, which is scoped to local
         # hosts (unqualified names, *.local, private IP ranges) and leaves
         # every other connection HTTPS-only. Talking to such a host also
         # triggers the local-network permission prompt, hence the description.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: PulsHealth connects to the health server you configure, which may be on your local network.
+        NSLocalNetworkUsageDescription: PulsHealth connects to the database you set up, which may be on your local network.
         # Background task identifiers derive from the bundle ID (Xcode expands
         # build settings in Info.plist values), matching what
         # BackgroundSyncScheduler registers, so a fork with its own bundle ID
@@ -85,12 +97,14 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         # Must exceed what is on the store — App Store Connect rejects an
-        # upload whose build number is not higher than the last one accepted
-        # for the same version train. The store holds 1.3 (build 13); see
-        # docs/appstore/README.md § Release record, and bump both here before
-        # every archive.
-        CURRENT_PROJECT_VERSION: 15
-        MARKETING_VERSION: 1.4
+        # upload whose build number it has already accepted. The store holds
+        # 1.6 (19); see docs/appstore/README.md § Release record, and bump
+        # both here before every archive.
+        CURRENT_PROJECT_VERSION: 19
+        MARKETING_VERSION: 1.6
+        # The tint every control takes (Assets.xcassets/AccentColor): the blue
+        # of the logo's pulse line, a shade lighter in dark mode.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: false
         ENABLE_USER_SCRIPT_SANDBOXING: true
   # Hosted in the app so tests run with the HealthKit entitlement — required to

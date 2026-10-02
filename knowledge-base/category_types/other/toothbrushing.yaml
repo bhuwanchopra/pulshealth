@@ -1,4 +1,4 @@
-identifier: "HKCategoryTypeIdentifierToothbrushing"
+identifier: "HKCategoryTypeIdentifierToothbrushingEvent"
 source: "HealthKit"
 type: "HKCategoryType"
 category: "Other"
@@ -42,7 +42,7 @@ primary_source: "Smart Toothbrush"
 description: |
   ## Overview
 
-  HKCategoryTypeIdentifierToothbrushing captures discrete toothbrushing events in HealthKit. Each sample
+  HKCategoryTypeIdentifierToothbrushingEvent captures discrete toothbrushing events in HealthKit. Each sample
   represents a single brushing session, recording when the brushing started and ended. The duration is
   calculated from the sample's start and end dates, providing insight into brushing habits and compliance
   with dental hygiene recommendations.
@@ -101,12 +101,12 @@ metadata_keys:
   - key: "HKMetadataKeySyncVersion"
     description: "Version number for sync conflict resolution"
 related_types:
-  - identifier: "HKCategoryTypeIdentifierHandwashing"
+  - identifier: "HKCategoryTypeIdentifierHandwashingEvent"
     relationship: "related_hygiene_behavior"
   - identifier: "HKCategoryTypeIdentifierSleepAnalysis"
     relationship: "temporal_correlation"
 references:
-  - title: "Apple Developer Documentation - HKCategoryTypeIdentifierToothbrushing"
+  - title: "Apple Developer Documentation - HKCategoryTypeIdentifierToothbrushingEvent"
     url: "https://developer.apple.com/documentation/healthkit/hkcategorytypeidentifiertoothbrushing"
     type: "official"
   - title: "American Dental Association - Brushing Your Teeth"

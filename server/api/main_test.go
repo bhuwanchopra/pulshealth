@@ -39,6 +39,7 @@ type fakeStore struct {
 	// The arguments of the most recent samples / workouts / series call, so
 	// handler tests can assert on what the parsers produced.
 	lastSamples  SampleFilters
+	lastDaily    DailyFilters
 	lastWorkouts WorkoutFilters
 	lastSeries   struct {
 		uuid      string
@@ -186,8 +187,9 @@ func (f *fakeStore) LatestMetrics(_ context.Context, user string, _ []string) ([
 	return f.latest, nil
 }
 
-func (f *fakeStore) DailyMetrics(_ context.Context, user string, _ []string, _, _ time.Time) ([]DailyMetric, error) {
+func (f *fakeStore) DailyMetrics(_ context.Context, user string, filters DailyFilters) ([]DailyMetric, error) {
 	f.lastUser = user
+	f.lastDaily = filters
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -866,15 +868,79 @@ func TestDailyMetricsReturnsMetricsWhenAuthorized(t *testing.T) {
 	}
 }
 
+func TestDailyMetricsPagesInDaysAcrossTypes(t *testing.T) {
+	t.Parallel()
+
+	// A page of three day rows spread over two metrics: nextOffset counts
+	// the rows, not the metrics, so the next page continues BodyMass.
+	store := &fakeStore{daily: []DailyMetric{
+		{Identifier: "HKQuantityTypeIdentifierStepCount", Unit: ptrString("count"), Days: []DailyPoint{
+			{Date: "2026-07-01", Value: ptrFloat64(1234)}, {Date: "2026-07-02", Value: nil},
+		}},
+		{Identifier: "HKQuantityTypeIdentifierBodyMass", Unit: ptrString("kg"), Days: []DailyPoint{
+			{Date: "2026-07-01", Value: ptrFloat64(80.5)},
+		}},
+	}}
+	srv := testServer(t, store)
+
+	rec := serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount,HKQuantityTypeIdentifierBodyMass&start=1751328000000&end=1751414400000&limit=3&offset=40", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if store.lastDaily.Limit != 3 || store.lastDaily.Offset != 40 || len(store.lastDaily.Types) != 2 {
+		t.Errorf("filters = %+v", store.lastDaily)
+	}
+	if store.lastDaily.Start.UnixMilli() != 1751328000000 || store.lastDaily.End.UnixMilli() != 1751414400000 {
+		t.Errorf("range = %s .. %s", store.lastDaily.Start, store.lastDaily.End)
+	}
+	var body struct {
+		Metrics    []DailyMetric `json:"metrics"`
+		NextOffset int           `json:"nextOffset"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if len(body.Metrics) != 2 || body.NextOffset != 43 {
+		t.Fatalf("body = %+v (nextOffset should be offset + day rows)", body)
+	}
+
+	// No limit: the documented default, not the whole range, and the cap
+	// clamps rather than rejects.
+	rec = serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount&start=1751328000000&end=1751414400000", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if store.lastDaily.Limit != defaultDailyLimit || store.lastDaily.Offset != 0 {
+		t.Errorf("defaults = %+v", store.lastDaily)
+	}
+	rec = serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount&start=1751328000000&end=1751414400000&limit=999999", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if store.lastDaily.Limit != maxDailyLimit {
+		t.Errorf("limit = %d, want the cap %d", store.lastDaily.Limit, maxDailyLimit)
+	}
+
+	for _, bad := range []string{"limit=0", "limit=ten", "offset=-1", "offset=x"} {
+		rec = serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount&start=1751328000000&end=1751414400000&"+bad, nil)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400: %s", bad, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestDailyMetricsReturnsEmptyArrayWhenAuthorized(t *testing.T) {
 	t.Parallel()
 
 	srv := testServer(t, &fakeStore{daily: []DailyMetric{}})
-	rec := serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount&start=1751328000000&end=1751414400000", nil)
+	rec := serveAuthorized(t, srv, http.MethodGet, "/v1/metrics/daily?types=HKQuantityTypeIdentifierStepCount&start=1751328000000&end=1751414400000&offset=7", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 	assertJSONKeyIsArray(t, rec.Body.Bytes(), "metrics")
+	if !strings.Contains(rec.Body.String(), `"nextOffset":7`) {
+		t.Errorf("an empty page should still carry nextOffset = offset: %s", rec.Body.String())
+	}
 }
 
 func TestActivitySummaryReturnsDaysWhenAuthorized(t *testing.T) {

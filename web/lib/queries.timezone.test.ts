@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const queryMock = vi.hoisted(() => vi.fn());
-vi.mock("./db", () => ({ query: queryMock }));
+// scoped() runs the callback's statements through the same mock; its
+// transaction and user setting are lib/db.ts's business, tested there.
+vi.mock("./db", () => ({
+  query: queryMock,
+  scoped: (_userId: string, fn: (q: typeof queryMock) => Promise<unknown>) => fn(queryMock),
+}));
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const STEPS = "HKQuantityTypeIdentifierStepCount";
@@ -84,7 +89,7 @@ describe("metric_daily zone guard", () => {
     mockDatabase(() => Promise.reject(new Error("function puls_time_zone() does not exist")));
     const { getSeries } = await import("./queries");
     await getSeries(USER_ID, STEPS, "Y");
-    await getSeries(USER_ID, STEPS, "M");
+    await getSeries(USER_ID, STEPS, "30D");
 
     expect(touchedMetricDaily()).toBe(false);
     expect(usedRawBuckets()).toBe(true);
@@ -94,7 +99,7 @@ describe("metric_daily zone guard", () => {
   it("looks the database zone up once and reuses it", async () => {
     mockDatabase(() => Promise.resolve([{ zone: "Europe/Berlin" }]));
     const { getDailySparklines, getSeries } = await import("./queries");
-    await Promise.all([getSeries(USER_ID, STEPS, "Y"), getSeries(USER_ID, STEPS, "M")]);
+    await Promise.all([getSeries(USER_ID, STEPS, "Y"), getSeries(USER_ID, STEPS, "30D")]);
     await getDailySparklines(USER_ID, [STEPS]);
 
     expect(zoneLookups()).toBe(1);

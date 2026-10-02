@@ -22,7 +22,7 @@ public enum ServerURLValidation {
         public var errorDescription: String? {
             switch self {
             case .empty:
-                return "Enter the server URL."
+                return "Enter the database URL."
             case .malformed:
                 return "That is not a valid URL."
             case .missingScheme:

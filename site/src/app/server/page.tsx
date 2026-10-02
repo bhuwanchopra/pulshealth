@@ -50,13 +50,13 @@ export default function SyncPage() {
     <main className="flex min-h-screen flex-col">
       <PageHero
         eyebrow={<>Docker Compose &middot; Apache-2.0</>}
-        title={<>Your server, your <span className="text-brand">health database</span></>}
-        lede="The reference backend the PulsHealth app syncs to. It runs on a home machine, a NAS, or a rented box. There is no hosted option and no managed tier."
+        title={<>Your own <span className="text-brand">health database</span></>}
+        lede="The open-source database stack the PulsHealth app syncs to: PostgreSQL with TimescaleDB and the services around it. It runs on a home machine, a NAS, or a rented box. There is no hosted option and no managed tier."
       >
         <Button asChild size="lg">
           <Link href="/docs/server">
             <FileText className="mr-2 h-4 w-4" />
-            Server Documentation
+            Setup Guide
           </Link>
         </Button>
         <Button asChild variant="outline" size="lg">
@@ -238,7 +238,7 @@ scripts/bootstrap.sh --time-zone Europe/Berlin`}</code>
           The database holds identifiable health data. Each phone can have its own bearer token,
           bound to one user, stored only as a hash and revocable on its own. The shared token a new
           install starts with still works until you switch it off, and anyone who has that one can
-          upload and delete for any user on the server. TLS, network exposure and retention are
+          upload and delete for any user in the database. TLS, network exposure and retention are
           yours to set up. The security policy lists the known limitations.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

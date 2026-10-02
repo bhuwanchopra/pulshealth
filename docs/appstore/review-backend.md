@@ -1,8 +1,14 @@
 # Standing up a backend for App Review
 
-App Review cannot exercise PulsHealth without a server, because the app has no
-backend of its own. This is how the maintainer puts a **short-lived, throwaway,
-publicly reachable** instance in front of a reviewer, and takes it down again.
+App Review cannot exercise PulsHealth's *sync* without a server, because the
+app has no backend of its own. This is how the maintainer puts a **short-lived,
+throwaway, publicly reachable** instance in front of a reviewer, and takes it
+down again.
+
+Explore and Export work without one, and the review notes say so, but
+syncing is what the app is for and what the listing describes, so a reviewer
+needs somewhere to sync to. The export path is the fallback if the instance is
+unreachable during review, not a replacement for it.
 
 Nothing here modifies [`scripts/bootstrap.sh`](../../scripts/bootstrap.sh) —
 the review instance is an ordinary install of the reference stack, created the
@@ -139,17 +145,11 @@ cd pulshealth/server
 docker compose down -v          # -v destroys the database volume as well
 ```
 
-Then rotate the token even though the stack is gone, in case you reuse the
-host:
-
-1. Edit `PULS_TOKEN` in `server/.env` (or delete `server/.env` entirely if the
-   host is being reused for nothing).
-2. `docker compose up -d ingest` — only ingest reads that value.
-3. `make pairing` prints the new one; any phone still paired with the old token
-   must be re-paired.
-
-Finally, delete the VPS, or at least stop the tunnel: `tailscale funnel --https=443 off`
-if you used path B.
+Then remove the way in — delete the DNS record, stop the tunnel
+(`tailscale funnel --https=443 off` on path B), or delete the VPS — and delete
+`server/.env`, which holds the token Apple's notes carry. If the host is being
+reused instead, give it a new `PULS_TOKEN` (`docker compose up -d ingest`
+picks it up; `make pairing` prints it) and never reuse the old one.
 
 ## Anticipated question: "why can't the app work without this?"
 

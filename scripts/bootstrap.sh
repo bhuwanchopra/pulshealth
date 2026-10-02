@@ -4,6 +4,7 @@
 #   scripts/bootstrap.sh [--time-zone <IANA zone>] [--lan] [--url <https URL>]
 #                        [--build] [--no-qr]
 #   scripts/bootstrap.sh --print-pairing
+#   scripts/bootstrap.sh --issue-device <label> [--user <uuid>] [--url <URL>]
 #
 # From a fresh clone it:
 #   1. creates server/.env from server/.env.example if there is none, with
@@ -19,7 +20,8 @@
 #   4. prints the pairing block for the app: the URL the phone should use,
 #      the bearer token, the user ID, and a QR code of
 #      puls://pair?url=<url-encoded>&token=<token>&user=<uuid>
-#      (rendered by qrencode when it is installed, printed as text otherwise);
+#      (drawn by qrencode when it is installed, by the running ingest
+#      container's own `ingest qr` otherwise, so no host package is needed);
 #   5. prints the web viewer and Grafana URLs with their passwords.
 #
 # Re-running it is safe: an existing server/.env is never rewritten — the app
@@ -29,6 +31,12 @@
 # block is printed again. --time-zone, --lan and --url update just their own
 # key in an existing .env. --print-pairing prints the block from .env and
 # touches nothing.
+#
+# --issue-device is the same block for a per-device token: it mints one in the
+# running stack (`ingest devices issue`, what `make devices` wraps) and hands
+# it the URL worked out here, so the command ends in a QR code that carries a
+# token bound to one user instead of the shared PULS_TOKEN. The token exists
+# in plaintext only in that output — nothing is written to server/.env.
 #
 # Ingest binds to 127.0.0.1 by default, which is right whenever a TLS proxy
 # (reverse proxy, Tailscale Serve/Funnel) sits in front of port 8080: pass its
@@ -58,6 +66,10 @@ secrets='POSTGRES_PASSWORD PULS_TOKEN PULS_API_TOKEN PULS_MCP_TOKEN GRAFANA_PASS
 # emptying the value is the documented way to turn the login off again. Shorter
 # than the 32-byte tokens because a person types this one into a browser.
 optional_secrets='WEB_AUTH_PASSWORD'
+# Same footing, at full length: the password of the web_app database role, which
+# only the viewer's accounts mode (WEB_ACCOUNTS=true) connects as. An older
+# .env without it simply has no web_app role (099_read_roles.sh skips it).
+optional_db_secrets='WEB_DB_PASSWORD'
 
 opt_time_zone=''
 opt_lan=0
@@ -69,6 +81,9 @@ case ${PULS_BOOTSTRAP_BUILD:-} in
   *) opt_build=1 ;;
 esac
 opt_print_pairing=0
+opt_print_url=0
+opt_issue_device=''
+opt_user=''
 opt_qr=1
 
 usage() {
@@ -94,6 +109,17 @@ Options:
                       ghcr.io/pulshealth/*. Also: PULS_BOOTSTRAP_BUILD=1.
   --print-pairing     Print the pairing block from server/.env and exit;
                       starts and changes nothing.
+  --issue-device <label>
+                      Issue a per-device token in the running stack and print
+                      its pairing block and QR code, then exit. The label is
+                      what \`make devices ARGS=list\` shows ("My iPhone"). With
+                      --url, that URL goes into this code only; server/.env is
+                      not changed. The token is shown this once.
+  --user <uuid>       With --issue-device: the user the token is bound to.
+                      Default: PULS_USER_ID from server/.env, else the seeded
+                      default user. A new UUID creates that user.
+  --print-url         Print only the URL the pairing block would carry (empty
+                      when there is none yet) and exit. \`make devices\` uses it.
   --no-qr             Skip the QR code (print the payload as text only).
   -h, --help          This help.
 EOF
@@ -317,7 +343,7 @@ wait_for_ingest() {
     # Nothing to present: a 401 here is the server refusing the shared
     # token as configured, which is the healthy answer.
     [[ $status == 401 || $status == 200 ]] || die "GET $base/v1/capabilities answered HTTP $status (expected 401 with the shared token disabled). Look at: docker compose -f server/docker-compose.yml logs ingest"
-    note "Ingest is up. The shared token is disabled — issue a device token with: make devices ARGS='issue --user <uuid> --name <label>'"
+    note "Ingest is up. The shared token is disabled, so the phone pairs with a device token (below)."
     return 0
   fi
   [[ $status == 200 ]] || die "GET $base/v1/capabilities answered HTTP $status with PULS_TOKEN from server/.env (expected 200). Is the running stack using this .env? Try: docker compose -f server/docker-compose.yml up -d ingest"
@@ -329,18 +355,24 @@ wait_for_ingest() {
 # ---------------------------------------------------------------------------
 # Pairing block.
 
-print_pairing() {
-  local token user_id bind public_url lan_ip pair_url reachable_note='' payload hr
-  token=$(env_get PULS_TOKEN)
-  user_id=$(env_get PULS_USER_ID)
+# Works out the URL the phone should use, from server/.env and this host, into
+# two globals (bash 3.2 has no namerefs): pair_url — empty when there is
+# nothing the phone could reach yet — and reachable_note, the sentence that
+# says where it came from or what to do about it. A container cannot do this
+# for itself (it sees neither the proxy in front of it nor the host's LAN
+# address), which is why --issue-device and `make devices` pass the result in.
+pair_url=''
+reachable_note=''
+resolve_pairing_url() {
+  local bind public_url lan_ip
   bind=$(env_get INGEST_BIND_ADDR)
   public_url=$(env_get PULS_PUBLIC_URL)
-  [[ -n $user_id ]] || user_id=$default_user_id
   [[ -n $bind ]] || bind=127.0.0.1
   public_url=${public_url%/}
   lan_ip=$(detect_lan_ip)
 
   pair_url=''
+  reachable_note=''
   if [[ -n $public_url ]]; then
     pair_url=$public_url
     reachable_note="PULS_PUBLIC_URL from server/.env — the TLS proxy in front of port $ingest_port."
@@ -365,6 +397,54 @@ print_pairing() {
                 and re-run with --url https://<its host>, or
               - re-run with --lan for plain HTTP to http://${lan_ip:-<LAN IP of this host>}:$ingest_port on your own Wi-Fi."
   fi
+}
+
+# The one command that ends in a QR code for a per-device token, with the
+# user filled in when it is not the default one.
+issue_device_hint() {
+  local user_id=$1
+  if [[ $user_id == "$default_user_id" ]]; then
+    printf 'scripts/bootstrap.sh --issue-device "<label, e.g. My iPhone>"'
+  else
+    printf 'scripts/bootstrap.sh --issue-device "<label, e.g. My iPhone>" --user %s' "$user_id"
+  fi
+}
+
+# Draws the payload as a terminal QR code: qrencode when the host has it, else
+# the running ingest container's own renderer (`ingest qr`, server/ingest/qr.go)
+# — exec rather than `run`, so it is whatever image the stack is actually on
+# (published or built from this checkout) and nothing is pulled, built or
+# started for the sake of a picture. The payload goes in on stdin both times:
+# it holds the token, and arguments are readable in `ps`. A stack that is down,
+# or an older image pinned by PULS_VERSION that has no `qr` subcommand, ends in
+# the hint — a missing QR code never fails the bootstrap.
+render_qr() {
+  local payload=$1 drawn=''
+  [[ $opt_qr == 1 ]] || return 0
+  echo
+  if command -v qrencode >/dev/null 2>&1; then
+    printf '%s' "$payload" | qrencode -t ANSIUTF8 -m 2
+    return 0
+  fi
+  drawn=$(printf '%s' "$payload" | compose exec -T ingest /ingest qr 2>/dev/null) || drawn=''
+  # An image without the subcommand ignores the argument and tries to start a
+  # second server, which dies on the taken port — but only print what is
+  # recognisably a drawing, never that server's log lines.
+  if [[ $drawn == *'█'* ]]; then
+    printf '%s\n' "$drawn"
+  else
+    echo " (No QR code: the ingest container could not draw one — it is not running, or its image predates"
+    echo "  \`ingest qr\` — and qrencode is not installed. Start or upgrade the stack, or brew install qrencode /"
+    echo "  apt install qrencode; then scripts/bootstrap.sh --print-pairing.)"
+  fi
+}
+
+print_pairing() {
+  local token user_id payload hr
+  token=$(env_get PULS_TOKEN)
+  user_id=$(env_get PULS_USER_ID)
+  [[ -n $user_id ]] || user_id=$default_user_id
+  resolve_pairing_url
 
   hr='------------------------------------------------------------------------'
   echo
@@ -376,7 +456,7 @@ print_pairing() {
   if shared_token_enabled; then
     printf ' %-12s %s\n' "Token" "$token"
   else
-    printf ' %-12s %s\n' "Token" "(shared token disabled — issue a device token with: make devices ARGS='issue --user <uuid> --name <label>')"
+    printf ' %-12s %s\n' "Token" "(shared token disabled — a device token is shown only when it is issued; see below)"
   fi
   printf ' %-12s %s\n' "User ID" "$user_id"
   echo
@@ -384,20 +464,61 @@ print_pairing() {
   echo " Keep the token private: with it, anyone who can reach the URL can upload and delete your data."
   echo "$hr"
 
-  [[ -n $pair_url ]] || return 0
-  shared_token_enabled || return 0
-  payload="puls://pair?url=$(urlencode "$pair_url")&token=$(urlencode "$token")&user=$(urlencode "$user_id")"
-  if [[ $opt_qr == 1 ]] && command -v qrencode >/dev/null 2>&1; then
+  if ! shared_token_enabled; then
+    # There is no token here to put in a code: only hashes of device tokens
+    # are stored. Say how to get one rather than ending without a word.
     echo
-    qrencode -t ANSIUTF8 -m 2 "$payload"
-  elif [[ $opt_qr == 1 ]]; then
+    echo " No QR code: the shared token is disabled, and a device token can only be shown when it is issued."
+    echo " This issues one and prints its QR code:"
+    echo "   $(issue_device_hint "$user_id")"
     echo
-    echo " (No QR code: qrencode is not installed. brew install qrencode / apt install qrencode, then scripts/bootstrap.sh --print-pairing.)"
+    return 0
   fi
+  [[ -n $pair_url ]] || return 0
+  payload="puls://pair?url=$(urlencode "$pair_url")&token=$(urlencode "$token")&user=$(urlencode "$user_id")"
+  render_qr "$payload"
   echo
   echo " Pairing payload (what the QR code encodes):"
   echo " $payload"
   echo
+}
+
+# --issue-device: mint a per-device token and print its pairing block. The
+# work is `ingest devices issue` inside the running container — exec, like
+# render_qr, so it is the image the stack is on and the DATABASE_URL it already
+# holds; this script only supplies the URL. Everything is checked before the
+# call, because a token minted for a code nobody can scan is a row to revoke.
+issue_device() {
+  local label=$1 user_id=$2 status=0
+  local -a extra=()
+  [[ -n $user_id ]] || user_id=$(env_get PULS_USER_ID)
+  [[ -n $user_id ]] || user_id=$default_user_id
+  [[ $user_id =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+    || die "--user '$user_id' is not a UUID"
+
+  resolve_pairing_url
+  if [[ -n $opt_url ]]; then
+    pair_url=${opt_url%/}
+  fi
+  [[ -n $pair_url ]] || die "there is no URL the phone could use yet, so no token was issued.
+           $reachable_note
+           Or name the URL for this one code: --issue-device \"$label\" --url https://<host>"
+
+  [[ -n $(compose ps -q --status running ingest 2>/dev/null) ]] \
+    || die "the ingest container is not running, so no token was issued. Start the stack (scripts/bootstrap.sh, or make up) and re-run."
+
+  [[ $opt_qr == 1 ]] || extra+=(--no-qr)
+  echo
+  # -T and no stdin: nothing here is interactive, and a pseudo-terminal would
+  # only add carriage returns to output someone may be capturing.
+  compose exec -T ingest /ingest devices issue \
+    --user "$user_id" --name "$label" --url "$pair_url" ${extra[@]+"${extra[@]}"} </dev/null || status=$?
+  if [[ $status == 2 ]]; then
+    die "the running ingest image refused the command (above). If it is complaining about --url, the image predates
+           pairing codes for device tokens: upgrade it (PULS_VERSION in server/.env, then make pull up), or issue the token
+           the old way — make devices ARGS='issue --user $user_id --name \"$label\"' — and type the values into the app."
+  fi
+  [[ $status == 0 ]] || die "issuing the device token failed (output above)."
 }
 
 # The two browser surfaces, printed after the pairing block and by
@@ -429,6 +550,11 @@ while (($# > 0)); do
     --url=*) opt_url=${1#*=}; shift ;;
     --build) opt_build=1; shift ;;
     --print-pairing) opt_print_pairing=1; shift ;;
+    --print-url) opt_print_url=1; shift ;;
+    --issue-device) [[ $# -ge 2 ]] || die "--issue-device needs a label, e.g. --issue-device \"My iPhone\""; opt_issue_device=$2; shift 2 ;;
+    --issue-device=*) opt_issue_device=${1#*=}; shift ;;
+    --user) [[ $# -ge 2 ]] || die "--user needs a value"; opt_user=$2; shift 2 ;;
+    --user=*) opt_user=${1#*=}; shift ;;
     --no-qr) opt_qr=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "unknown option: $1" ;;
@@ -436,6 +562,28 @@ while (($# > 0)); do
 done
 
 [[ -f $env_example ]] || die "cannot find $env_example — run from a PulsHealth checkout"
+
+if [[ -n $opt_url ]]; then
+  [[ $opt_url == http://* || $opt_url == https://* ]] || die "--url must start with http:// or https://"
+  if [[ $opt_url == http://* ]] && ! is_local_network_host "$(url_host "$opt_url")"; then
+    die "the app refuses plain http:// outside the local network; --url must be https:// for $(url_host "$opt_url")"
+  fi
+fi
+[[ -z $opt_user || -n $opt_issue_device ]] || die "--user only applies to --issue-device"
+
+if [[ $opt_print_url == 1 ]]; then
+  [[ -f $env_file ]] || die "server/.env does not exist yet; run scripts/bootstrap.sh first"
+  resolve_pairing_url
+  printf '%s\n' "$pair_url"
+  exit 0
+fi
+
+if [[ -n $opt_issue_device ]]; then
+  [[ -f $env_file ]] || die "server/.env does not exist yet; run scripts/bootstrap.sh first"
+  need docker
+  issue_device "$opt_issue_device" "$opt_user"
+  exit 0
+fi
 
 if [[ $opt_print_pairing == 1 ]]; then
   [[ -f $env_file ]] || die "server/.env does not exist yet; run scripts/bootstrap.sh first"
@@ -452,13 +600,6 @@ fi
 need docker openssl curl
 docker compose version >/dev/null 2>&1 || die "docker compose (the Compose v2 plugin) is required"
 docker info >/dev/null 2>&1 || die "the Docker daemon is not running or not reachable"
-
-if [[ -n $opt_url ]]; then
-  [[ $opt_url == http://* || $opt_url == https://* ]] || die "--url must start with http:// or https://"
-  if [[ $opt_url == http://* ]] && ! is_local_network_host "$(url_host "$opt_url")"; then
-    die "the app refuses plain http:// outside the local network; --url must be https:// for $(url_host "$opt_url")"
-  fi
-fi
 
 # --- server/.env --------------------------------------------------------------
 
@@ -492,7 +633,10 @@ else
   for key in $optional_secrets; do
     env_set "$key" "$(openssl rand -hex 12)"
   done
-  note "Generated: $secrets $optional_secrets"
+  for key in $optional_db_secrets; do
+    env_set "$key" "$(openssl rand -hex 32)"
+  done
+  note "Generated: $secrets $optional_secrets $optional_db_secrets"
 
   zone=''
   zone_source=''

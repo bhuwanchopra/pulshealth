@@ -31,6 +31,25 @@ public struct TypeSyncState: Codable, Sendable, Equatable {
     /// types and the counts cannot be attributed to this one.
     public var lastBatchAccepted: Int?
     public var lastBatchDuplicates: Int?
+    /// The recent-window stream of a type whose backfill has not finished
+    /// (`RecentSampleWindow`): an anchor of its own over samples starting at
+    /// `recentWindowStart`, so each run sends what is new there before the
+    /// oldest-first sweep continues. Separate from `anchorData` by design — a
+    /// date-bounded anchor reused for the full sweep would skip everything
+    /// older than the window. Both are cleared when the backfill completes.
+    public var recentAnchorData: Data?
+    public var recentWindowStart: Date?
+    /// iOS 27 limited history access: the earliest date HealthKit let this
+    /// app read the type from when last asked (`HealthSyncEngine
+    /// .refreshReadableHistory`), nil when reading was unlimited — the date
+    /// the sync has been running under. When HealthKit later reports an
+    /// earlier date, or none, the access has widened, and a type with
+    /// progress is re-swept: its anchor sits past everything it read and
+    /// would never return the history that just became readable
+    /// (`ReadableHistory`). Optional, so state files from 1.5 and earlier
+    /// decode as unlimited. Kept through a reset: it describes the grant,
+    /// not progress.
+    public var readableSince: Date?
 
     public init(identifier: String) {
         self.identifier = identifier
@@ -75,6 +94,13 @@ public struct AggregateSyncState: Codable, Sendable, Equatable {
     public var totalBytesUploaded: Int
     public var lastError: String?
     public var lastErrorAt: Date?
+    /// iOS 27 limited history access: the earliest readable date of the
+    /// series' type the last run computed under. Buckets that end before it,
+    /// or straddle it, were neither computed nor uploaded, yet the watermark
+    /// is a high-water mark past them — so when HealthKit later reports an
+    /// earlier date, or none, the run resets the series and recomputes it
+    /// from the start date (`ReadableHistory`). Nil = computed unlimited.
+    public var readableSince: Date?
 
     public init(configID: UUID) {
         self.configID = configID
@@ -157,6 +183,10 @@ public struct ActivitySummaryState: Codable, Sendable, Equatable {
     public var totalBytesUploaded: Int
     public var lastError: String?
     public var lastErrorAt: Date?
+    /// iOS 27 limited history access: the earliest readable date the last
+    /// run read the rings under. Days before it were not uploaded; a widened
+    /// grant recomputes every day from the start date. Nil = unlimited.
+    public var readableSince: Date?
 
     public init() {
         self.computedThrough = nil
@@ -207,6 +237,11 @@ public struct WorkoutEnrichmentState: Codable, Sendable, Equatable {
     public var totalBytesUploaded: Int
     public var lastError: String?
     public var lastErrorAt: Date?
+    /// iOS 27 limited history access: the workout type's earliest readable
+    /// date the last run enumerated under. Older workouts were invisible to
+    /// it, so a widened grant re-enriches from the start date. Nil =
+    /// unlimited.
+    public var readableSince: Date?
 
     public init() {
         self.computedThrough = nil
@@ -485,7 +520,9 @@ public actor SyncStateStore {
     /// True when any anchor or watermark has been earned — i.e. there is
     /// progress a server change could strand.
     public var hasSyncProgress: Bool {
-        typeStates.values.contains { $0.anchorData != nil || $0.totalSamplesExported > 0 }
+        typeStates.values.contains {
+            $0.anchorData != nil || $0.recentAnchorData != nil || $0.totalSamplesExported > 0
+        }
             || aggregateStates.values.contains { $0.computedThrough != nil }
             || activitySummaryState.computedThrough != nil
             || workoutRoutesState.computedThrough != nil
@@ -570,8 +607,73 @@ public actor SyncStateStore {
         }
     }
 
+    /// Record an acked page of a type's recent-window stream. The stream's own
+    /// anchor moves; `anchorData` and `backfillComplete` never do — the sweep
+    /// has not reached these samples, and will send them again when it does.
+    /// Traffic and date coverage are real, so those advance; the sample count
+    /// is left to the sweep, which would otherwise count these twice.
+    public func recordRecentWindowUpload(
+        identifier: String,
+        newAnchorData: Data?,
+        windowStart: Date,
+        bytes: Int,
+        sampleDateRange: ClosedRange<Date>?,
+        duration: TimeInterval
+    ) {
+        update(identifier) { s in
+            s.recentAnchorData = newAnchorData
+            s.recentWindowStart = windowStart
+            s.totalBytesUploaded += bytes
+            s.totalBatchesUploaded += 1
+            s.lastSyncAt = Date()
+            s.lastSyncDuration = duration
+            s.lastError = nil
+            if let range = sampleDateRange {
+                s.earliestExported = s.earliestExported.map { min($0, range.lowerBound) } ?? range.lowerBound
+                s.latestExported = s.latestExported.map { max($0, range.upperBound) } ?? range.upperBound
+            }
+        }
+    }
+
+    /// The backfill is done, so the recent-window stream has nothing left to
+    /// get ahead of: from here the type's own anchor carries everything new.
     public func markBackfillComplete(_ identifier: String) {
-        update(identifier) { s in s.backfillComplete = true }
+        update(identifier) { s in
+            s.backfillComplete = true
+            s.recentAnchorData = nil
+            s.recentWindowStart = nil
+        }
+    }
+
+    /// Note the earliest date HealthKit now lets the app read a type from
+    /// (iOS 27 limited history access), nil for unlimited. Only for a change
+    /// that needs no re-sweep — see `restartBackfillForWidenedAccess`.
+    public func recordReadableSince(_ identifier: String, _ date: Date?) {
+        update(identifier) { $0.readableSince = date }
+    }
+
+    /// Access to a type widened while its sync had been reading under a
+    /// limit: start its history over. Both anchors and the recent-window
+    /// stream go and the backfill is no longer complete, so the next sweep
+    /// reads everything from the start date — including what was readable
+    /// before, which the server ignores (`ON CONFLICT DO NOTHING` on UUID).
+    /// The sample count restarts with it, since that sweep counts every
+    /// sample again; traffic and dates are history and stay.
+    ///
+    /// The caller must hold the type's claim, for the reason
+    /// `HealthSyncEngine.resetType` gives.
+    public func restartBackfillForWidenedAccess(_ identifier: String, readableSince: Date?) {
+        update(identifier) { s in
+            s.anchorData = nil
+            s.recentAnchorData = nil
+            s.recentWindowStart = nil
+            s.backfillComplete = false
+            s.totalSamplesExported = 0
+            s.lastSyncAt = nil
+            // In the same write as the reset: a crash that loses one loses
+            // both, and the next refresh sees the widening again.
+            s.readableSince = readableSince
+        }
     }
 
     public func recordReconciliation(identifier: String, summary: String) {
@@ -582,13 +684,26 @@ public actor SyncStateStore {
     }
 
     /// Reset a type back to "never synced" (drops the anchor; next sync re-exports everything).
+    /// The type's `readableSince` survives: it describes what iOS lets the
+    /// app read, which a reset does not change, and the backfill that follows
+    /// runs under it.
     public func resetType(_ identifier: String) {
-        typeStates[identifier] = TypeSyncState(identifier: identifier)
+        var fresh = TypeSyncState(identifier: identifier)
+        fresh.readableSince = typeStates[identifier]?.readableSince
+        typeStates[identifier] = fresh
         persist()
     }
 
     public func resetAll() {
-        typeStates = [:]
+        // Every type's progress goes; what iOS lets the app read stays, for
+        // the reason `resetType` gives.
+        typeStates = typeStates.compactMapValues { state in
+            state.readableSince.map { since in
+                var fresh = TypeSyncState(identifier: state.identifier)
+                fresh.readableSince = since
+                return fresh
+            }
+        }
         aggregateStates = [:]
         activitySummaryState = ActivitySummaryState()
         workoutRoutesState = WorkoutEnrichmentState()

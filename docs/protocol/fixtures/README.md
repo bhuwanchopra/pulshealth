@@ -16,7 +16,8 @@ with the HTTP status and the count body a conformant reference server returns.
 
 The expected counts assume the fixtures are applied **in file-name order to
 an empty store**: `04` re-sends a UUID that `01` stored, and `05` deletes it.
-Each `expected.json` says what the counts would be standalone. Replaying any
+Where the order matters, the `notes` field of the `expected.json` gives the
+standalone counts. Replaying any
 fixture immediately after itself must return 2xx with `accepted` 0.
 
 The lines come from the Go parser's own test fixtures

@@ -37,16 +37,18 @@ question→tool recipes) and `pulshealth://types` (the live catalog). Prompts:
 Every tool but `list_users` takes an optional `user` — a `user_id` from
 `list_users` — and passes it to the product API as `user=`; omitted, the API
 answers for its own `PULS_USER_ID`. Naming anyone else needs the API's
-`PULS_MULTI_USER` on, or the 403 it answers with reaches the model as a tool
-error saying so. Per-user answers carry `user_id` whenever a user was named
-or the instance is pinned. Every tool is annotated read-only and idempotent.
-`get_summary` is the one tool whose answer is markdown text rather than
-JSON: the product API renders the page and the tool hands it over verbatim.
+`PULS_MULTI_USER` on; otherwise the API's 403 reaches the model as a tool
+error. Per-user answers carry `user_id` whenever a user was named or the
+instance is pinned. Every tool is annotated read-only and idempotent.
+`get_summary` is the one tool whose answer is markdown rather than JSON: the
+product API renders the page and the tool passes it on verbatim.
+
 Tool inputs and outputs use `YYYY-MM-DD` calendar days and ISO 8601 instants
-in the server's time zone; the server translates them to the product API's epoch-millisecond,
-half-open ranges (an inclusive `start_date`…`end_date` becomes
-`[start of start_date, start of the day after end_date)` in that zone, DST
-included). API errors surface as tool errors carrying the HTTP status.
+in the server's time zone. The server translates them to the product API's
+epoch-millisecond, half-open ranges: an inclusive `start_date`…`end_date`
+becomes `[start of start_date, start of the day after end_date)` in that
+zone, DST included. API errors surface as tool errors carrying the HTTP
+status.
 
 ## Running it
 
@@ -60,8 +62,8 @@ PULS_API_URL=https://<api-host>:8444 PULS_API_TOKEN=... PULS_TIME_ZONE=Europe/Be
 PULS_API_URL=http://127.0.0.1:8081 PULS_API_TOKEN=... PULS_MCP_TOKEN=... ./pulshealth-mcp --http 127.0.0.1:8082
 ```
 
-Build it from a checkout (`go build -o pulshealth-mcp ./server/mcp`) or,
-once a release is tagged, `go install
+Build it from a checkout (`go build -o pulshealth-mcp ./server/mcp`) or
+install the latest commit on `main` with `go install
 github.com/PulsHealth/pulshealth/server/mcp@latest` (the binary is then
 named `mcp` in `$(go env GOPATH)/bin`; rename it if you like). Go 1.26 or
 newer. `--version` prints the build.
@@ -127,4 +129,9 @@ takes one dependency beyond the standard library, the official
 
 When the product API's shapes change (`server/api/docs.go`), update
 `api.go`, the tool descriptions in `tools.go`, and `guide.md` in the same
-change.
+change. Where the API pages, the client either passes the page through
+(`list_workouts`, `get_samples` expose `limit`/`offset`) or follows it to
+the end itself: `get_daily_metrics` walks `/v1/metrics/daily`'s
+`nextOffset` (`APIClient.DailyMetrics`, page size `dailyPageSize`) and
+returns the whole range as one answer, merging a metric split across two
+pages.

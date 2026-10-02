@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build producing a lean Next.js standalone server.
 # Runs as a service in the Puls stack (server/docker-compose.yml), reaching
-# Postgres over the internal docker network as the read-only `grafana` role.
+# Postgres over the internal docker network as the read-only `grafana` role —
+# or, in accounts mode, as the per-user `web_app` role.
 
 FROM node:26-alpine AS deps
 WORKDIR /app
@@ -28,6 +29,9 @@ RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 # Standalone bundle + static assets (no public/ dir in this project).
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# The accounts-mode invite command (`make web-invite`); it imports pg, which
+# the standalone bundle already carries for the server.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/invite.mjs ./scripts/invite.mjs
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]

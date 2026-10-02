@@ -20,7 +20,7 @@ records batch-level observability.
 ```mermaid
 flowchart LR
   HK["HealthKit objects\nsamples, workouts, routes,\naggregates, activity rings"]
-  Batch["Upload batch\none HealthKit type at a time\nplus user/source/time context"]
+  Batch["Upload batch\none or more HealthKit types\nplus user/source/time context"]
   Lookups["Dimensions\nusers\nsample_types\nsources\ntemporal_contexts"]
   Facts["Raw fact tables\nquantity_samples\ncategory_samples\nworkouts\nspecialty tables"]
   Aggregates["Aggregate fact tables\naggregate_samples\nactivity_summaries"]
@@ -98,9 +98,10 @@ erDiagram
 
 ### User
 
-Every data row carries a `user_id`. The database currently seeds one default
-user, but the schema is multi-user capable. For analysis, always include
-`user_id` when comparing counts or building persistent summaries.
+Every data row carries a `user_id`. The schema seeds one default user; ingest
+adds any other user the first time a phone uploads with its id. For analysis,
+always include `user_id` when comparing counts or building persistent
+summaries.
 
 Table: `users`
 
@@ -540,7 +541,7 @@ Important columns:
 | Column | Meaning |
 |---|---|
 | `device_id` | Sending device identifier from the app |
-| `type_identifier` | HealthKit type carried by the batch |
+| `type_identifier` | A label: the type that contributed the most samples (an incremental batch can carry several types) |
 | `reason` | Why the client produced the batch |
 | `sample_count`, `deletion_count`, `aggregate_count`, `activity_summary_count` | Payload counts |
 | `bytes` | Compressed upload size |
@@ -579,7 +580,7 @@ Table: `deleted_samples`
 
 What it stores: HealthKit deletion tombstones reported by anchored queries.
 
-Grain: one deletion UUID per user.
+Grain: one row per deleted UUID (HealthKit UUIDs are globally unique).
 
 Important columns:
 
@@ -666,6 +667,10 @@ GROUP BY type_identifier
 ORDER BY last_received_at DESC NULLS LAST;
 ```
 
+`type_identifier` names only a batch's biggest contributor, so a type that
+rides along in other types' batches looks older here than it is. For one
+type's freshness, take `max(start_ts)` from its sample table.
+
 ### One Row Per Device Wake
 
 ```sql
@@ -750,8 +755,5 @@ cp .env.example .env
 docker compose up -d migrate      # db + schema, nothing else
 ```
 
-The `migrate` Compose service applies `server/db/migrations/` on every
-`docker compose up -d` and records what it applied in `schema_migrations`: a
-fresh volume gets the whole set, and a database created before the service
-existed needs a one-time `docker compose run --rm migrate baseline`. See
-`server/README.md`, "Schema migrations".
+The `migrate` service applies `server/db/migrations/` on every
+`docker compose up -d`; see `server/README.md`, "Schema migrations".

@@ -1,7 +1,29 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const queryMock = vi.hoisted(() => vi.fn());
-vi.mock("./db", () => ({ query: queryMock }));
+// Every statement a scoped() callback issues, with the user it was scoped to.
+const scopedStatements = vi.hoisted(() => [] as { userId: string; sql: string }[]);
+// query() or scoped() called while a scoped() callback is running: each would
+// take a second pooled connection while the first is held (see lib/db.ts).
+const nested = vi.hoisted(() => ({ depth: 0, calls: [] as string[] }));
+vi.mock("./db", () => ({
+  query: (sql: string, params?: unknown[]) => {
+    if (nested.depth > 0) nested.calls.push(sql);
+    return queryMock(sql, params);
+  },
+  scoped: async (userId: string, fn: (q: (sql: string, params?: unknown[]) => unknown) => Promise<unknown>) => {
+    if (nested.depth > 0) nested.calls.push(`scoped(${userId})`);
+    nested.depth++;
+    try {
+      return await fn((sql: string, params?: unknown[]) => {
+        scopedStatements.push({ userId, sql });
+        return queryMock(sql, params);
+      });
+    } finally {
+      nested.depth--;
+    }
+  },
+}));
 
 // Passed to every query explicitly: the user is an argument, never read from
 // the environment or a cookie inside lib/queries.ts.
@@ -14,6 +36,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   queryMock.mockReset();
+  scopedStatements.length = 0;
+  nested.calls.length = 0;
   queryMock.mockImplementation((text: string) => {
     // Same zone as PULS_TIME_ZONE above, so the metric_daily gate stays open
     // (its dedicated coverage lives in queries.timezone.test.ts).
@@ -100,7 +124,7 @@ describe("query semantics", () => {
     expect(intradaySql).toContain("sum(value)::float8 AS sum");
 
     const [yearSql, yearParams] = calls[1];
-    expect(yearParams.slice(0, 2)).toEqual(["1 day", "1 day"]);
+    expect(yearParams.slice(0, 2)).toEqual(["1 week", "1 day"]);
     expect(yearSql).toContain("time_bucket($2::interval");
     expect(yearSql).toContain("time_bucket($1::interval");
   });
@@ -198,8 +222,89 @@ describe("query semantics", () => {
     }
 
     expect(windows[0].params).toContain("1 day");
-    expect(windows[1].params).toContain("1 day");
+    expect(windows[1].params).toContain("1 week");
     expect(windows[2].params).toContain("1 day");
+  });
+
+  it("starts All Time at the type's earliest sample", async () => {
+    const { getSeries } = await import("./queries");
+    const user = "33333333-3333-4333-8333-333333333333";
+    const earliest = Date.now() - 200 * 86_400_000;
+
+    queryMock.mockImplementation((text: string) => {
+      if (text.includes("SELECT st.identifier,")) {
+        return Promise.resolve([{
+          identifier: "HKQuantityTypeIdentifierHeartRate",
+          rows: "10",
+          earliest: String(earliest),
+          latest: String(Date.now()),
+        }]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const series = await getSeries(
+      user,
+      "HKQuantityTypeIdentifierHeartRate",
+      "ALL",
+    );
+
+    const [, params] =
+      queryMock.mock.calls.find(([sql]) =>
+        /time_bucket[\s\S]*FROM quantity_samples/.test(sql),
+      ) ?? [];
+
+    expect(params?.[0]).toBe("1 week");
+    expect(params?.[2]).toEqual(new Date(earliest));
+    expect(series.bucketMs).toBe(7 * 86_400_000);
+
+    queryMock.mockClear();
+
+    const none = await getSeries(
+      user,
+      "HKQuantityTypeIdentifierBodyMass",
+      "ALL",
+    );
+
+    expect(none.points).toEqual([]);
+    expect(queryMock.mock.calls.some(([sql]) => /time_bucket/.test(sql))).toBe(false);
+  });
+
+  it("binds the time zone wherever a query expects one", async () => {
+    const { getSeries } = await import("./queries");
+
+    for (const id of [
+      "HKCategoryTypeIdentifierSleepAnalysis",
+      "HKCategoryTypeIdentifierMindfulSession",
+      "HKCategoryTypeIdentifierAppleStandHour",
+      "HKQuantityTypeIdentifierStepCount",
+      "HKQuantityTypeIdentifierHeartRate",
+    ]) {
+      await getSeries(USER_ID, id, "30D");
+      await getSeries(USER_ID, id, "D");
+      await getSeries(USER_ID, id, "ALL");
+    }
+
+    const charts = queryMock.mock.calls.filter(([sql]) =>
+      /time_bucket/.test(sql as string),
+    );
+
+    expect(charts.length).toBeGreaterThanOrEqual(10);
+
+    for (const [sql, params] of charts as [string, unknown[]][]) {
+      const zones = [
+        ...sql.matchAll(/time_bucket\([^;]*?, *\$(\d+)::text\)/g),
+        ...sql.matchAll(/AT TIME ZONE \$(\d+)::text/g),
+      ].map((m) => Number(m[1]));
+
+      expect(zones.length, sql).toBeGreaterThan(0);
+
+      for (const n of zones) {
+        expect(params[n - 1], `$${n} in ${sql}`).toBe(
+          "America/Los_Angeles",
+        );
+      }
+    }
   });
 
   it("attributes sleep to the wake day and dedups duration sources", async () => {
@@ -242,13 +347,42 @@ describe("query semantics", () => {
     for (const [sql, params] of healthCalls) {
       expect(sql, sql).toMatch(/user_id|u\.id =/);
       expect(params, sql).toContain(USER_ID);
+      // …and every one of them inside a transaction scoped to that user, so
+      // in accounts mode the database filters it too (lib/db.ts scoped()).
+      expect(scopedStatements.filter((s) => s.sql === sql).map((s) => s.userId), sql).toContain(USER_ID);
     }
+    expect(new Set(scopedStatements.map((s) => s.userId))).toEqual(new Set([USER_ID]));
 
     const activitySql = healthCalls.find(([sql]) => sql.includes("FROM activity_summaries"))?.[0];
     expect(activitySql).toContain("date = (now() AT TIME ZONE $2::text)::date");
 
     const cumulativeSql = healthCalls.find(([sql]) => sql.includes("WITH per_source") && sql.includes("truth AS"))?.[0];
     expect(cumulativeSql).toBeTruthy();
+  });
+
+  it("never opens a second connection from inside a scoped transaction", async () => {
+    // All Time pulls the per-user stats and every quantity chart consults the
+    // database zone: both must happen before the chart's own transaction.
+    // A fresh module per call, so the zone and stats caches are cold and each
+    // function has to do its own lookups.
+    type Queries = typeof import("./queries");
+    const calls: [string, (queries: Queries) => Promise<unknown>][] = [];
+    for (const range of ["D", "30D", "ALL"] as const) {
+      calls.push([`steps ${range}`, (x) => x.getSeries(USER_ID, "HKQuantityTypeIdentifierStepCount", range)]);
+      calls.push([`sleep ${range}`, (x) => x.getSeries(USER_ID, "HKCategoryTypeIdentifierSleepAnalysis", range)]);
+    }
+    calls.push(["sparklines", (x) => x.getDailySparklines(USER_ID, ["HKQuantityTypeIdentifierStepCount"])]);
+    calls.push(["stats", (x) => x.getStats(USER_ID)]);
+    calls.push(["workout", (x) => x.getWorkoutDetail(USER_ID, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")]);
+    calls.push(["profile", (x) => x.getProfile(USER_ID)]);
+    for (const [name, call] of calls) {
+      vi.resetModules();
+      nested.calls.length = 0;
+      scopedStatements.length = 0;
+      await call(await import("./queries"));
+      expect(scopedStatements.length, name).toBeGreaterThan(0);
+      expect(nested.calls, name).toEqual([]);
+    }
   });
 
   it("keeps the per-user caches apart when users alternate", async () => {

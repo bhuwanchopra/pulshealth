@@ -430,21 +430,60 @@ func (c *APIClient) LatestMetrics(ctx context.Context, types []string) ([]Latest
 	return out.Metrics, nil
 }
 
-// DailyMetrics is GET /v1/metrics/daily?types=a,b&start=ms&end=ms. The API
-// returns every local day (in its PULS_TIME_ZONE) overlapping [start, end).
+// dailyPageSize is the page the client asks /v1/metrics/daily for: the API
+// pages in day rows across the requested types, and a tool call is at most
+// 10 types over 366 days, so one page is the normal case and the loop below
+// is for correctness when it is not.
+const dailyPageSize = 10000
+
+// DailyMetrics is GET /v1/metrics/daily?types=a,b&start=ms&end=ms, every
+// page of it. The API returns every local day (in its PULS_TIME_ZONE)
+// overlapping [start, end), paged in day rows across the types with
+// nextOffset; a page shorter than limit is the last. A boundary can fall
+// inside a metric's days, so pages are merged by identifier in the order
+// the API returns them (the request order).
 func (c *APIClient) DailyMetrics(ctx context.Context, types []string, startMS, endMS int64) ([]DailyMetric, error) {
-	q := url.Values{
-		"types": {strings.Join(types, ",")},
-		"start": {strconv.FormatInt(startMS, 10)},
-		"end":   {strconv.FormatInt(endMS, 10)},
+	var (
+		merged []DailyMetric
+		index  = map[string]int{}
+		offset = 0
+	)
+	for {
+		q := url.Values{
+			"types":  {strings.Join(types, ",")},
+			"start":  {strconv.FormatInt(startMS, 10)},
+			"end":    {strconv.FormatInt(endMS, 10)},
+			"limit":  {strconv.Itoa(dailyPageSize)},
+			"offset": {strconv.Itoa(offset)},
+		}
+		var page struct {
+			Metrics    []DailyMetric `json:"metrics"`
+			NextOffset int           `json:"nextOffset"`
+		}
+		if err := c.get(ctx, "/v1/metrics/daily", q, &page); err != nil {
+			return nil, err
+		}
+		points := 0
+		for _, m := range page.Metrics {
+			points += len(m.Days)
+			if i, ok := index[m.Identifier]; ok {
+				merged[i].Days = append(merged[i].Days, m.Days...)
+				continue
+			}
+			index[m.Identifier] = len(merged)
+			merged = append(merged, m)
+		}
+		// A short page is the last; so is one that did not move (an older
+		// API without paging answers the whole range and no nextOffset).
+		if points < dailyPageSize || page.NextOffset <= offset {
+			break
+		}
+		offset = page.NextOffset
 	}
-	var out struct {
-		Metrics []DailyMetric `json:"metrics"`
+	if merged == nil {
+		merged = []DailyMetric{}
 	}
-	if err := c.get(ctx, "/v1/metrics/daily", q, &out); err != nil {
-		return nil, err
-	}
-	return out.Metrics, nil
+	return merged, nil
 }
 
 // ActivitySummary is GET /v1/activity/summary?start=ms&end=ms.

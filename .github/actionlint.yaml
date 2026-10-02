@@ -1,0 +1,6 @@
+# actionlint's built-in runner list predates GitHub's xcode-27 image (a
+# public preview, announced 2026-09-10), so ios-ci.yml's label has to be
+# declared here or the lint job fails on it. Drop this once actionlint knows it.
+self-hosted-runner:
+  labels:
+    - xcode-27

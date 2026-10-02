@@ -9,7 +9,7 @@ const columns: { heading: string; links: FooterLink[] }[] = [
     heading: "Project",
     links: [
       { title: "iOS App", href: "/ios" },
-      { title: "Self-Hosted Server", href: "/server" },
+      { title: "Self-Hosted Database", href: "/server" },
       { title: "Documentation", href: "/docs" },
       { title: "Sync Protocol", href: "/docs/protocol" },
       { title: "Use It With AI", href: "/docs/ai" },
@@ -76,7 +76,7 @@ export function SiteFooter() {
               <span className="font-semibold">PulsHealth</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
-              Apple Health, on a server you run. Free app, open source, no service in between.
+              Apple Health, in a database you run. Free app, open source, no service in between.
             </p>
           </div>
 

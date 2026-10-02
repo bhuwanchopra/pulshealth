@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Cached liveness (SRV-9).
+// Cached liveness.
 //
 // /healthz is deliberately unauthenticated — the container health check and
 // scripts/bootstrap.sh poll it — and it used to acquire a pool connection and

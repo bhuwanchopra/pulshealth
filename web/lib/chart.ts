@@ -41,6 +41,36 @@ export function niceBounds(min: number, max: number): [number, number] {
   return [lo, hi];
 }
 
+// The smallest 1/2/5 × 10ⁿ step at least `raw` wide, and the decimals a label
+// at that step needs (0.05 → 2, 20 → 0).
+export function niceStep(raw: number): { step: number; decimals: number } {
+  if (!(raw > 0) || !Number.isFinite(raw)) return { step: 1, decimals: 0 };
+  const exp = Math.floor(Math.log10(raw));
+  const m = [1, 2, 5].find((m) => m * 10 ** exp >= raw * (1 - 1e-9));
+  return m ? { step: m * 10 ** exp, decimals: Math.max(0, -exp) } : { step: 10 ** (exp + 1), decimals: Math.max(0, -exp - 1) };
+}
+
+// Gridlines at the nice step that splits [min, max] into at most `count`
+// intervals, with the bounds snapped outward to it. Labels come back as strings at the
+// step's precision: per-sample workout values are often fractions (a resting
+// energy sample is a few hundredths of a kcal), so rounding to integers would
+// label every line 0.
+export function niceTicks(min: number, max: number, count = 5): { lo: number; hi: number; ticks: { val: number; label: string }[] } {
+  if (min === max) {
+    const pad = Math.abs(min) * 0.1 || 1;
+    min -= pad;
+    max += pad;
+  }
+  const { step, decimals } = niceStep((max - min) / count);
+  const first = Math.floor(min / step + 1e-9);
+  const last = Math.ceil(max / step - 1e-9);
+  const ticks = Array.from({ length: last - first + 1 }, (_, i) => {
+    const val = (first + i) * step;
+    return { val, label: val.toFixed(decimals) };
+  });
+  return { lo: first * step, hi: last * step, ticks };
+}
+
 export function makeScale(domainMin: number, domainMax: number, rangeMin: number, rangeMax: number) {
   const d = domainMax - domainMin || 1;
   return (v: number) => rangeMin + ((v - domainMin) / d) * (rangeMax - rangeMin);

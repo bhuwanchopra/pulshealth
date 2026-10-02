@@ -88,6 +88,6 @@ fi
   printf '%s\n' "$hits"
   echo
   echo "public-tree: $(printf '%s\n' "$hits" | wc -l | tr -d ' ') hit(s)." \
-    "Scrub or relocate the content (docs/open-source-plan.md, section 9)."
+    "Scrub or relocate the content; the classes are listed at the top of $self."
 } >&2
 exit 1

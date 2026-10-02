@@ -31,6 +31,10 @@ struct PulsHealthApp: App {
             RootView()
                 .environment(model)
                 .task { await model.start() }
+                // `puls://pair?…` — a tapped link, or the server's QR code read
+                // by the iOS Camera app. Untrusted by definition: the model
+                // only ever turns it into a prompt (`handleIncomingURL`).
+                .onOpenURL { model.handleIncomingURL($0) }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {

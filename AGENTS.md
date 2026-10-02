@@ -1,10 +1,9 @@
 # AGENTS.md
 
 Orientation for an automated contributor (Claude Code, Codex, Cursor, an
-agentic CI job) working in this repository. It says what the repository is,
-where the authoritative facts live, what must not be broken, and how to run
-each test suite. It does not restate the rules it points at — read the file it
-names.
+agentic CI job) working in this repository: what it is, where the
+authoritative facts live, what must not be broken, and how to run each test
+suite. It does not restate the rules it points at — read the file it names.
 
 **[`CLAUDE.md`](CLAUDE.md) is the deep guide**: the component map, the
 invariants in full, and the accumulated gotchas (HealthKit crashes, iOS
@@ -27,20 +26,20 @@ the self-hosted backend is pre-release.
 | Path | What | Its own docs |
 |---|---|---|
 | `PulsHealthSync/` | Swift package: sync engine, transport, NDJSON encoding (iOS 17+, Swift 6 strict concurrency, no dependencies) | `PulsHealthSync/README.md` |
-| `PulsHealth/` | SwiftUI app around the package. `project.pbxproj` is **generated** — run `xcodegen` after adding or renaming a file | `PulsHealth/README.md` |
+| `PulsHealth/` | SwiftUI app around the package. The Xcode project is **generated** — run `xcodegen` after adding or renaming a file | `PulsHealth/README.md` |
 | `server/ingest/` | Go ingest server: parses batches, writes Postgres | `server/README.md` |
 | `server/api/` | Go product API: read-only JSON + `/v1/export`, OpenAPI at `/openapi.json`, HTML at `/docs` | `server/README.md` |
 | `server/mcp/` | Go MCP server, read-only, over the product API only | `server/mcp/README.md`, `docs/ai.md` |
 | `server/db/` | `migrate.sh` and the numbered migrations it applies | `server/README.md` |
 | `server/backup/` | The opt-in `backup` Compose profile: scheduled `pg_dump`s and the restore drill | `server/README.md` |
-| `web/` | Next.js viewer, reads Postgres directly. **Not** `site/` | `web/README.md` |
+| `web/` | Next.js viewer, reads Postgres directly (in accounts mode as `web_app`, limited by the database to the signed-in person). **Not** `site/` | `web/README.md` |
 | `site/` | Next.js static export behind **pulshealth.com**: marketing pages, blog, knowledge-base viewer. Built with **bun**, not npm | `site/README.md` |
-| `knowledge-base/`, `blog/` | The site's content: 177 YAML HealthKit type files and the MDX posts with their images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
+| `knowledge-base/`, `blog/` | The site's content: 178 YAML HealthKit type files and the MDX posts with their images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
 | `docs/protocol/` | The Puls Sync Protocol v1 spec, JSON Schemas, fixtures | `docs/protocol/README.md` |
-| `tools/protocol-check/` | Validates a batch against the schemas | — |
+| `tools/protocol-check/` | Validates a batch against the schemas | `docs/protocol/README.md` |
 | `tools/puls-export/` | CLI for `GET /v1/export` | `docs/export.md` |
 | `examples/receivers/python-sqlite/` | A complete third-party receiver | its `README.md` |
-| `scripts/` | `bootstrap.sh` (first run), `check-public-tree.sh` (the public-tree gate) | root `README.md` |
+| `scripts/` | `bootstrap.sh` (first run), `check-public-tree.sh` (the public-tree gate), the knowledge-base JSON generator and its check, `deploy-site.sh` | root `README.md` |
 
 ## Where the authoritative facts live
 
@@ -57,61 +56,52 @@ Do not infer these from code you happen to be reading; go to the source.
 
 ## Invariants
 
-These are stated in full — with the reasoning, which matters — under
-"Invariants — do not break" in [`CLAUDE.md`](CLAUDE.md). Breaking one loses
-data or corrupts it silently, so read that section before touching the
+Stated in full, with the reasoning, under "Invariants — do not break" in
+[`CLAUDE.md`](CLAUDE.md). Breaking one loses or silently corrupts data, or
+breaks a promise the shipped app makes, so read the rule before touching its
 subsystem. The list, so you know when to go and read it:
 
 - **Anchor-after-ack** — a type's HealthKit anchor is persisted only after the
   server confirms the upload.
+- **Export never shares sync state** — the on-device export runs on a
+  throwaway engine and store, never the app's.
 - **Every row belongs to a user** — `user_id` on every data table, sent in the
   `X-User-ID` header, never in the NDJSON body.
 - **Canonical units** — one unit per type, converted before encoding; never
   send raw device units.
+- **The bearer token's second home** — where the token may rest is part of the
+  privacy claims.
 - **One type vocabulary** — `HealthTypeCatalog.swift` is the only hand-written
-  list of types; `docs/protocol/catalog.json` and `web/lib/catalog.generated.ts`
-  are rendered from it and are never hand-edited.
-- **Epoch milliseconds everywhere** — wire format, state files, query
-  parameters. Not ISO 8601.
-- **Wire-format changes touch both sides** — see the next section.
+  list of types; everything else is generated from it.
+- **Epoch milliseconds everywhere** — not ISO 8601.
+- **Wire-format changes touch both sides** — client, server, schema and the
+  protocol spec, schemas and fixtures land in one pull request; deploy the
+  server first.
 - **Aggregates overwrite; raw samples never do.**
-- **Activity rings upsert by date and are not samples** — the local calendar
-  day is stored straight through, never UTC-shifted.
-- **A locked device means HealthKit is unreadable** — background paths must
-  check and skip cleanly rather than report failure.
+- **Activity rings upsert by date and are not samples.**
+- **`PULS_TIME_ZONE` must match the phone's zone.**
+- **A locked device means HealthKit is unreadable** — background paths check
+  and skip cleanly rather than report failure.
+- **Limited history access (iOS 27)** — never overwrite history HealthKit
+  reports as empty because it may not be read.
 - **Incremental sync merges types into one batch; a page is never split
   across batches.**
+- **Recent data first, on an anchor of its own.**
+- **Work the app starts itself holds a background-task assertion** — and is
+  cancelled, not frozen, when it expires.
 - **The schema is applied by the `migrate` service, never by hand** — new DDL
-  is a new numbered file, an applied file's checksum is enforced, and only a
-  file whose first line is `-- puls:rerun` is re-applied.
-- **Actors** — `HealthSyncEngine`, `SyncStateStore` and `SyncEventLog` are
-  actors under Swift 6 strict concurrency; views reach them through the
-  `@MainActor` `AppModel`.
-- **iOS version gates** — new type support is gated the same way the existing
-  `#available` checks are.
-
-### The wire-format lockstep rule
-
-A change to what goes over the wire is never a change to one file. It has to
-land, in the same pull request, in **all** of:
-
-1. `PulsHealthSync/Sources/PulsHealthSync/Models/SyncModels.swift` and
-   `Serialization/NDJSONEncoder.swift` (the sender),
-2. `server/ingest/parse.go` and `server/ingest/store.go` (the receiver),
-3. a **new** migration in `server/db/migrations/` if it needs schema,
-4. the spec and schemas in `docs/protocol/` — plus a fixture in
-   `docs/protocol/fixtures/` and its `.expected.json`,
-5. `server/ingest/parse_test.go` fixtures and the curl example in
-   `server/README.md`.
-
-A catalog change additionally regenerates `docs/protocol/catalog.json` and
-`web/lib/catalog.generated.ts`. The header's `schemaVersion` (and
-`X-Puls-Protocol`) is bumped **only** for a change a v1 receiver written from
-the spec would reject — new sample kinds and new line types; new optional
-fields, new type identifiers and new read endpoints are additive and keep the
-number. **Deploy the server first**: an old server rejects batches carrying
-new line types with a `400`, which stalls syncing until it is updated (nothing
-is lost — the client does not retry a `4xx` and its anchors stay put).
+  is a new numbered file; an applied file never changes.
+- **Actors** — views reach the engine through the `@MainActor` `AppModel`.
+- **iOS version gates** — `#available`, plus a compile guard for APIs only in
+  a newer SDK.
+- **The first run's Health page cannot be skipped**, and nothing is applied
+  until its last page.
+- **`site/` reads its content by relative path** — CI asserts the page counts.
+- **The app is shipped software** — the bundle ID is fixed by the store
+  record, and build numbers only go up.
+- **The published privacy claims are load-bearing** — a new dependency,
+  outbound request, permission or on-disk store changes the privacy documents
+  in the same pull request.
 
 ## Running the tests
 
@@ -119,7 +109,7 @@ Every command is run from the repository root unless a `cd` is shown.
 `.github/workflows/ci.yml` is the authority; this is the same set.
 
 **Go — every module** (`server/ingest`, `server/api`, `server/mcp`,
-`tools/protocol-check`, `tools/puls-export`):
+`tools/protocol-check`, `tools/puls-export`), for example:
 
 ```bash
 cd server/api && go mod verify && go vet ./... && go test -race -count=1 ./...
@@ -165,18 +155,14 @@ cd web && npm ci && npm run check:catalog && npm run lint && \
   npm run typecheck && npm test && npm run build
 ```
 
-**Marketing site** (bun, not npm — it exports 177 type pages rendered from
-`knowledge-base/`, one page per `blog/articles/*.mdx`, and one `/docs/` page
-per entry in `site/src/lib/docs.ts`'s manifest of repository markdown files;
-the CI job asserts all three counts against their sources, so a content
-directory or a file that goes missing fails the build rather than silently
-shrinking it):
+**Marketing site** (bun, not npm). CI also asserts the export's page counts
+against their sources, so a content file that goes missing fails the build:
 
 ```bash
 cd site && bun install && bun run lint && bun run build
 ```
 
-**Swift package** (macOS with Xcode 26):
+**Swift package** (macOS with Xcode 26.5 or later):
 
 ```bash
 cd PulsHealthSync && xcodebuild test -scheme PulsHealthSync \
@@ -190,13 +176,14 @@ cd PulsHealth && xcodegen && xcodebuild test -scheme PulsHealth \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-**Compose, shell and the public-tree gate:**
+**Compose, shell, the bundled knowledge base and the public-tree gate:**
 
 ```bash
 docker compose -f server/docker-compose.yml config --quiet
 docker compose -f server/docker-compose.yml -f server/compose.build.yml config --quiet
 docker compose -f server/docker-compose.yml --profile backup config --quiet
 shellcheck server/db/migrate.sh server/db/migrations/*.sh server/backup/*.sh scripts/*.sh
+scripts/check-knowledge-json.sh    # needs python3 with PyYAML
 scripts/check-public-tree.sh
 ```
 
@@ -217,13 +204,15 @@ it too.
   says why.
 - **Never edit a generated file.** `PulsHealth/PulsHealth.xcodeproj`
   (`xcodegen`), `docs/protocol/catalog.json` (the Swift catalog test),
-  `web/lib/catalog.generated.ts` (`npm run gen:catalog`).
+  `web/lib/catalog.generated.ts` (`npm run gen:catalog`),
+  `PulsHealth/Sources/Resources/knowledge.json`
+  (`scripts/gen-knowledge-json.py`).
 - **Never edit an applied migration.** Add a new numbered file.
-- **Go:** `gofmt`, `go vet` and the race detector clean; standard library plus
-  `pgx` only. **TypeScript:** `eslint` with zero warnings, `tsc --noEmit`
-  clean. **Shell:** `shellcheck` clean, `set -euo pipefail`. **SQL:**
-  idempotent DDL, and a predicate against a compressed hypertable must include
-  `start_ts`.
+- **Go:** `gofmt`, `go vet` and the race detector clean; think twice before
+  adding a dependency. **TypeScript:** `eslint` with zero warnings,
+  `tsc --noEmit` clean. **Shell:** `shellcheck` clean, `set -euo pipefail`.
+  **SQL:** idempotent DDL, and a predicate against a compressed hypertable
+  must include `start_ts`.
 - **Secrets never enter the tree.** `server/.env` is generated by
   `scripts/bootstrap.sh` and is not tracked. Do not commit one.
 - For anything larger than a bug fix, open an issue first.

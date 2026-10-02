@@ -71,11 +71,13 @@ public struct ServerIdentityChange: Sendable, Equatable {
 
     public var userChanged: Bool { from.userID != to.userID }
 
-    /// One line describing what moved, e.g. "server host:8080 → other:8080".
+    /// One line describing what moved, e.g. "database host:8080 → other:8080".
+    /// Shown in the app's change prompt, so it says "database", the word
+    /// the app uses for where data goes.
     public var summary: String {
         var parts: [String] = []
         if serverChanged {
-            parts.append("server \(from.serverLabel) → \(to.serverLabel)")
+            parts.append("database \(from.serverLabel) → \(to.serverLabel)")
         }
         if userChanged {
             parts.append("user ID \(from.userID) → \(to.userID)")

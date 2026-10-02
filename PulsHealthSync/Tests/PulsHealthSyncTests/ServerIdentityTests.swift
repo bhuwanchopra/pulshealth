@@ -65,7 +65,7 @@ private func stateJSON(in dir: URL) throws -> [String: Any] {
         let toUser = try #require(identity("https://a.test:8080", user: "11111111-1111-4111-8111-111111111111"))
         let server = ServerIdentityChange(from: from, to: toServer)
         #expect(server.serverChanged && !server.userChanged)
-        #expect(server.summary == "server a.test:8080 → b.test:8080")
+        #expect(server.summary == "database a.test:8080 → b.test:8080")
         let user = ServerIdentityChange(from: from, to: toUser)
         #expect(!user.serverChanged && user.userChanged)
         #expect(user.summary.hasPrefix("user ID "))

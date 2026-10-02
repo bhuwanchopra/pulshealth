@@ -3,9 +3,9 @@
 # runner for tests/test_healthkit_notebook.py. Exact pins, not floors: CI's
 # db-integration job installs this file and runs that test, so the set has to
 # resolve the same way on every run. Dependabot keeps it moving.
-pandas==3.0.5
-sqlalchemy==2.0.53
-psycopg[binary]==3.3.5
+pandas==3.0.6
+sqlalchemy==2.1.0
+psycopg[binary]==3.3.6
 matplotlib==3.11.2
 seaborn==0.13.2
 ipykernel==7.3.0

@@ -217,21 +217,22 @@ func (s *Server) exportDatasetFor(r *http.Request) (*exportDataset, error) {
 }
 
 func (s *Server) exportDailyMetrics(r *http.Request) (*exportDataset, error) {
-	types, start, end, err := dailyMetricsRequest(r)
+	// No paging: the whole capped range in one query (Limit zero).
+	filters, err := dailyTypesAndRange(r)
 	if err != nil {
 		return nil, asBadRequest(err)
 	}
-	if err := capExportRange(start, end, maxExportRange); err != nil {
+	if err := capExportRange(filters.Start, filters.End, maxExportRange); err != nil {
 		return nil, err
 	}
-	metrics, err := s.store.DailyMetrics(r.Context(), s.requestUser(r), types, start, end)
+	metrics, err := s.store.DailyMetrics(r.Context(), s.requestUser(r), filters)
 	if err != nil {
 		return nil, err
 	}
 	return &exportDataset{
 		Name:    "daily_metrics",
-		StartMS: start.UnixMilli(),
-		EndMS:   end.UnixMilli(),
+		StartMS: filters.Start.UnixMilli(),
+		EndMS:   filters.End.UnixMilli(),
 		// The JSON endpoint nests days under their metric; a flat file
 		// repeats the identifier and unit on every row instead.
 		Columns: []string{"identifier", "unit", "date", "value"},

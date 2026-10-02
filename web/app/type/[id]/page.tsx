@@ -83,7 +83,7 @@ export default async function TypePage({
     );
   }
 
-  const series = await getSeries(user, id, range, seriesWindow);
+  const series = await getSeries(user, id, range, seriesWindow ?? undefined);
 
   const vals = series.points.map((p) => p.value).filter(Number.isFinite);
   const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
@@ -144,7 +144,7 @@ export default async function TypePage({
         </div>
 
         <div style={{ marginTop: 22 }}>
-          <TrendChart series={series} color={color} />
+          <TrendChart key={range} series={series} color={color} name={type.name} />
         </div>
       </section>
 
