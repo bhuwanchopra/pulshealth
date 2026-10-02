@@ -145,16 +145,7 @@ export default async function CategoryPage({
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <SleepRangeSelector value={range} />
           </div>
-          {nights.length === 0 ? (
-            <div className="panel" style={{ padding: 24 }}>
-              <div style={{ fontWeight: 600 }}>No sleep-stage data</div>
-              <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 6 }}>
-                Sync Sleep Analysis from Apple Health to see Core, Deep, REM, and Awake time.
-              </div>
-            </div>
-          ) : (
-            <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
-          )}
+          <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
         </div>
       </>
     );
