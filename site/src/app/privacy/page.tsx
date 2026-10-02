@@ -8,7 +8,7 @@ const POLICY_PATH = "docs/privacy-policy.md";
 export const metadata = {
   title: "Privacy Policy - PulsHealth",
   description:
-    "Where your health data goes and where it does not. The developer receives no data; the app posts read-only Apple Health data to the one database address you configure. The website loads no analytics.",
+    "Where your health data goes and where it does not. The app posts read-only Apple Health data to the one database address you configure; the developer receives none unless you use their invite-only viewer. The website loads no analytics.",
   alternates: {
     canonical: "/privacy/",
   },
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent>
             <ul className="list-disc pl-6 space-y-2">
-              <li>The developer receives no health data. There is no PulsHealth account, service or server.</li>
+              <li>The developer receives no health data, unless they invited you to their own database and viewer at app.pulshealth.com — then it is the database you enter, and they hold your data for you alone. There is no sign-up, and no developer server is built into the app.</li>
               <li>Your health data leaves the phone only two ways, both yours: uploads to the database you run and configure, and files you export and share yourself.</li>
               <li>HealthKit access is read-only. The app never writes to Apple Health.</li>
               <li>No analytics, advertising, tracking or third-party SDKs in the app.</li>

@@ -10,7 +10,7 @@ plus two standalone CLIs and the public website:
 | `PulsHealth/` | SwiftUI app wrapping the library: Explore (type pages with analysis charts and an aggregate preview), Export builder (server-less files), Sync (the Database screen, synced types, activity log), Settings; benchmark | `PulsHealth/README.md` |
 | `server/` | Docker Compose: Go ingest/product APIs + PostgreSQL 17/TimescaleDB + Grafana | `server/README.md` |
 | `server/mcp/` | Go MCP server (stdio + streamable HTTP) giving AI assistants read-only tools over the product API; talks only to the API, never Postgres | `server/mcp/README.md`, `docs/ai.md` |
-| `web/` | Next.js self-hosted viewer, published as the fourth GHCR image. Reads Postgres directly as the read-only `grafana` role; optional HTTP Basic auth. **Not** `site/`, which is the public marketing site | `web/README.md` |
+| `web/` | Next.js self-hosted viewer, published as the fourth GHCR image. Reads Postgres directly: as the read-only `grafana` role (open, or one HTTP Basic password), or in accounts mode as `web_app`, limited by the database to the signed-in person's records. **Not** `site/`, which is the public marketing site | `web/README.md` |
 | `tools/puls-export/` | Standalone Go module: CLI for the product API's `GET /v1/export` (streamed CSV/JSONL). Its own `go.mod`, stdlib only | `docs/export.md` |
 | `tools/protocol-check/` | Standalone Go module: validates the `docs/protocol/fixtures/` corpus against the JSON Schemas. Own `go.mod`, own CI job | `docs/protocol/README.md` |
 | `site/` | Next.js static export behind **pulshealth.com** (marketing pages, blog, knowledge-base viewer). Built with bun. **Not** `web/`, which is the self-hosted viewer | `site/README.md` |
@@ -380,6 +380,52 @@ entitlements): set `DEVELOPMENT_TEAM` in `PulsHealth/Config/Local.xcconfig`.
   updates those documents in the same pull request, and the App Store listing's
   privacy answers with them (`docs/appstore/README.md` has the table).
 
+- **The web viewer's accounts mode: the database decides what a signed-in
+  person can read.** With `WEB_ACCOUNTS=true` the viewer connects as
+  `web_app`, which has **no grant on any table holding health data**; it
+  reads them only through the security-barrier views in schema `web`
+  (`015_web_accounts.sql`), each filtered on `puls_viewer_user()`, the
+  transaction-local `puls.user_id` that `scoped()` (`web/lib/db.ts`) sets
+  from the session. So every health read goes through `scoped(userId, q =>
+  …)` and issues statements through its `q` only (a `query()` or nested
+  `scoped()` inside takes a second pooled connection and can deadlock the
+  pool; `queries.test.ts` checks); a query without its own `WHERE user_id`
+  still returns one person's rows, and one without the setting returns
+  none. Row-level security is not the mechanism: TimescaleDB refuses it on
+  hypertables with columnstore enabled. `web_app`'s `search_path` is `web,
+  public`, so the same SQL names the views as `web_app` and the tables as
+  `grafana` — no table-name switching in the viewer. `099_read_roles.sh`
+  rebuilds the views every run (`puls_create_web_views()`, so a CASCADE or a
+  column change heals on the next `up -d`) and asserts the exact grant set,
+  the exact set of views, and that `web_app` can read no relation with a
+  `user_id` outside `web`/`auth`; a relation the viewer newly reads is a new
+  migration replacing that function plus a `GRANT` and expected rows there.
+  `sources` is a scoped view too (device names and app bundle ids are
+  per-person). In accounts mode the viewer serves no data as any role that
+  can read the tables directly. `web/lib/webapp.integration.test.ts` and
+  `accounts.integration.test.ts` (db-integration CI job) prove it.
+- **The viewer never identifies a user from a cookie it did not sign.** In
+  accounts mode the user is the session row's (`auth.sessions`, looked up
+  from the `__Host-puls-session` cookie by `proxy.ts` *and* again by
+  `viewerUser()` per request); `?user=`, the `puls-user` cookie, the
+  switcher and `/api/user` mean nothing there, and `getUsers()` is never
+  called. Basic and open mode are untouched — same `grafana` role, same
+  switcher — and one image serves all three modes (`web/lib/mode.ts`).
+  Accounts mode refuses plain HTTP (403, except `/api/healthz`), checks
+  `Origin` on every state-changing request, and throttles failed sign-ins
+  with the ingest/API failure-only bucket, keyed per address and per email —
+  but the token is taken *before* the scrypt check and refunded on success
+  (`takeAll`/`refundAll`), or parallel guesses all pass the check first;
+  never charge on a GET (an `<img>` can trigger one). `safeReturnPath`
+  checks the *parsed* path too: `/.//x` parses to `//x`.
+- **Account identity lives in `auth.*`, never in `users`.** `users.name` and
+  `users.email` are the phone's HealthKit profile, overwritten by every
+  `{"profile":…}` line. Accounts are invite-only (`make web-invite`); an
+  invite for a user with an account resets its password.
+- **The viewer never issues or displays an ingest token**, in any mode (no
+  pairing QR code in `web/` either). Pairing a phone is the operator's step
+  (`make issue-device`).
+
 ## Gotchas
 
 - `HKQueryAnchor` blobs are opaque NSKeyedArchiver data — never inspect or
@@ -493,7 +539,12 @@ nothing here assumes a particular machine.
   `WEB_AUTH_PASSWORD` is set** (`web/proxy.ts` over `web/lib/auth.ts`: HTTP
   Basic, any username, `/api/healthz` exempt, constant-time, nothing logged);
   it is not TLS, so `web` still binds `WEB_BIND_ADDR` (default `127.0.0.1`) and
-  reads Postgres as the read-only `grafana` role.
+  reads Postgres as the read-only `grafana` role. Accounts mode
+  (`WEB_ACCOUNTS=true`, `WEB_DATABASE_URL` pointing at `web_app`) is the one
+  meant for the internet, behind a TLS proxy with `TRUST_PROXY_HEADERS=true` —
+  the optional `tunnel` Compose profile (a Cloudflare Tunnel to
+  `http://web:3000`, `COMPOSE_PROFILES=tunnel` in `.env`) is the documented
+  way; `WEB_BIND_ADDR` stays on loopback either way.
 - **Ingest and the product API throttle failed authentications, never
   successful ones** (`server/ingest/ratelimit.go`, `server/api/ratelimit.go` —
   copies across two modules; keep them in step). The refusal comes *before*

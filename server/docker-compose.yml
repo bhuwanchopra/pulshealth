@@ -76,6 +76,11 @@ services:
       GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?set in .env}
       API_DB_PASSWORD: ${API_DB_PASSWORD:?set in .env}
       INGEST_DB_PASSWORD: ${INGEST_DB_PASSWORD:?set in .env}
+      # Optional: the web_app role, which only the web viewer's accounts mode
+      # connects as (it reads health data solely through the per-user views
+      # in schema `web`). Unset, the role is not created and an existing one
+      # cannot log in. See web/README.md, "Access control".
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:-}
       # Calendar zone for every daily view (metric_daily, Grafana daily
       # panels, the api's local-day ranges). Must match the phone's zone.
       # 013_time_zone.sh validates it and stores it on the database
@@ -214,14 +219,20 @@ services:
 
   web:
     # Next.js health viewer. Reads Postgres directly over the internal
-    # network as the read-only `grafana` role — same data Grafana sees.
+    # network as the read-only `grafana` role — same data Grafana sees — or,
+    # in accounts mode, as `web_app`, which the database limits to the
+    # signed-in person's own records.
     # The developer overlay builds it from the sibling web/ directory
     # (../web relative to this file), so build from a full checkout.
     image: ghcr.io/pulshealth/web:${PULS_VERSION:-latest}
     restart: unless-stopped
     logging: *app-logging
     environment:
-      DATABASE_URL: postgres://grafana:${GRAFANA_DB_PASSWORD}@db:5432/postgres?sslmode=disable
+      # Basic and open mode: the read-only grafana role. Accounts mode must
+      # connect as web_app instead — set WEB_DATABASE_URL (see .env.example);
+      # the viewer serves no data in accounts mode as any role that can read
+      # the tables directly.
+      DATABASE_URL: ${WEB_DATABASE_URL:-postgres://grafana:${GRAFANA_DB_PASSWORD}@db:5432/postgres?sslmode=disable}
       PULS_USER_ID: ${PULS_USER_ID:-5ea4d000-0000-4000-8000-000000000001}
       PULS_TIME_ZONE: ${PULS_TIME_ZONE:-UTC}
       # Set it and every page asks for this password over HTTP Basic (any
@@ -230,6 +241,21 @@ services:
       # startup log. scripts/bootstrap.sh generates one on a fresh install
       # and prints it. See web/README.md, "Access control".
       WEB_AUTH_PASSWORD: ${WEB_AUTH_PASSWORD:-}
+      # Accounts mode: people sign in with their own email and password
+      # (invite-only, `make web-invite`) and each sees only their own
+      # records. Needs WEB_DATABASE_URL (web_app) and HTTPS in front — behind
+      # a TLS proxy, TRUST_PROXY_HEADERS=true. See web/README.md, "Access
+      # control".
+      WEB_ACCOUNTS: ${WEB_ACCOUNTS:-false}
+      # Same switch as ingest's and the API's: believe X-Forwarded-Proto/-Host
+      # and the client-address header only when a proxy that overwrites them
+      # is the only way in. WEB_CLIENT_IP_HEADER picks that header:
+      # x-forwarded-for (default), or cf-connecting-ip behind Cloudflare.
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      WEB_CLIENT_IP_HEADER: ${WEB_CLIENT_IP_HEADER:-x-forwarded-for}
+      # The viewer's public https:// address: completes the links
+      # `make web-invite` prints, and is accepted as an Origin.
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-}
     ports:
       # 3000 is Grafana. Default to loopback; to reach the viewer from other
       # machines set WEB_BIND_ADDR to a private interface, e.g. the host's
@@ -241,6 +267,34 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  tunnel:
+    # Optional, behind the `tunnel` profile: a Cloudflare Tunnel that serves
+    # the web viewer on a hostname of yours (https://viewer.example.com)
+    # without opening a port or revealing the host's address. Cloudflare
+    # terminates TLS and so sees the traffic; in return it adds its WAF, rate
+    # limiting and, optionally, Access in front. It reaches the viewer by its
+    # container name (http://web:3000 — the service URL to give the tunnel's
+    # route in the dashboard), so WEB_BIND_ADDR stays on loopback.
+    #
+    # Meant for the viewer's accounts mode (WEB_ACCOUNTS=true) with
+    # TRUST_PROXY_HEADERS=true, WEB_CLIENT_IP_HEADER=cf-connecting-ip and
+    # WEB_PUBLIC_URL set: a viewer in basic or open mode should not be on the
+    # internet. To keep it on across `docker compose up -d` and `make dev-up`,
+    # put COMPOSE_PROFILES=tunnel in .env. See server/README.md, "Exposing the
+    # server", and web/README.md, "Access control".
+    image: cloudflare/cloudflared:2026.9.3
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    logging: *app-logging
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      # The tunnel's token (Cloudflare dashboard → Networks → Tunnels → your
+      # tunnel → install connector). Whoever holds it can serve traffic for
+      # the tunnel's hostnames: treat it like a password.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - web
 
   grafana:
     # Pinned: a :latest pull to Grafana 13 silently broke datasource

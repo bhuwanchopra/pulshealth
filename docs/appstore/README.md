@@ -125,6 +125,7 @@ changes, revisit them in the same pull request:
 | The first-run flow's steps | `review-notes.md` — the reviewer walkthrough is step-by-step |
 | `ServerURLValidation`'s rules | `review-notes.md` — the ATS justification quotes them |
 | Anything about HealthKit write access | everything; read-only is the load-bearing claim |
+| The maintainer's invite-only viewer instance: who may join (today invitation only), what it stores, who carries its traffic (Cloudflare) | `privacy-policy.md` § If the developer invited you, the site's `/privacy` glance card, `listing.md` (App Privacy point 1). Opening it to sign-ups changes the App Privacy answer — decide that first |
 | What ships to the store | [Release record](#release-record) — these documents describe the shipped binary, not whatever `main` happens to be |
 
 ## Release record

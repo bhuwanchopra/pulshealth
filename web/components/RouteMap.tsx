@@ -42,6 +42,10 @@ export function RouteMap({
       attribution: spec.attribution,
       maxZoom: spec.maxZoom,
       maxNativeZoom: spec.maxNativeZoom,
+      // The page's Referrer-Policy is same-origin; tile servers (OpenStreetMap's
+      // usage policy among them) expect a Referer, so the tiles send the
+      // origin alone — what browsers sent by default before — and no path.
+      referrerPolicy: "strict-origin-when-cross-origin",
     }).addTo(map);
     tileRef.current.bringToBack();
   }, []);

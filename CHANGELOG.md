@@ -27,11 +27,36 @@ operator action, and when it does this file says so at the top of the entry.
 
 ## Unreleased
 
-No operator action. The one image that changes is `ingest`, which gains a
-subcommand and one Go dependency; there is no schema change and nothing new is
-required in `.env`.
+No operator action is required, but there is a schema migration: take
+`make backup` before upgrading, as for any. `015_web_accounts.sql` adds two
+schemas (`auth`, `web`), two functions and a set of views, and alters no
+existing table, so Grafana, the product API and ingest read and write exactly
+as before. `ingest` gains a subcommand and one Go dependency; `web` gains an
+opt-in accounts mode. Nothing new is required in `.env`; `WEB_DB_PASSWORD`
+(which `scripts/bootstrap.sh` now generates) creates the `web_app` role that
+accounts mode connects as.
 
 ### Added
+
+- **Accounts mode for the web viewer** (`WEB_ACCOUNTS=true`): invite-only
+  accounts (`make web-invite`), each person signing in with their own email
+  and password and seeing only their own records. The database enforces it:
+  the viewer connects as the new `web_app` role, which reads health data
+  only through per-user security-barrier views (schema `web`), filtered on
+  the user that every health query's transaction now sets. Sessions in a
+  `__Host-` cookie with only a hash stored, scrypt passwords, an `Origin`
+  check on every state change, failed sign-ins throttled like ingest's, an
+  account page to change the password and sign browsers out, and plain HTTP
+  refused. Needs HTTPS in front, `WEB_DATABASE_URL` and
+  `TRUST_PROXY_HEADERS=true`; see `web/README.md`, "Access control". Basic
+  and open mode are unchanged.
+- An optional `tunnel` Compose profile: a Cloudflare Tunnel that serves the
+  viewer on a domain of yours with no open port (`CLOUDFLARE_TUNNEL_TOKEN`,
+  `COMPOSE_PROFILES=tunnel`); `server/README.md`, "Exposing the server".
+- Every viewer response, in every mode, carries a Content-Security-Policy with
+  a per-request script nonce, and HSTS, `Referrer-Policy: same-origin`,
+  `X-Content-Type-Options`, `X-Frame-Options: DENY` and a
+  `Permissions-Policy`; pages are `noindex`.
 
 - **Every pairing path ends in a QR code, and none needs `qrencode`.**
   `ingest qr` renders a terminal QR code in pure Go from a payload on stdin
@@ -63,6 +88,12 @@ required in `.env`.
 
 - `make devices ARGS='issue --name "My iPhone"'` no longer dies in `test` on
   the quoted label.
+- `make restore` drops the viewer's `auth` and `web` schemas along with
+  `public`: left in place, `pg_restore` stopped at `schema "auth" already
+  exists` with `public` already gone.
+- The viewer's return-path check refuses control characters and backslashes.
+  Browsers strip tabs and newlines from a URL, so the user switcher's `next`
+  field could be pointed off-site as `/<tab>/example.com`.
 
 ## [0.2.0] - 2026-09-18
 

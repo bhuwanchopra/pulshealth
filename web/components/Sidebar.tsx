@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { GROUPS, GROUP_LABELS } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
 import type { DataSourceInfo, User } from "@/lib/types";
-import { GridIcon, GroupIcon, HomeIcon, SettingsIcon, WorkoutIcon } from "./Icons";
+import { GridIcon, GroupIcon, HomeIcon, SettingsIcon, SignOutIcon, UserIcon, WorkoutIcon } from "./Icons";
+import { BrandMark } from "./BrandMark";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserSwitcher } from "./UserSwitcher";
 
@@ -13,10 +14,13 @@ export function Sidebar({
   source,
   users,
   currentUserId,
+  account = null,
 }: {
   source: DataSourceInfo;
   users: User[];
   currentUserId: string;
+  /** The signed-in account, in accounts mode; null otherwise. */
+  account?: { email: string } | null;
 }) {
   const path = usePathname();
   // A choice is only worth offering when there is one — or when the current
@@ -34,11 +38,7 @@ export function Sidebar({
     <aside className="sidebar">
       <Link href="/" className="brand">
         <span className="brand-mark">
-          <svg width="26" height="26" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
-            <g transform="translate(6 129)">
-              <path d="M40.004 381.819C86.4752 376.225 136.051 373.615 185.474 368.206C211.166 365.394 236.828 362.22 251.472 389.171C265.755 415.459 265.1 448.859 264.639 477.978C263.77 532.879 259.305 587.742 260.278 642.67C260.754 669.528 258.022 725.86 300.01 718.194C321.698 714.236 339.41 697.641 353.442 681.436C379.454 651.394 396.473 614.015 411.631 577.456C472.185 431.404 513.294 277.599 577.976 133.131C583.292 121.898 584.866 118.279 590.641 107.263C592.882 102.989 595.211 98.7631 597.549 94.5431C600.296 89.5831 604.962 81.5231 607.973 76.9347C619.693 59.0723 640.007 24.9456 664.419 47.4087C685.984 67.2492 688.825 100.78 689.068 128.397C689.63 192.023 679.483 257.719 672.043 320.882C669.018 346.575 660.288 376 674.308 399.876C692.058 430.105 734.56 433.139 765.245 430.754C835.383 425.31 907.083 399.616 973.199 376.038" stroke="#0092FF" strokeWidth="80" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
-            </g>
-          </svg>
+          <BrandMark />
         </span>
         <span className="brand-name">PulsHealth</span>
       </Link>
@@ -75,11 +75,31 @@ export function Sidebar({
 
       <div className="nav-section" style={{ marginTop: 0 }}>
         {showSwitcher && <UserSwitcher users={users} currentUserId={currentUserId} />}
+        {account && (
+          <Link
+            href="/account"
+            aria-current={path === "/account" ? "page" : undefined}
+            className={`nav-link${path === "/account" ? " active" : ""}`}
+            title={`Signed in as ${account.email}`}
+          >
+            <UserIcon className="nav-icon" />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.email}</span>
+          </Link>
+        )}
         <Link href="/settings" className={`nav-link${path === "/settings" ? " active" : ""}`}>
           <SettingsIcon className="nav-icon" />
           <span>Settings</span>
         </Link>
         <ThemeToggle />
+        {account && (
+          // A form post, not a link: signing out changes state, and works without JavaScript.
+          <form method="post" action="/api/auth/logout">
+            <button type="submit" className="nav-link" style={{ width: "100%", cursor: "pointer", background: "transparent" }}>
+              <SignOutIcon className="nav-icon" />
+              <span>Sign out</span>
+            </button>
+          </form>
+        )}
         <div className="chip" style={{ marginTop: 10, width: "100%", justifyContent: "flex-start" }} title={source.detail}>
           <span
             className="dot"

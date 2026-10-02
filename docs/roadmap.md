@@ -58,9 +58,6 @@ Decided 2026-10-01.
   replace pairing by QR code, which already works.
 - **A per-user read token for the product API** (SRV-11). Multi-user reads are
   off by default (`PULS_MULTI_USER`), and no household has asked for one.
-- **A viewer-scoped database role** (SRV-10). The viewer already reads as the
-  read-only `grafana` role, which cannot see `device_tokens`; a second
-  read-only role over the same tables would separate almost nothing.
 - **Alternative sinks** (APP-11). `HealthSyncEngine.buildTransport` hardcodes
   `HTTPSyncTransport`, and a transport set with `setTransport` lives only in
   memory, so a cold background launch rebuilds HTTP from the persisted URL

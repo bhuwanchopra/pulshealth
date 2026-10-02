@@ -67,8 +67,14 @@ Everything in this repository is in scope, in particular:
   is in scope; data sent anywhere other than the configured server.
 - **Compose stack and schema** (`server/docker-compose.yml`, `server/db/migrations`):
   defaults that expose a service or credential more widely than documented.
-- **Web viewer** (`web/`): only as deployed the documented way — bound to
-  loopback or a private interface. See the note below.
+- **Web viewer** (`web/`): as deployed the documented way — bound to loopback
+  or a private interface, or in accounts mode behind a TLS proxy. In accounts
+  mode in particular: reading another account's records by any route;
+  signing in without the password or a valid invite; a session that survives
+  sign-out, a password change or an invite reset; cross-site request forgery;
+  getting past the failed-sign-in throttle; an open redirect; and any table
+  holding per-user data that the `web_app` database role can read directly
+  rather than through its per-user views. See the notes below.
 
 Out of scope:
 
@@ -76,7 +82,8 @@ Out of scope:
   TimescaleDB, Grafana, Next.js, Go modules). Report those upstream; a report
   here is welcome if the project pins a version with a known fix available.
 - Deployments that diverge from the documentation, such as publishing the web
-  viewer, Grafana, or the database port on a public interface.
+  viewer in open or basic mode, Grafana, or the database port on a public
+  interface.
 - Attacks that require an unlocked phone in hand, or a compromised server host.
 - HealthKit behaviour (delivery latency, permission-sheet quirks). Those are
   bugs, not vulnerabilities; use the issue tracker.
@@ -87,8 +94,12 @@ These are documented properties of the current design; what is still open is
 in `docs/roadmap.md`. They are not vulnerabilities to report; they are context
 for judging what is.
 
-- **Self-hosted.** No PulsHealth service ever receives your data. Where your
-  server runs, how it is exposed, and who can reach it are your decisions.
+- **Self-hosted.** PulsHealth is software you run; no PulsHealth service
+  receives your data. Where your server runs, how it is exposed, and who can
+  reach it are your decisions. The maintainer runs one invite-only instance
+  for family and friends (the viewer at `app.pulshealth.com`); a report about
+  the software covers it too, and one about that instance's configuration is
+  welcome through the same channel.
 - **Bearer tokens.** The ingest server accepts two kinds. The shared
   `PULS_TOKEN` is a single static value: anyone who holds it can upload,
   delete, and (via the reconciliation endpoints) enumerate samples for *any*
@@ -128,11 +139,28 @@ for judging what is.
 - **TLS is yours to provide.** Every service binds to loopback by default. The
   phone must reach the ingest port over HTTPS through a TLS-terminating
   reverse proxy or a VPN; the token is only a second layer.
-- **The web viewer has no login unless you give it one.** It is a read-only
-  page over the health database. Setting `WEB_AUTH_PASSWORD` puts it behind
-  HTTP Basic authentication; with the variable unset it is open to anyone who
-  can reach the port. Either way its bind address is the primary access
-  control, so keep `WEB_BIND_ADDR` on loopback or a private network.
+- **The web viewer has three modes** (`web/README.md`, "Access control").
+  Open, with no login, for loopback only; basic, one shared
+  `WEB_AUTH_PASSWORD` over HTTP Basic, behind which everyone sees every user —
+  in both, the bind address is the primary access control, so keep
+  `WEB_BIND_ADDR` on loopback or a private network; and accounts
+  (`WEB_ACCOUNTS=true`), with invite-only accounts and HTTPS required.
+- **Accounts mode: what the database enforces, and what it does not.** The
+  viewer connects as `web_app`, which has no grant on any table holding
+  health data and reads it only through security-barrier views filtered on a
+  transaction-local setting (`server/db/migrations/015_web_accounts.sql`;
+  views, not row-level security, which TimescaleDB refuses on compressed
+  hypertables). That turns a query that forgets its user filter into a
+  harmless one. It does not make a compromised viewer harmless: code running
+  as `web_app` — an SQL injection, a compromised container — can set the
+  setting to any user, and can read the account table (email addresses,
+  scrypt password hashes, session hashes), which sign-in needs. Shared,
+  non-health metadata is readable by every account's role: the list of
+  HealthKit type identifiers seen on the server, and TimescaleDB catalog
+  information such as approximate row counts and chunk time ranges, reachable
+  only with arbitrary SQL. Failed sign-ins are throttled in process, per
+  address and per email, and reset when the container restarts. The viewer
+  sends no email, so a forgotten password is a new invite from the operator.
 - **Health data at rest.** The database holds identifiable data (name, email,
   date of birth, sex) alongside samples. Ingest connects as the scoped
   DML-only `ingest` role, which cannot create or drop objects; set

@@ -211,7 +211,7 @@ summary.
 | `NNN_name.sql` | One-shot: applied once, in one transaction with its `schema_migrations` row (`psql --single-transaction`, `ON_ERROR_STOP`), so a failed file leaves nothing behind and is retried next run. Applied files are immutable: the migrator stops if a recorded file's checksum changed (put the change in a new file) or a recorded file is missing (never rename or delete one). |
 | `-- puls:rerun` on the first line | Re-applied whenever its checksum changes. For `CREATE OR REPLACE`/upsert files edited in place: `009_metric_daily.sql` (the view and `puls_time_zone()`) and `010_category_labels.sql` (the label seed). |
 | `-- puls:no-transaction` on the first line | Applied statement by statement, for a statement that cannot run in a transaction block (`008_quantity_rollups.sql`: `refresh_continuous_aggregate`). Must be idempotent: a mid-file failure is retried from the top. |
-| `NNN_name.sh` | Run on every invocation, never recorded: `013_time_zone.sh` (stores `PULS_TIME_ZONE`) and `099_read_roles.sh` (creates the `grafana`, `api_reader` and `ingest` roles and sets their passwords from `GRAFANA_DB_PASSWORD`, `API_DB_PASSWORD` and `INGEST_DB_PASSWORD`). |
+| `NNN_name.sh` | Run on every invocation, never recorded: `013_time_zone.sh` (stores `PULS_TIME_ZONE`) and `099_read_roles.sh` (creates the `grafana`, `api_reader` and `ingest` roles and sets their passwords from `GRAFANA_DB_PASSWORD`, `API_DB_PASSWORD` and `INGEST_DB_PASSWORD`; and, when `WEB_DB_PASSWORD` is set, `web_app`, the web viewer's accounts-mode role). |
 
 **Adding a migration.** Create the next `NNN_name.sql` (three digits, an
 underscore, a name) with plain DDL/DML — no `BEGIN`/`COMMIT`, the migrator
@@ -221,7 +221,17 @@ Fresh and existing installs take the same path. New tables are readable by
 `099_read_roles.sh` sets (the script then revokes `grafana`'s SELECT on
 `device_tokens` on every run — credential hashes are not dashboard
 material). `api_reader` has an exact grant list instead: extend that script
-and its assertion when the product API reads a new table. Because `migrate`
+and its assertion when the product API reads a new table. So does `web_app`,
+the web viewer's role in accounts mode, which reads health data only through
+the per-user, security-barrier views in schema `web`
+(`015_web_accounts.sql`, filtered on the `puls.user_id` setting the viewer
+puts in each transaction). The views are rebuilt on every run by
+`puls_create_web_views()`, so a CASCADE or a column change heals itself on
+the next `docker compose up -d`; a table the viewer newly reads needs a new
+migration replacing that function, a `GRANT` and an expected row in the
+script, whose assertion fails the run on any other relation in `web` and if
+`web_app` could read any table with a `user_id` directly. (Views, not row-level security: TimescaleDB refuses
+`ENABLE ROW LEVEL SECURITY` on a hypertable with columnstore enabled.) Because `migrate`
 applies every pending file before `ingest` starts, a table `InsertBatch`
 writes unconditionally is always there before the code that writes it.
 
@@ -527,6 +537,49 @@ cannot join the tailnet; the token is then the only gate, so rotate it if it
 leaks. Grafana, the product API and the MCP server stay on loopback and are
 reached only this way (or through your own proxy with its own
 authentication).
+
+### The web viewer on your own domain: Cloudflare Tunnel
+
+To let people outside your tailnet use the web viewer — family on their own
+phones, say — run it in **accounts mode** (each person signs in and sees only
+their own records; `web/README.md`, "Access control") and publish it through
+the optional `tunnel` service, a Cloudflare Tunnel. It needs a domain whose
+DNS is on Cloudflare, and no open port: `cloudflared` dials out and reaches
+the viewer as `http://web:3000` on the Compose network, so `WEB_BIND_ADDR`
+stays on loopback. Cloudflare terminates TLS, so it sees the traffic — say so
+to the people you invite.
+
+1. In the Cloudflare dashboard, create a tunnel (Networks → Tunnels), add a
+   published application route for your hostname (`viewer.example.com`) with
+   the service `http://web:3000`, and copy the tunnel's token.
+2. In `.env`:
+
+   ```bash
+   CLOUDFLARE_TUNNEL_TOKEN=<token>
+   COMPOSE_PROFILES=tunnel              # start the tunnel on every `up -d`
+   WEB_ACCOUNTS=true
+   WEB_DATABASE_URL=postgres://web_app:${WEB_DB_PASSWORD}@db:5432/postgres?sslmode=disable
+   TRUST_PROXY_HEADERS=true             # the tunnel is the only way in
+   WEB_CLIENT_IP_HEADER=cf-connecting-ip
+   WEB_PUBLIC_URL=https://viewer.example.com
+   ```
+
+   `CF-Connecting-IP` is the header to key throttling on: Cloudflare sets it
+   itself, whereas it appends to a client's `X-Forwarded-For`.
+   `TRUST_PROXY_HEADERS` is shared with ingest and the API; if ingest is
+   reached some other way that does not overwrite `X-Forwarded-For`, read
+   "Rate limiting" before turning it on.
+3. `docker compose up -d` (or `make dev-up`), then invite people:
+   `make issue-device NAME='…' ARGS='--user <uuid>'` for their phone, and
+   `make web-invite ARGS='--user <uuid> --email <address>'` for the viewer.
+
+While the viewer is invite-only, a second lock costs nothing: put Cloudflare
+Access (a one-time PIN to the invited addresses, or your identity provider) in
+front of the hostname, and add a Cloudflare rate-limiting rule on `/login`,
+`/invite/*` and `/api/auth/*` on top of the viewer's own throttling. Check
+from outside that `http://` is redirected to `https://` (Cloudflare's "Always
+Use HTTPS"), that `/workouts` sends you to `/login`, and that the viewer's log
+says `mode=accounts`.
 
 ## API
 
@@ -909,14 +962,17 @@ throwaway container, never staged in a temporary file). Flags go through
 | `--no-start` | Leave the app services stopped afterwards; `docker compose up -d` when you are ready. |
 
 In order, it: starts `db` and verifies the archive is readable; stops
-`ingest`, `api`, `mcp`, `web` and `grafana`; drops and recreates the
+`ingest`, `api`, `mcp`, `web` and `grafana`; drops the web viewer's
+`web` and `auth` schemas (the dump recreates them; left in place they stop
+`pg_restore` at "schema already exists"), then drops and recreates the
 `public` schema while TimescaleDB is still live, so its event triggers
 dismantle hypertable chunks and continuous aggregates properly; reinstalls
 the extension (it lives in `public`, so the drop takes it too); runs
 `timescaledb_pre_restore()`, a **single-threaded** `pg_restore --no-owner
 --no-privileges`, `timescaledb_post_restore()` and `ANALYZE`; and finally
 `docker compose up -d`, where `migrate` recreates the `grafana`,
-`api_reader` and `ingest` roles from `.env` with their grants. The first
+`api_reader`, `ingest` and (with `WEB_DB_PASSWORD`) `web_app` roles from
+`.env` with their grants. The first
 check is the important one: a truncated file, a plain-SQL dump, the wrong
 file or a name not in the store is refused **before** anything is dropped.
 

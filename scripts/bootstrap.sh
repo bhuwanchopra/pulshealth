@@ -66,6 +66,10 @@ secrets='POSTGRES_PASSWORD PULS_TOKEN PULS_API_TOKEN PULS_MCP_TOKEN GRAFANA_PASS
 # emptying the value is the documented way to turn the login off again. Shorter
 # than the 32-byte tokens because a person types this one into a browser.
 optional_secrets='WEB_AUTH_PASSWORD'
+# Same footing, at full length: the password of the web_app database role, which
+# only the viewer's accounts mode (WEB_ACCOUNTS=true) connects as. An older
+# .env without it simply has no web_app role (099_read_roles.sh skips it).
+optional_db_secrets='WEB_DB_PASSWORD'
 
 opt_time_zone=''
 opt_lan=0
@@ -629,7 +633,10 @@ else
   for key in $optional_secrets; do
     env_set "$key" "$(openssl rand -hex 12)"
   done
-  note "Generated: $secrets $optional_secrets"
+  for key in $optional_db_secrets; do
+    env_set "$key" "$(openssl rand -hex 32)"
+  done
+  note "Generated: $secrets $optional_secrets $optional_db_secrets"
 
   zone=''
   zone_source=''

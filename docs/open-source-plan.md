@@ -149,8 +149,8 @@ and so are the ones decided against (its "Not planned").
 | SRV-7 | Auth-failure rate limiting on ingest and the API. | S | Done |
 | SRV-8 | Per-device tokens: enroll → pending → approve; hashed at rest; last-seen; revocable; bound to a user. | S | Done server side (`make devices`); phone-side enrollment not planned — roadmap, Not planned |
 | SRV-9 | Opt-in backups with retention, and a documented restore drill. | S | Done (the `backup` profile) |
-| SRV-10 | Web viewer auth, and a viewer-scoped database role instead of `grafana`. | S | Auth done (`WEB_AUTH_PASSWORD`); the viewer keeps the read-only `grafana` role — roadmap, Not planned |
-| SRV-11 | A second user without a volume wipe. | S | Writes, and reads through the API, viewer and MCP server, done; a per-user read token is not planned — roadmap, Not planned |
+| SRV-10 | Web viewer auth, and a viewer-scoped database role instead of `grafana`. | S | Done, in two forms: `WEB_AUTH_PASSWORD` (one shared password, the `grafana` role) and accounts mode (`WEB_ACCOUNTS`: invite-only accounts, and the `web_app` role, which the database limits to the signed-in person's records) |
+| SRV-11 | A second user without a volume wipe. | S | Writes, and reads through the API, viewer and MCP server, done; in the viewer's accounts mode each person signs in and reads only their own records. A per-user read token for the product API is not planned — roadmap, Not planned |
 | SRV-12 | Grafana contact point from `GRAFANA_ALERT_EMAIL`; alert thresholds documented as tunables. | S | Done |
 | SRV-13 | The API additions agents ask for first — sleep, raw samples, workout series, State of Mind — and pagination on daily metrics. | S | Done: `/v1/metrics/daily` pages in days across the requested types (`limit`, `offset`, `nextOffset`) |
 
@@ -203,6 +203,13 @@ and so are the ones decided against (its "Not planned").
 
 - Android / Health Connect. The protocol is platform-neutral in shape, but
   the v1 type vocabulary is HealthKit identifiers.
-- A hosted PulsHealth service.
+- A hosted PulsHealth service open to anyone. The maintainer runs one
+  invite-only instance of the viewer for family and friends, which is close
+  to a shared self-hosted install, and the privacy policy describes it.
+  Opening it to sign-ups would make the maintainer a vendor of personal
+  health records — in the US the FTC Health Breach Notification Rule likely
+  applies, the App Store "Data Not Collected" answer likely changes for those
+  users, and email verification, password reset and account deletion become
+  mandatory — so it needs a decision of its own, not a configuration change.
 - Writing data back into HealthKit.
 - Native non-HTTP sinks in the app (see D3).

@@ -76,6 +76,13 @@ export const UserIcon = (p: P) => (
   </Svg>
 );
 
+export const SignOutIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+    <path d="M10 17 5 12l5-5M5 12h11" />
+  </Svg>
+);
+
 export const SettingsIcon = (p: P) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />

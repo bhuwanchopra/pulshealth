@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const queryMock = vi.hoisted(() => vi.fn());
-vi.mock("./db", () => ({ query: queryMock }));
+// scoped() runs the callback's statements through the same mock; its
+// transaction and user setting are lib/db.ts's business, tested there.
+vi.mock("./db", () => ({
+  query: queryMock,
+  scoped: (_userId: string, fn: (q: typeof queryMock) => Promise<unknown>) => fn(queryMock),
+}));
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const STEPS = "HKQuantityTypeIdentifierStepCount";

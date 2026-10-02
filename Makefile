@@ -8,7 +8,7 @@ COMPOSE       := docker compose --project-directory server -f server/docker-comp
 COMPOSE_BUILD := $(COMPOSE) -f server/compose.build.yml
 ARGS          ?=
 
-.PHONY: help bootstrap up down pull logs ps migrate baseline pairing issue-device devices dev-up \
+.PHONY: help bootstrap up down pull logs ps migrate baseline pairing issue-device devices web-invite dev-up \
         backup backup-list restore site-dev site-build site-lint deploy-site
 
 help: ## List targets
@@ -55,6 +55,14 @@ issue-device: ## Issue a per-device token and print its pairing QR: NAME='My iPh
 devices: ## Per-device tokens: ARGS='list [--all]' | 'issue --user <uuid> --name <label> [--url <url>] [--no-qr]' | 'revoke <id>' | 'rename <id> <label>'
 	@$(if $(strip $(ARGS)),:,echo "usage: make devices ARGS='list|issue --user <uuid> --name <label>|revoke <id>|rename <id> <label>'"; exit 2)
 	$(COMPOSE) run --rm --no-deps -e PULS_PUBLIC_URL="$$(scripts/bootstrap.sh --print-url 2>/dev/null || true)" ingest devices $(ARGS)
+
+# Accounts mode only (WEB_ACCOUNTS=true): a one-time link that creates the
+# person's viewer account, or resets its password. Runs inside the running web
+# container, so it uses that container's database role and WEB_PUBLIC_URL.
+# The user must exist first — `make issue-device` creates it.
+web-invite: ## Invite someone to the web viewer (accounts mode): ARGS='--user <uuid> --email <address> [--admin]'
+	@$(if $(strip $(ARGS)),:,echo "usage: make web-invite ARGS='--user <uuid> --email <address> [--admin] [--url https://<viewer host>]'"; exit 2)
+	$(COMPOSE) exec web node scripts/invite.mjs $(ARGS)
 
 dev-up: ## Build the four app images from this checkout and start the stack
 	DEPLOY_COMMIT=$$(git rev-parse HEAD 2>/dev/null || echo unknown) $(COMPOSE_BUILD) up -d --build $(ARGS)

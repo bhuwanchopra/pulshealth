@@ -1,6 +1,6 @@
 # PulsHealth privacy policy
 
-**Last updated: 2026-09-30**
+**Last updated: 2026-10-02**
 
 PulsHealth is an iOS app that copies the health data on your iPhone to a
 database **you** run, or — if you have no database — writes it to files you
@@ -11,9 +11,12 @@ that is the whole of it.
 
 ## The short version
 
-- **The developer of PulsHealth receives no data from you.** None. There is no
-  PulsHealth account, no PulsHealth service, no telemetry endpoint, and no
-  server operated by the developer that the app talks to.
+- **The developer of PulsHealth receives no data from you** — unless they have
+  invited you to use their own database, which is then the one you enter in
+  the app (see [If the developer invited you](#if-the-developer-invited-you)).
+  There is no account to sign up for, no telemetry endpoint, and no
+  developer server built into the app: it talks to the database address you
+  enter and to nothing else.
 - **Your health data leaves the phone in two ways, and both are yours.** The
   app uploads only to the database URL you enter in it — typed, or taken from
   your database's pairing code (scanned, pasted, or opened as a link you
@@ -207,15 +210,53 @@ provider's responsibility are yours:
   database. What you point at it, and what those tools do with the data, is
   outside the app's control.
 
+## If the developer invited you
+
+The developer runs one PulsHealth database of their own, with the web viewer
+at `app.pulshealth.com`, for family and friends they invite. There is no
+sign-up: an account exists only because the developer created an invite for
+you. If you use it:
+
+- **The app still works exactly as described above.** It uploads only to the
+  database address you entered — in this case the developer's — and to
+  nowhere else.
+- **The developer holds your data.** Everything the app uploads (the health
+  data you chose to sync, and the identity fields if you filled them in) is
+  stored in the developer's database under your own user ID. The developer,
+  as the person who runs that database, can access it. It is used for one
+  thing: showing it back to you. It is not sold, shared or analysed, and no
+  one else who uses the viewer can see it — the database itself limits each
+  signed-in person to their own records.
+- **Your viewer account.** Signing in to the viewer stores your email
+  address, a one-way hash of your password (never the password), and, for
+  each browser you sign in from, when it signed in and was last used, its
+  browser and system name, and its IP address. The viewer sets one cookie,
+  which keeps you signed in; it holds a random value and nothing else.
+- **Cloudflare carries the viewer's traffic.** `app.pulshealth.com` is
+  reached through Cloudflare, which terminates its TLS connection and so
+  handles the pages you open, health data on them included, under
+  [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
+  If the developer has put Cloudflare Access in front of it, signing in there
+  sends your email address to Cloudflare for a one-time code.
+- **Maps.** A workout's route map is drawn by your browser fetching map tiles
+  directly from the provider named on the map (Esri, OpenStreetMap or
+  OpenTopoMap). Those requests carry no health data, but they do reveal to
+  that provider which area the map shows, and the viewer's address.
+- **Leaving.** Ask the developer, and they delete your viewer account and
+  every row stored under your user ID; delete the app's database address (or
+  the app) to stop uploading.
+
 ## The website
 
-Everything above is about the app. This section is about pulshealth.com,
+Everything above is about the app and, in the section just before this one,
+the developer's own viewer. This section is about pulshealth.com,
 which is a separate thing.
 
 The site is a set of static files. It loads no analytics, sets no cookies,
 and includes no tracking scripts or third-party embeds. No health data ever
 passes through it: the app does not talk to it, and there is nothing to sign
-in to.
+in to on it. Its "Sign in" link leads to the developer's invite-only viewer
+at `app.pulshealth.com`, a separate site described in the section above.
 
 Two forms on the site — "Sign up for updates" and the consulting contact
 form — send exactly what you type into them (a name, an email address, and

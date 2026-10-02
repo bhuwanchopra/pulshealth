@@ -67,11 +67,34 @@ time. Which one:
 **This is a preference, not access control.** Everyone behind the one
 `WEB_AUTH_PASSWORD` can look at every user, and the cookie is nothing but the
 chosen id (a forged value is at worst an id the database does not have, which
-renders empty — with the switcher there to pick a real one). The viewer cannot
-limit a person to their own records, so share the password only with people
-who may see everything in the database.
+renders empty — with the switcher there to pick a real one). In Basic mode the
+viewer cannot limit a person to their own records, so share the password only
+with people who may see everything in the database — or use accounts mode.
+
+**None of this applies in accounts mode** (below): there the user is the
+signed-in account's, `?user=` and the `puls-user` cookie are ignored, the
+switcher and `/api/user` do not exist, and the list of users is never read.
 
 ## Access control
+
+The viewer runs in one of three modes, chosen from the environment at every
+request (`lib/mode.ts`) and named in its startup log
+(`docker compose logs web | grep puls-web`):
+
+| Mode | Set | Who sees what |
+|---|---|---|
+| **open** | neither variable | Anyone who can reach the port sees every user. Fine on loopback only. |
+| **basic** | `WEB_AUTH_PASSWORD` | One shared password; everyone who has it sees every user. |
+| **accounts** | `WEB_ACCOUNTS=true` | Each person signs in with their own email and password and sees only their own records — enforced by the database. Invite-only. Wins if both are set. |
+
+Every mode sends the same hardening headers: a per-request
+Content-Security-Policy with a script nonce (`proxy.ts`,
+`lib/securityHeaders.ts`; scripts run only with the nonce, images only from
+this origin and the map's tile servers), and from `next.config.ts`
+`Strict-Transport-Security`, `Referrer-Policy: same-origin`,
+`X-Content-Type-Options`, `X-Frame-Options: DENY` and a `Permissions-Policy`.
+
+### Basic mode
 
 **`WEB_AUTH_PASSWORD` is a password prompt in front of the whole viewer.** Set
 it and every route asks for HTTP Basic credentials; leave it empty and the
@@ -110,6 +133,95 @@ to reach it from other machines, use a private overlay network (Tailscale, a
 VPN), an SSH tunnel, or an HTTPS reverse proxy — never `0.0.0.0` on an
 untrusted network, and never directly on the internet.
 
+### Accounts mode
+
+For a viewer that more than one person uses, or one on the public internet:
+each person has their own account and sees only their own records.
+
+**The database decides what a signed-in person can read.** In accounts mode
+the viewer connects as `web_app`, a role with no grant on any table that holds
+health data. It reads them only through the per-user, security-barrier views
+in schema `web` (`server/db/migrations/015_web_accounts.sql`), filtered on the
+`puls.user_id` setting that `scoped()` in `lib/db.ts` puts in every
+transaction from the signed-in session. A query here that forgot its
+`WHERE user_id` would still return that person's rows and nobody else's, and
+one run without the setting returns nothing. The viewer refuses to serve data
+in accounts mode while connected as any role that can read the tables
+directly (`/api/healthz` says so). What this does **not** defend against is a
+compromised viewer: code running as `web_app` can set the user itself.
+
+Turn it on in `server/.env`, then `docker compose up -d`:
+
+```bash
+WEB_DB_PASSWORD=...          # bootstrap.sh generates it; creates the web_app role
+WEB_ACCOUNTS=true
+WEB_DATABASE_URL=postgres://web_app:${WEB_DB_PASSWORD}@db:5432/postgres?sslmode=disable
+TRUST_PROXY_HEADERS=true     # behind the TLS proxy that is the only way in
+WEB_PUBLIC_URL=https://viewer.example.com
+WEB_CLIENT_IP_HEADER=cf-connecting-ip   # behind Cloudflare only
+```
+
+**It needs HTTPS.** The session cookie is `Secure`, and a password should
+never cross plain HTTP, so accounts mode answers plain-HTTP requests with a
+403 — everything but `/api/healthz`. The container itself speaks HTTP, so put
+it behind a TLS proxy (a Cloudflare Tunnel — see `server/README.md`,
+"Exposing the server" — Tailscale Serve, or a reverse proxy) that is the only
+way to reach it, and set `TRUST_PROXY_HEADERS=true` so `X-Forwarded-Proto`,
+`X-Forwarded-Host` and the client address are believed. Keep `WEB_BIND_ADDR`
+on loopback. `next dev` on `http://localhost` works without a proxy.
+
+**Inviting people.** There is no sign-up. An operator runs, for each person:
+
+```bash
+make issue-device NAME='Ann’s iPhone' ARGS='--user <uuid>'   # the phone's token; creates the user
+make web-invite ARGS='--user <uuid> --email ann@example.com' # a one-time viewer link
+```
+
+The second prints `https://<WEB_PUBLIC_URL>/invite/<token>`, valid once for 48
+hours (`--hours`). Opening it asks for a password (at least 10 characters) and
+signs the person in. An invite for a user who already has an account resets
+its password and signs it out everywhere — that is the way back in after a
+forgotten password, since the viewer sends no email. `--admin` marks the
+account as an administrator (no extra powers yet). The viewer never issues or
+shows an ingest token; pairing a phone stays the operator's step.
+
+**Signing in.** `/login`, `/invite/<token>`, their two POST endpoints,
+`/api/auth/logout`, build assets and `/api/healthz` are reachable without a
+session; everything else redirects to `/login?next=…` (pages) or answers 401.
+`/account` changes the password (it needs the current one, and signs out every
+other browser) and lists the account's sessions with a sign-out for each.
+Details:
+
+- Passwords are hashed with scrypt (N=2¹⁵, r=8, p=1, 32-byte salt) from
+  `node:crypto` (`lib/accounts/password.ts`); old parameters are upgraded on
+  the next sign-in.
+- The session cookie `__Host-puls-session` is `HttpOnly; Secure;
+  SameSite=Lax; Path=/` and carries 32 random bytes; the database keeps only
+  their SHA-256 (`auth.sessions`). Sessions last 30 days from last use. Every
+  sign-in gets a new session id, signing out deletes the session row (so a
+  copy of the cookie stops working), and a password change or an invite
+  reset ends every session of the account and starts a fresh one.
+- Every state-changing request must carry an `Origin` of this viewer
+  (`lib/accounts/request.ts`), on top of `SameSite=Lax`.
+- Failed sign-ins, bad invite links and wrong current passwords are throttled
+  per client address and per email address, with the same token bucket as
+  ingest and the product API (10, refilling 10 a minute; only failures draw,
+  and an exhausted bucket is refused before the password is looked at). An
+  attempt takes its token before the check and gets it back on success, so
+  a burst of parallel guesses cannot all slip past while scrypt runs.
+  Nothing about a failed attempt is logged.
+- The client address is `X-Forwarded-For`'s first entry, or the header
+  `WEB_CLIENT_IP_HEADER` names (`cf-connecting-ip` behind Cloudflare, which
+  appends to `X-Forwarded-For` rather than overwriting it).
+- The sign-in error never says which of email and password was wrong, and an
+  unknown email costs the same scrypt as a wrong password.
+
+The code: `proxy.ts` and `lib/accounts/` (policy, request facts, sessions,
+passwords, throttling, the account store), the routes under `app/login`,
+`app/invite`, `app/account` and `app/api/auth`, and `scripts/invite.mjs`.
+`lib/accounts.integration.test.ts` and `lib/webapp.integration.test.ts` run
+the whole flow and the role's isolation against a real database in CI.
+
 ## What's here
 
 | Route | View |
@@ -132,8 +244,11 @@ web/
     ├── catalog.generated.ts  # GENERATED from ../docs/protocol/catalog.json (npm run gen:catalog)
     ├── catalog.ts       # the web catalog: generated core + web-only overlay, GROUPS, lookups
     ├── queries.ts       # the single data API (user id as first argument); local demo fallback
-    ├── viewer.ts        # which user this request shows: puls-user cookie, else PULS_USER_ID
-    ├── db.ts            # pg pool (server-only)
+    ├── viewer.ts        # which user this request shows: the session's (accounts), else puls-user cookie / PULS_USER_ID
+    ├── mode.ts          # open / basic / accounts, from the environment
+    ├── accounts/        # accounts mode: policy, sessions, passwords, throttling, account store
+    ├── securityHeaders.ts # per-request CSP (nonce) and the static hardening headers
+    ├── db.ts            # pg pool; scoped() runs health reads as one user (server-only)
     ├── demo.ts          # deterministic synthetic data
     ├── metrics.ts       # cumulative-vs-instantaneous classification, time ranges
     ├── chart.ts         # SVG path / scale helpers
@@ -144,8 +259,10 @@ web/
 **How data is read.** Like Grafana, the viewer queries TimescaleDB directly
 rather than going through the product API: `quantity_samples` /
 `category_samples` / `workouts` joined to `sample_types`, bucketed with
-`time_bucket()`. Every health-data read is scoped to the chosen user (the
-`puls-user` cookie, else `PULS_USER_ID` — see "Choosing a user"), with calendar
+`time_bucket()`. Every health-data read runs in one read-only transaction
+scoped to the user being shown (`scoped()` in `lib/db.ts`: the session's user
+in accounts mode, else the `puls-user` cookie or `PULS_USER_ID` — see
+"Choosing a user"), with calendar
 boundaries in `PULS_TIME_ZONE`. Sleep and mindful sessions are durations, Stand
 Hours count only stood records, and other categories are occurrence counts.
 Cumulative raw samples total each source separately and choose the highest source

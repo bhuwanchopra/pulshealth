@@ -32,7 +32,7 @@ the self-hosted backend is pre-release.
 | `server/mcp/` | Go MCP server, read-only, over the product API only | `server/mcp/README.md`, `docs/ai.md` |
 | `server/db/` | `migrate.sh` and the numbered migrations it applies | `server/README.md` |
 | `server/backup/` | The opt-in `backup` Compose profile: scheduled `pg_dump`s and the restore drill | `server/README.md` |
-| `web/` | Next.js viewer, reads Postgres directly. **Not** `site/` | `web/README.md` |
+| `web/` | Next.js viewer, reads Postgres directly (in accounts mode as `web_app`, limited by the database to the signed-in person). **Not** `site/` | `web/README.md` |
 | `site/` | Next.js static export behind **pulshealth.com**: marketing pages, blog, knowledge-base viewer. Built with **bun**, not npm | `site/README.md` |
 | `knowledge-base/`, `blog/` | The site's content: 178 YAML HealthKit type files and the MDX posts with their images | `knowledge-base/README.md`, `blog/BLOG_SYSTEM.md` |
 | `docs/protocol/` | The Puls Sync Protocol v1 spec, JSON Schemas, fixtures | `docs/protocol/README.md` |

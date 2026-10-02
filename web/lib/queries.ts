@@ -12,7 +12,7 @@
 // result stays empty.
 
 import { cache } from "react";
-import { query } from "./db";
+import { query, scoped, type QueryFn } from "./db";
 import { typeByIdentifier } from "./catalog";
 import { configuredTimeZone } from "./config";
 import { defaultAgg, RANGES, resolvePresetWindow } from "./metrics";
@@ -177,13 +177,14 @@ async function metricDailyUsable(): Promise<boolean> {
 const DAY_MS = 86_400_000;
 const mdTypesCache = new Map<string, { set: Set<string>; at: number }>();
 const mdTypesInFlight = new Map<string, Promise<Set<string>>>();
-async function metricDailyTypes(userId: string): Promise<Set<string>> {
-  if (!(await metricDailyUsable())) return new Set();
+const NO_TYPES: ReadonlySet<string> = new Set();
+
+async function metricDailyTypes(q: QueryFn, userId: string): Promise<Set<string>> {
   const cached = mdTypesCache.get(userId);
   if (cached && Date.now() - cached.at < 60_000) return cached.set;
   const inFlight = mdTypesInFlight.get(userId);
   if (inFlight) return inFlight;
-  const promise = query<{ identifier: string }>(
+  const promise = q<{ identifier: string }>(
     `SELECT DISTINCT identifier FROM metric_daily WHERE user_id = $1::uuid`, [userId],
   ).then((rows) => new Set(rows.map((row) => row.identifier)));
   mdTypesInFlight.set(userId, promise);
@@ -256,7 +257,17 @@ export async function getSeries(
   const src = await source();
   if (src !== "live") return notLive(src, () => demoSeries(identifier, range), empty);
 
-  try {
+  const dailyUsable = type?.kind !== "category" && (await metricDailyUsable());
+
+  // Resolve ALL before entering the scoped transaction. getStats() itself
+  // uses scoped(), so calling it from inside this callback would nest scopes.
+  const earliest =
+    !window && range === "ALL"
+      ? (await getStats(userId)).get(identifier)?.earliest ?? null
+      : null;
+
+  return await scoped(userId, async (q) => {
+    try {
     // `from` is an instant (now − span). Every query below aligns it down to
     // the start of the bucket that contains it, in the viewer's zone, via
     // time_bucket($1, $from, $tz): otherwise the first day/week bucket held a
@@ -264,11 +275,6 @@ export async function getSeries(
     // range's "Minimum".
     let resolvedWindow: ResolvedSeriesWindow | null = window ?? null;
     if (!resolvedWindow) {
-      const earliest =
-        range === "ALL"
-          ? (await getStats(userId)).get(identifier)?.earliest ?? null
-          : null;
-
       if (range === "CUSTOM") return empty;
 
       resolvedWindow = resolvePresetWindow(
@@ -314,7 +320,7 @@ export async function getSeries(
         // do (Watch stages alongside a third-party app's asleepUnspecified),
         // so establish each bucket's truth as the highest single-source total
         // rather than summing everything.
-        const rows = await query<{ t: string; value: number }>(
+        const rows = await q<{ t: string; value: number }>(
           `WITH per_source AS (
              SELECT time_bucket($1::interval, c.start_ts${shift}, $6::text) AS t,
                     c.source_id,
@@ -352,7 +358,7 @@ export async function getSeries(
         return { identifier, unit: category.unit, agg: "sum", bucketMs, points };
       }
 
-      const rows = await query<{ t: string; n: number }>(
+      const rows = await q<{ t: string; n: number }>(
         `SELECT (extract(epoch from time_bucket($1::interval, c.start_ts, $6::text)) * 1000)::bigint AS t,
                 count(*)::int AS n
            FROM category_samples c
@@ -393,7 +399,7 @@ export async function getSeries(
     // millions of raw HealthKit samples.
     const aggregateInterval = bucketMs < DAY_MS ? "hour" : "day";
 
-    const aggregateSeries = await query<{
+    const aggregateSeries = await q<{
       series_id: number;
       agg_func: string;
       interval_value: number;
@@ -418,7 +424,7 @@ export async function getSeries(
     if (aggregateSeries.length) {
       const seriesId = aggregateSeries[0].series_id;
 
-      const rows = await query<{ t: string; value: number; n: number }>(
+      const rows = await q<{ t: string; value: number; n: number }>(
         `SELECT
            (extract(
               epoch from time_bucket(
@@ -476,9 +482,9 @@ export async function getSeries(
 
     // Best-guess-of-truth view for covered types at day-or-coarser buckets.
     // metric_daily remains the fallback when no suitable aggregate exists.
-    const mdTypes = await metricDailyTypes(userId);
+    const mdTypes = dailyUsable ? await metricDailyTypes(q, userId) : NO_TYPES;
     if (mdTypes.has(identifier) && bucketMs >= DAY_MS) {
-      const rows = await query<{ t: string; value: number }>(
+      const rows = await q<{ t: string; value: number }>(
         `SELECT
            (extract(
               epoch from time_bucket(
@@ -543,7 +549,7 @@ export async function getSeries(
     // source on each day.
     const truthBucket = bucketMs < DAY_MS ? bucket : "1 day";
     const rows = agg === "sum"
-      ? await query<SeriesRow>(
+      ? await q<SeriesRow>(
         `WITH per_source AS (
            SELECT time_bucket($2::interval, q.start_ts, $6::text) AS truth_bucket,
                   q.source_id,
@@ -581,7 +587,7 @@ export async function getSeries(
 	  ? [bucket, truthBucket, identifier, from, userId, timeZone, endExclusive]
 	    : [bucket, truthBucket, identifier, from, userId, timeZone],
       )
-      : await query<SeriesRow>(
+      : await q<SeriesRow>(
         `SELECT (extract(epoch from time_bucket($1::interval, q.start_ts, $5::text)) * 1000)::bigint AS t,
                 sum(q.value)::float8 AS sum,
                 avg(q.value)::float8 AS avg,
@@ -620,10 +626,11 @@ export async function getSeries(
       bucketMs,
       points,
     };
-  } catch (e) {
-    console.error("[queries] getSeries failed:", e);
-    return ALLOW_DEMO ? demoSeries(identifier, range) : empty;
-  }
+    } catch (e) {
+      console.error("[queries] getSeries failed:", e);
+      return ALLOW_DEMO ? demoSeries(identifier, range) : empty;
+    }
+  });
 }
 
 // ── latest reading per type ──────────────────────────────────────────────
@@ -637,8 +644,9 @@ export async function getLatestMany(userId: string, identifiers: string[]): Prom
     return out;
   }
 
-  try {
-    const rows = await query<{ identifier: string; value: number; t: string }>(
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{ identifier: string; value: number; t: string }>(
       `SELECT st.identifier,
               latest.value::float8 AS value,
 	      (extract(epoch from latest.start_ts) * 1000)::bigint AS t
@@ -668,6 +676,7 @@ export async function getLatestMany(userId: string, identifiers: string[]): Prom
     if (ALLOW_DEMO) for (const id of identifiers) out.set(id, demoLatest(id));
     return out;
   }
+  });
 }
 
 // ── today's cumulative totals (for activity rings / summary) ──────────────
@@ -681,14 +690,15 @@ export async function getTodayTotals(userId: string, identifiers: string[]): Pro
     return out;
   }
 
-  try {
-    for (const id of identifiers) out.set(id, 0);
+  return await scoped(userId, async (q) => {
+    try {
+      for (const id of identifiers) out.set(id, 0);
     const timeZone = configuredTimeZone();
 
     // Read Today directly from raw local-day samples so the live headline does
     // not depend on aggregate refresh or bucket-settlement timing. Choose one
     // source per type to avoid overlapping Watch/phone totals.
-    const rows = await query<{ identifier: string; total: number }>(
+    const rows = await q<{ identifier: string; total: number }>(
       `WITH per_source AS (
          SELECT st.identifier, q.source_id, sum(q.value)::float8 AS total
            FROM quantity_samples q
@@ -706,11 +716,12 @@ export async function getTodayTotals(userId: string, identifiers: string[]): Pro
     );
     for (const r of rows) out.set(r.identifier, Number(r.total));
     return out;
-  } catch (e) {
-    console.error("[queries] getTodayTotals failed:", e);
-    for (const id of identifiers) out.set(id, ALLOW_DEMO ? demoTodaySum(id) : 0);
-    return out;
-  }
+    } catch (e) {
+      console.error("[queries] getTodayTotals failed:", e);
+      for (const id of identifiers) out.set(id, ALLOW_DEMO ? demoTodaySum(id) : 0);
+      return out;
+    }
+  });
 }
 
 // ── activity rings (today's HKActivitySummary) ───────────────────────────
@@ -728,9 +739,10 @@ export async function getActivityRings(userId: string): Promise<ActivityRingsDat
   const src = await source();
   if (src !== "live") return notLive(src, () => demoActivityRings(), fallback);
 
-  try {
+  return await scoped(userId, async (q) => {
+    try {
 
-    const rows = await query<{
+      const rows = await q<{
       date: string;
       move_kcal: number | null;
       move_goal_kcal: number | null;
@@ -772,6 +784,7 @@ export async function getActivityRings(userId: string): Promise<ActivityRingsDat
     console.error("[queries] getActivityRings failed:", e);
     return ALLOW_DEMO ? demoActivityRings() : fallback;
   }
+  });
 }
 
 // ── catalog-wide stats (rows + date range per type) ──────────────────────
@@ -805,8 +818,9 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
     return out;
   }
 
-  try {
-    const rows = await query<{ identifier: string; rows: string; earliest: string | null; latest: string | null }>(
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{ identifier: string; rows: string; earliest: string | null; latest: string | null }>(
       `WITH quantity_stats AS (
          SELECT r.type_id,
                 SUM(r.n)::bigint AS rows
@@ -866,7 +880,7 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
       });
     }
     // Workouts live in their own table.
-    const wk = await query<{ rows: string; earliest: string | null; latest: string | null }>(
+    const wk = await q<{ rows: string; earliest: string | null; latest: string | null }>(
       `SELECT count(*)::bigint AS rows,
               (extract(epoch from min(start_ts)) * 1000)::bigint AS earliest,
               (extract(epoch from max(start_ts)) * 1000)::bigint AS latest
@@ -888,6 +902,7 @@ async function loadStats(userId: string): Promise<Map<string, TypeStat>> {
     if (ALLOW_DEMO) for (const s of demoStats()) out.set(s.identifier, s);
     return out;
   }
+  });
 }
 
 export async function getDailySparklines(
@@ -911,149 +926,180 @@ export async function getDailySparklines(
     return out;
   }
 
-  try {
-    const timeZone = configuredTimeZone();
+  const dailyUsable = await metricDailyUsable();
 
-    // The optimized path uses canonical aggregate days together with the
-    // hourly raw-sample rollup fallback. Canonical days are only safe when
-    // the database and viewer use the same calendar timezone.
-    if (await metricDailyUsable()) {
-      const rows = await query<{
-        identifier: string;
-        value: number;
-      }>(
-        `WITH type_semantics AS (
-           SELECT a.type_id,
-                  CASE
-                    WHEN bool_or(a.agg_func = 'sum') THEN 'cumulative'
-                    WHEN bool_or(a.agg_func = 'average') THEN 'discrete'
-                  END AS semantic
-             FROM aggregate_series a
-             JOIN sample_types st ON st.type_id = a.type_id
-            WHERE st.identifier = ANY($1::text[])
-            GROUP BY a.type_id
-           HAVING bool_or(a.agg_func IN ('sum', 'average'))
-         ),
-         canonical_agg AS (
-           SELECT s.type_id,
-                  b.user_id,
-                  (b.bucket_start AT TIME ZONE $4::text)::date AS day,
-                  b.value,
-                  row_number() OVER (
-                    PARTITION BY s.type_id,
-                                 b.user_id,
-                                 (b.bucket_start AT TIME ZONE $4::text)::date
-                    ORDER BY b.updated_at DESC, b.bucket_start DESC
-                  ) AS preference
-             FROM aggregate_samples b
-             JOIN aggregate_series s USING (series_id)
-             JOIN type_semantics ts USING (type_id)
-            WHERE b.value IS NOT NULL
-              AND s.interval_value = 1
-              AND s.interval_unit = 'day'
-              AND s.device_filter = 'all'
-              AND (
-                (ts.semantic = 'cumulative' AND s.agg_func = 'sum')
-                OR
-                (ts.semantic = 'discrete' AND s.agg_func = 'average')
-              )
-              AND b.user_id = $3::uuid
-              AND b.bucket_start >= (
-                (((now() AT TIME ZONE $4::text)::date - $2::int)
-                  AT TIME ZONE $4::text)
-              )
-         ),
-         agg_daily AS (
-           SELECT type_id, user_id, day, value
-             FROM canonical_agg
-            WHERE preference = 1
-         ),
-         rollup_src AS (
-           SELECT r.type_id,
-                  r.user_id,
-                  r.source_id,
-                  ts.semantic,
-                  (r.bucket AT TIME ZONE $4::text)::date AS day,
-                  CASE
-                    WHEN ts.semantic = 'cumulative'
-                      THEN sum(r.sum_value)
-                    ELSE
-                      sum(r.avg_value * r.n)
-                      / NULLIF(sum(r.n), 0)
-                  END AS value,
-                  sum(r.n) AS n
-             FROM quantity_rollups r
-             JOIN type_semantics ts USING (type_id)
-            WHERE r.user_id = $3::uuid
-              AND r.bucket >= (
-                (((now() AT TIME ZONE $4::text)::date - $2::int)
-                  AT TIME ZONE $4::text)
-              )
-            GROUP BY r.type_id,
-                     r.user_id,
-                     r.source_id,
-                     ts.semantic,
-                     day
-         ),
-         rollup_daily AS (
-           SELECT type_id,
-                  user_id,
-                  day,
-                  CASE
-                    WHEN semantic = 'cumulative'
-                      THEN (array_agg(value ORDER BY value DESC))[1]
-                    ELSE
-                      sum(value * n) / NULLIF(sum(n), 0)
-                  END AS value
-             FROM rollup_src
-            GROUP BY type_id, user_id, day, semantic
-         ),
-         daily AS (
-           SELECT COALESCE(a.type_id, r.type_id) AS type_id,
-                  COALESCE(a.user_id, r.user_id) AS user_id,
-                  COALESCE(a.day, r.day) AS day,
-                  COALESCE(a.value, r.value) AS value
-             FROM agg_daily a
-             FULL JOIN rollup_daily r
-               ON a.type_id = r.type_id
-              AND a.user_id = r.user_id
-              AND a.day = r.day
-         )
-         SELECT st.identifier,
-                d.value::float8 AS value
-           FROM daily d
-           JOIN sample_types st ON st.type_id = d.type_id
-          ORDER BY st.identifier, d.day`,
-        [identifiers, days, userId, timeZone],
-      );
+  return await scoped(userId, async (q) => {
+    try {
+        const timeZone = configuredTimeZone();
 
-      const byId = new Map<string, number[]>();
-      for (const r of rows) {
-        const arr = byId.get(r.identifier) ?? [];
-        arr.push(Number(r.value) || 0);
-        byId.set(r.identifier, arr);
-      }
-
-      for (const id of identifiers) {
-        out.set(id, byId.get(id) ?? []);
-      }
-      return out;
-    }
-
-    // If the database timezone differs from the viewer timezone, do not use
-    // metric_daily/canonical aggregate days. Fall back to raw local buckets,
-    // preserving the original semantics.
-    const byId = new Map<string, number[]>();
-    const rawCumIds = identifiers.filter((id) => defaultAgg(id) === "sum");
-    const rawDiscIds = identifiers.filter((id) => defaultAgg(id) === "avg");
-
-    if (rawCumIds.length) {
-      const rows = await query<{ identifier: string; value: number }>(
-        `WITH per_source AS (
+      // The optimized path uses canonical aggregate days together with the
+      // hourly raw-sample rollup fallback. Canonical days are only safe when
+      // the database and viewer use the same calendar timezone.
+      if (dailyUsable) {
+        const rows = await q<{
+          identifier: string;
+          value: number;
+        }>(
+          `WITH type_semantics AS (
+             SELECT a.type_id,
+                    CASE
+                      WHEN bool_or(a.agg_func = 'sum') THEN 'cumulative'
+                      WHEN bool_or(a.agg_func = 'average') THEN 'discrete'
+                    END AS semantic
+               FROM aggregate_series a
+               JOIN sample_types st ON st.type_id = a.type_id
+              WHERE st.identifier = ANY($1::text[])
+              GROUP BY a.type_id
+             HAVING bool_or(a.agg_func IN ('sum', 'average'))
+           ),
+           canonical_agg AS (
+             SELECT s.type_id,
+                    b.user_id,
+                    (b.bucket_start AT TIME ZONE $4::text)::date AS day,
+                    b.value,
+                    row_number() OVER (
+                      PARTITION BY s.type_id,
+                                   b.user_id,
+                                   (b.bucket_start AT TIME ZONE $4::text)::date
+                      ORDER BY b.updated_at DESC, b.bucket_start DESC
+                    ) AS preference
+               FROM aggregate_samples b
+               JOIN aggregate_series s USING (series_id)
+               JOIN type_semantics ts USING (type_id)
+              WHERE b.value IS NOT NULL
+                AND s.interval_value = 1
+                AND s.interval_unit = 'day'
+                AND s.device_filter = 'all'
+                AND (
+                  (ts.semantic = 'cumulative' AND s.agg_func = 'sum')
+                  OR
+                  (ts.semantic = 'discrete' AND s.agg_func = 'average')
+                )
+                AND b.user_id = $3::uuid
+                AND b.bucket_start >= (
+                  (((now() AT TIME ZONE $4::text)::date - $2::int)
+                    AT TIME ZONE $4::text)
+                )
+           ),
+           agg_daily AS (
+             SELECT type_id, user_id, day, value
+               FROM canonical_agg
+              WHERE preference = 1
+           ),
+           rollup_src AS (
+             SELECT r.type_id,
+                    r.user_id,
+                    r.source_id,
+                    ts.semantic,
+                    (r.bucket AT TIME ZONE $4::text)::date AS day,
+                    CASE
+                      WHEN ts.semantic = 'cumulative'
+                        THEN sum(r.sum_value)
+                      ELSE
+                        sum(r.avg_value * r.n)
+                        / NULLIF(sum(r.n), 0)
+                    END AS value,
+                    sum(r.n) AS n
+               FROM quantity_rollups r
+               JOIN type_semantics ts USING (type_id)
+              WHERE r.user_id = $3::uuid
+                AND r.bucket >= (
+                  (((now() AT TIME ZONE $4::text)::date - $2::int)
+                    AT TIME ZONE $4::text)
+                )
+              GROUP BY r.type_id,
+                       r.user_id,
+                       r.source_id,
+                       ts.semantic,
+                       day
+           ),
+           rollup_daily AS (
+             SELECT type_id,
+                    user_id,
+                    day,
+                    CASE
+                      WHEN semantic = 'cumulative'
+                        THEN (array_agg(value ORDER BY value DESC))[1]
+                      ELSE
+                        sum(value * n) / NULLIF(sum(n), 0)
+                    END AS value
+               FROM rollup_src
+              GROUP BY type_id, user_id, day, semantic
+           ),
+           daily AS (
+             SELECT COALESCE(a.type_id, r.type_id) AS type_id,
+                    COALESCE(a.user_id, r.user_id) AS user_id,
+                    COALESCE(a.day, r.day) AS day,
+                    COALESCE(a.value, r.value) AS value
+               FROM agg_daily a
+               FULL JOIN rollup_daily r
+                 ON a.type_id = r.type_id
+                AND a.user_id = r.user_id
+                AND a.day = r.day
+           )
            SELECT st.identifier,
-                  time_bucket('1 day', q.start_ts, $4::text) AS day,
-                  q.source_id,
-                  sum(q.value)::float8 AS value
+                  d.value::float8 AS value
+             FROM daily d
+             JOIN sample_types st ON st.type_id = d.type_id
+            ORDER BY st.identifier, d.day`,
+          [identifiers, days, userId, timeZone],
+        );
+
+        const byId = new Map<string, number[]>();
+        for (const r of rows) {
+          const arr = byId.get(r.identifier) ?? [];
+          arr.push(Number(r.value) || 0);
+          byId.set(r.identifier, arr);
+        }
+
+        for (const id of identifiers) {
+          out.set(id, byId.get(id) ?? []);
+        }
+        return out;
+      }
+
+      // If the database timezone differs from the viewer timezone, do not use
+      // metric_daily/canonical aggregate days. Fall back to raw local buckets,
+      // preserving the original semantics.
+      const byId = new Map<string, number[]>();
+      const rawCumIds = identifiers.filter((id) => defaultAgg(id) === "sum");
+      const rawDiscIds = identifiers.filter((id) => defaultAgg(id) === "avg");
+
+      if (rawCumIds.length) {
+        const rows = await q<{ identifier: string; value: number }>(
+          `WITH per_source AS (
+             SELECT st.identifier,
+                    time_bucket('1 day', q.start_ts, $4::text) AS day,
+                    q.source_id,
+                    sum(q.value)::float8 AS value
+               FROM quantity_samples q
+               JOIN sample_types st ON st.type_id = q.type_id
+              WHERE st.identifier = ANY($1::text[])
+                AND q.user_id = $3::uuid
+                AND q.start_ts >= (
+                  (((now() AT TIME ZONE $4::text)::date - $2::int)
+                    AT TIME ZONE $4::text)
+                )
+              GROUP BY st.identifier, day, q.source_id
+           )
+           SELECT identifier, max(value)::float8 AS value
+             FROM per_source
+            GROUP BY identifier, day
+            ORDER BY identifier, day`,
+          [rawCumIds, days, userId, timeZone],
+        );
+
+        for (const r of rows) {
+          const arr = byId.get(r.identifier) ?? [];
+          arr.push(Number(r.value) || 0);
+          byId.set(r.identifier, arr);
+        }
+      }
+
+      if (rawDiscIds.length) {
+        const rows = await q<{ identifier: string; value: number }>(
+          `SELECT st.identifier,
+                  avg(q.value)::float8 AS value
              FROM quantity_samples q
              JOIN sample_types st ON st.type_id = q.type_id
             WHERE st.identifier = ANY($1::text[])
@@ -1062,67 +1108,39 @@ export async function getDailySparklines(
                 (((now() AT TIME ZONE $4::text)::date - $2::int)
                   AT TIME ZONE $4::text)
               )
-            GROUP BY st.identifier, day, q.source_id
-         )
-         SELECT identifier, max(value)::float8 AS value
-           FROM per_source
-          GROUP BY identifier, day
-          ORDER BY identifier, day`,
-        [rawCumIds, days, userId, timeZone],
-      );
-
-      for (const r of rows) {
-        const arr = byId.get(r.identifier) ?? [];
-        arr.push(Number(r.value) || 0);
-        byId.set(r.identifier, arr);
-      }
-    }
-
-    if (rawDiscIds.length) {
-      const rows = await query<{ identifier: string; value: number }>(
-        `SELECT st.identifier,
-                avg(q.value)::float8 AS value
-           FROM quantity_samples q
-           JOIN sample_types st ON st.type_id = q.type_id
-          WHERE st.identifier = ANY($1::text[])
-            AND q.user_id = $3::uuid
-            AND q.start_ts >= (
-              (((now() AT TIME ZONE $4::text)::date - $2::int)
-                AT TIME ZONE $4::text)
-            )
-          GROUP BY st.identifier,
-                   time_bucket('1 day', q.start_ts, $4::text)
-          ORDER BY st.identifier,
-                   time_bucket('1 day', q.start_ts, $4::text)`,
-        [rawDiscIds, days, userId, timeZone],
-      );
-
-      for (const r of rows) {
-        const arr = byId.get(r.identifier) ?? [];
-        arr.push(Number(r.value) || 0);
-        byId.set(r.identifier, arr);
-      }
-    }
-
-    for (const id of identifiers) {
-      out.set(id, byId.get(id) ?? []);
-    }
-
-    return out;
-  } catch (e) {
-    console.error("[queries] getDailySparklines failed:", e);
-    if (ALLOW_DEMO) {
-      for (const id of identifiers) {
-        out.set(
-          id,
-          demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+            GROUP BY st.identifier,
+                     time_bucket('1 day', q.start_ts, $4::text)
+            ORDER BY st.identifier,
+                     time_bucket('1 day', q.start_ts, $4::text)`,
+          [rawDiscIds, days, userId, timeZone],
         );
-      }
-    }
-    return out;
-  }
-}
 
+        for (const r of rows) {
+          const arr = byId.get(r.identifier) ?? [];
+          arr.push(Number(r.value) || 0);
+          byId.set(r.identifier, arr);
+        }
+      }
+
+      for (const id of identifiers) {
+        out.set(id, byId.get(id) ?? []);
+      }
+
+      return out;
+    } catch (e) {
+      console.error("[queries] getDailySparklines failed:", e);
+      if (ALLOW_DEMO) {
+        for (const id of identifiers) {
+          out.set(
+            id,
+            demoSeries(id, "M").points.slice(-days).map((p) => p.value),
+          );
+        }
+      }
+      return out;
+    }
+  });
+}
 // ── sleep stages ──────────────────────────────────────────────────────────
 // Sleep is category interval data, not a numeric quantity. Attribute each
 // sample to the local wake-up day (18:00 boundary), aggregate per source,
@@ -1139,11 +1157,12 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
   const src = await source();
   if (src !== "live") return empty;
 
-  try {
-    const timeZone = configuredTimeZone();
+  return await scoped(userId, async (q) => {
+    try {
+      const timeZone = configuredTimeZone();
     const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
     const params = [userId, timeZone, days, bucket];
-    const rows = await query<{
+    const rows = await q<{
       date: string;
       asleep_minutes: number;
       in_bed_minutes: number;
@@ -1216,10 +1235,11 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       awakeMinutes: Number(r.awake_minutes) || 0,
       nights: Number(r.nights) || 1,
     }));
-  } catch (e) {
-    console.error("[queries] getSleepHistory failed:", e);
-    return empty;
-  }
+    } catch (e) {
+      console.error("[queries] getSleepHistory failed:", e);
+      return empty;
+    }
+  });
 }
 
 export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
@@ -1229,8 +1249,9 @@ export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[
 export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]> {
   const src = await source();
   if (src !== "live") return notLive(src, () => demoWorkouts(limit), []);
-  try {
-    const rows = await query<{
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{
       uuid: string;
       activity_type: string;
       start: string;
@@ -1262,10 +1283,11 @@ export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]
       energyKcal: r.energy_kcal == null ? null : Number(r.energy_kcal),
       distanceM: r.distance_m == null ? null : Number(r.distance_m),
     }));
-  } catch (e) {
-    console.error("[queries] getWorkouts failed:", e);
-    return ALLOW_DEMO ? demoWorkouts(limit) : [];
-  }
+    } catch (e) {
+      console.error("[queries] getWorkouts failed:", e);
+      return ALLOW_DEMO ? demoWorkouts(limit) : [];
+    }
+  });
 }
 
 // ── one workout + its route ───────────────────────────────────────────────
@@ -1279,8 +1301,9 @@ export const getWorkoutDetail = cache(async function getWorkoutDetail(userId: st
   // the cast error) and report not-found.
   if (!UUID_RE.test(uuid)) return null;
 
-  try {
-    const rows = await query<{
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{
       uuid: string;
       activity_type: string;
       start: string;
@@ -1317,7 +1340,7 @@ export const getWorkoutDetail = cache(async function getWorkoutDetail(userId: st
     const r = rows[0];
     if (!r) return null;
 
-    const routeRows = await query<{
+    const routeRows = await q<{
       t: string;
       lat: number;
       lon: number;
@@ -1364,10 +1387,11 @@ export const getWorkoutDetail = cache(async function getWorkoutDetail(userId: st
       source: r.source,
       route,
     };
-  } catch (e) {
-    console.error("[queries] getWorkoutDetail failed:", e);
-    return ALLOW_DEMO ? demoWorkoutDetail(uuid) : null;
-  }
+    } catch (e) {
+      console.error("[queries] getWorkoutDetail failed:", e);
+      return ALLOW_DEMO ? demoWorkoutDetail(uuid) : null;
+    }
+  });
 });
 
 // Raw activity shape as stored in the workouts.activities jsonb (Swift field
@@ -1385,8 +1409,9 @@ export async function getWorkoutSeries(userId: string, uuid: string): Promise<Wo
   const src = await source();
   if (src !== "live") return notLive(src, () => demoWorkoutSeries(uuid), []);
   if (!UUID_RE.test(uuid)) return [];
-  try {
-    const rows = await query<{ identifier: string; unit: string | null; t: string; value: number }>(
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{ identifier: string; unit: string | null; t: string; value: number }>(
       `SELECT st.identifier,
               st.unit,
               (extract(epoch from p.ts) * 1000)::bigint AS t,
@@ -1408,10 +1433,11 @@ export async function getWorkoutSeries(userId: string, uuid: string): Promise<Wo
       s.points.push({ t: Number(r.t), value: Number(r.value) });
     }
     return [...byType.values()];
-  } catch (e) {
-    console.error("[queries] getWorkoutSeries failed:", e);
-    return ALLOW_DEMO ? demoWorkoutSeries(uuid) : [];
-  }
+    } catch (e) {
+      console.error("[queries] getWorkoutSeries failed:", e);
+      return ALLOW_DEMO ? demoWorkoutSeries(uuid) : [];
+    }
+  });
 }
 
 // ── the users the database holds (for the switcher) ──────────────────────
@@ -1434,15 +1460,33 @@ export async function getUsers(): Promise<User[]> {
   }
 }
 
-// ── user profile (DOB/max HR + resting HR for HRR zones) ──────────────────
+// ── one user's own row (name/email from the phone's profile) ─────────────
+export async function getUser(userId: string): Promise<User> {
+  const fallback: User = { id: userId, name: null, email: null };
+  const src = await source();
+  if (src !== "live") return notLive(src, () => demoUsers().find((u) => u.id === userId) ?? fallback, fallback);
+  try {
+    const rows = await scoped(userId, (q) => q<{ id: string; name: string | null; email: string | null }>(
+      "SELECT id::text AS id, name, email FROM users WHERE id = $1::uuid",
+      [userId],
+    ));
+    return rows[0] ? { id: rows[0].id, name: rows[0].name, email: rows[0].email } : fallback;
+  } catch (e) {
+    console.error("[queries] getUser failed:", e);
+    return fallback;
+  }
+}
+
 export const DEFAULT_MAX_HR = 190;
 
+// ── user profile (DOB/max HR + resting HR for HRR zones) ──────────────────
 export async function getProfile(userId: string): Promise<Profile> {
   const fallback: Profile = { dob: null, biologicalSex: null, age: null, maxHr: DEFAULT_MAX_HR, restingHr: null };
   const src = await source();
   if (src !== "live") return notLive(src, demoProfile, fallback);
-  try {
-    const rows = await query<{ dob: string | null; biological_sex: string | null; resting_hr: number | null }>(
+  return await scoped(userId, async (q) => {
+    try {
+      const rows = await q<{ dob: string | null; biological_sex: string | null; resting_hr: number | null }>(
       `SELECT (extract(epoch from (u.dob::timestamp AT TIME ZONE $2::text)) * 1000)::bigint AS dob,
               u.biological_sex,
               r.value::float8 AS resting_hr
@@ -1467,10 +1511,11 @@ export async function getProfile(userId: string): Promise<Profile> {
       r.biological_sex,
       restingHr,
     );
-  } catch (e) {
-    console.error("[queries] getProfile failed:", e);
-    return ALLOW_DEMO ? demoProfile() : fallback;
-  }
+    } catch (e) {
+      console.error("[queries] getProfile failed:", e);
+      return ALLOW_DEMO ? demoProfile() : fallback;
+    }
+  });
 }
 
 export function profileFromStoredValues(
