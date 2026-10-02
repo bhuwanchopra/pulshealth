@@ -3,8 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { GroupIcon } from "@/components/Icons";
-import { SleepCard } from "@/components/SleepCard";
-import { SleepHistoryChart } from "@/components/SleepHistoryChart";
 import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
 import { SleepScoreCard } from "@/components/SleepScoreCard";
 import { SleepRangeSelector } from "@/components/SleepRangeSelector";
@@ -157,11 +155,7 @@ export default async function CategoryPage({
               </div>
             </div>
           ) : (
-            <>
-              <SleepCard sleep={latestSleep?.night ?? null} />
-              <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
-              <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
-            </>
+            <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
           )}
         </div>
       </>
