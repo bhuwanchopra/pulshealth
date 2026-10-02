@@ -10,7 +10,7 @@ import { GROUP_LABELS, GROUPS, type Group, typesInGroup } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
 import { isCumulative } from "@/lib/metrics";
 import { getDailySparklines, getLatestMany, getOrCreateSleepScores, getSeries, getSleepDays, getStats, getTodayTotals } from "@/lib/queries";
-import { aggregateSleepDays, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
+import { parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 import { formatCompact } from "@/lib/format";
 
@@ -137,8 +137,6 @@ export default async function CategoryPage({
     const visibleDates = new Set(rawNights.map((night) => night.date));
     const historicalScores = scoredWindow.filter((entry) => visibleDates.has(entry.night.date));
     const latestSleep = historicalScores[0];
-    const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
-
     return (
       <>
         {pageHeader}
