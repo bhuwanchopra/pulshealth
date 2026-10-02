@@ -138,7 +138,7 @@ export function SleepHistoryChart({
                   <polyline
                     fill="none"
                     stroke="var(--fg)"
-                    strokeWidth="1.5"
+                    strokeWidth="1"
                     vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
                     strokeLinejoin="round"
