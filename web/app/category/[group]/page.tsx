@@ -3,9 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { GroupIcon } from "@/components/Icons";
-import { SleepScoreHistoryChart } from "@/components/SleepScoreHistoryChart";
 import { SleepScoreCard } from "@/components/SleepScoreCard";
-import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { GROUP_LABELS, GROUPS, type Group, typesInGroup } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
 import { isCumulative } from "@/lib/metrics";
@@ -141,12 +139,6 @@ export default async function CategoryPage({
       <>
         {pageHeader}
         {renderMetricGrid(<SleepScoreCard score={latestSleep?.score ?? null} history={historicalScores} />)}
-        <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <SleepRangeSelector value={range} />
-          </div>
-          <SleepScoreHistoryChart scores={historicalScores} interval={sleepRangeBucket(range).interval} />
-        </div>
       </>
     );
   }
