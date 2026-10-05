@@ -217,30 +217,34 @@ export function SleepHistoryChart({
                       style={{
                         width: "100%",
                         height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "flex-end",
+                        position: "relative",
                         overflow: "hidden",
                         borderRadius: "5px 5px 2px 2px",
                         background: "var(--border)",
                       }}
                     >
-                      {STACKED_STAGES.map((stage) => {
+                      {STACKED_STAGES.map((stage, stageIndex) => {
                         const minutes = Math.max(0, night[stage.key]);
                         if (!minutes) return null;
+                        const lowerMinutes = STACKED_STAGES
+                          .slice(0, stageIndex)
+                          .reduce((sum, lowerStage) => sum + Math.max(0, night[lowerStage.key]), 0);
                         return (
                           <div
                             key={stage.key}
                             style={{
-                              height: `${Math.min(minutes, axisMax) / axisMax * chartHeight}px`,
+                              position: "absolute",
+                              left: 0,
+                              right: 0,
+                              bottom: `${(lowerMinutes / axisMax) * 100}%`,
+                              height: `${Math.min(minutes, axisMax) / axisMax * 100}%`,
                               minHeight: 1,
                               background: stage.color,
-                              flex: "0 0 auto",
                             }}
                             title={`${formatSleepPeriodLabel(night.date, interval)} — ${stage.label}: ${hoursAndMinutes(minutes)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"}`}
                           />
                         );
-                      })}
+                      })})}
                     </div>
                   </div>
                 );
