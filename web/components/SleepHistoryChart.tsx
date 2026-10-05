@@ -136,7 +136,7 @@ export function SleepHistoryChart({
                     overflow: "visible",
                   }}
                 >
-                  <polyline
+                  <path
                     fill="none"
                     stroke="#5e5ce6"
                     strokeWidth="2"
