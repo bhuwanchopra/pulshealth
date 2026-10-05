@@ -43,22 +43,6 @@ function aggregateScores(scores: ScoredNight[], interval: string): ScoredNight[]
   }).sort((a, b) => a.night.date.localeCompare(b.night.date));
 }
 
-const scoreColors = {
-  veryLow: "#ef4444",
-  low: "#f59e0b",
-  ok: "#22c55e",
-  high: "#16a34a",
-  veryHigh: "#0ea5e9",
-} as const;
-
-function scoreColor(score: number): string {
-  if (score >= 96) return scoreColors.veryHigh;
-  if (score >= 81) return scoreColors.high;
-  if (score >= 61) return scoreColors.ok;
-  if (score >= 41) return scoreColors.low;
-  return scoreColors.veryLow;
-}
-
 export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNight[]; interval: string }) {
   const points = aggregateScores(scores, interval);
   if (!points.length) return null;
