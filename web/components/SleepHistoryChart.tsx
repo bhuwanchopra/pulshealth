@@ -134,6 +134,7 @@ export function SleepHistoryChart({
                     height: "100%",
                     pointerEvents: "none",
                     overflow: "visible",
+                    zIndex: 2,
                   }}
                 >
                   <path
