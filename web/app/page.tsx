@@ -111,12 +111,7 @@ export default async function Dashboard() {
       </section>
 
       {/* Sleep */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "30px 0 14px" }}>
-        <h2 className="eyebrow" style={{ margin: 0 }}>Sleep</h2>
-        <Link href="/sleep" style={{ fontSize: 13, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 2 }}>
-          View sleep <ChevronRight size={14} />
-        </Link>
-      </div>
+      <h2 className="eyebrow" style={{ margin: "30px 0 14px" }}>Sleep</h2>
       <div className="rise" style={{ animationDelay: "80ms" }}>
         <SleepCard sleep={sleepDays[0] ?? null} />
       </div>
