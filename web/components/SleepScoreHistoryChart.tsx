@@ -1,4 +1,5 @@
-import { formatSleepPeriodLabel, sleepScoreClassification, type SleepDay, type SleepScore } from "@/lib/sleep";
+import { type SleepDay, type SleepScore } from "@/lib/sleep";
+import { TrendChart } from "@/components/TrendChart";
 
 type ScoredNight = { night: SleepDay; score: SleepScore };
 function aggregateScores(scores: ScoredNight[], interval: string): ScoredNight[] {
