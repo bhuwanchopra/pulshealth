@@ -8,7 +8,7 @@ import { GROUP_LABELS, GROUPS, type Group, typesInGroup } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
 import { isCumulative } from "@/lib/metrics";
 import { getDailySparklines, getLatestMany, getOrCreateSleepScores, getSeries, getSleepDays, getStats, getTodayTotals } from "@/lib/queries";
-import { parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
+import { parseSleepRange, sleepRangeDays } from "@/lib/sleep";
 import { viewerUser } from "@/lib/viewer";
 import { formatCompact } from "@/lib/format";
 
