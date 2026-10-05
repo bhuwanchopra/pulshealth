@@ -17,11 +17,25 @@ import { viewerUser } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub, inline }: { label: string; value: string; sub?: string; inline?: boolean }) {
   return (
     <div className="panel panel-tight" style={{ padding: "14px 16px" }}>
-      <div className="eyebrow" style={{ fontSize: 10 }}>{label}</div>
-      <div className="metric-num tabular" style={{ fontSize: 22, fontWeight: 600, marginTop: 8 }}>{value}</div>
+      <div
+        style={{
+          display: inline ? "flex" : undefined,
+          alignItems: inline ? "baseline" : undefined,
+          gap: inline ? 7 : undefined,
+          whiteSpace: inline ? "nowrap" : undefined,
+        }}
+      >
+        <div className="eyebrow" style={{ fontSize: 10 }}>{label}</div>
+        <div
+          className="metric-num tabular"
+          style={{ fontSize: 22, fontWeight: 600, marginTop: inline ? 0 : 8 }}
+        >
+          {value}
+        </div>
+      </div>
       {sub && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 3 }}>{sub}</div>}
     </div>
   );
@@ -97,7 +111,7 @@ export default async function SleepScorePage({
         <Stat label={`Average · ${range}`} value={avg == null ? "—" : avg.toFixed(1)} />
         <Stat label="Minimum" value={min == null ? "—" : String(min)} />
         <Stat label="Maximum" value={max == null ? "—" : String(max)} />
-        <Stat label="Scored nights" value={String(values.length)} />
+        <Stat label="Scored nights" value={String(values.length)} inline />
       </div>
     </>
   );
