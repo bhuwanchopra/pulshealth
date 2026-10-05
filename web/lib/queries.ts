@@ -47,7 +47,7 @@ import type {
   WorkoutSeries,
   WorkoutStat,
 } from "./types";
-import type { SleepDay } from "./sleep";
+import { calculateSleepScore, type SleepDay, type SleepScore } from "./sleep";
 
 // uuid v4-ish shape — guard before casting to ::uuid so a bad path segment
 // surfaces as "not found" instead of a 500 from a failed cast.
@@ -1138,7 +1138,7 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
   return await scoped(userId, async (q) => {
     try {
       const timeZone = configuredTimeZone();
-    const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - $3::int)::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
+      const dateFilter = "AND ($3::int = 0 OR c.start_ts >= ((((now() AT TIME ZONE $2::text)::date - GREATEST($3::int - 1, 0))::timestamp AT TIME ZONE $2::text) - interval '6 hours'))";
     const params = [userId, timeZone, days, bucket];
     const rows = await q<{
       date: string;
@@ -1149,6 +1149,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       rem_minutes: number;
       unspecified_minutes: number;
       awake_minutes: number;
+      bedtime_minutes: number | null;
+      awake_periods: number;
       nights: number;
     }>(
       `WITH per_source AS (
@@ -1161,7 +1163,24 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepDeep' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS deep_minutes,
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepREM' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS rem_minutes,
            sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAsleepUnspecified' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS unspecified_minutes,
-           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes
+           sum(CASE WHEN cl.enum_name = 'HKCategoryValueSleepAnalysisAwake' THEN extract(epoch FROM (c.end_ts - c.start_ts)) ELSE 0 END) / 60.0 AS awake_minutes,
+           extract(epoch FROM ((min(c.start_ts) FILTER (
+             WHERE cl.enum_name IN (
+               'HKCategoryValueSleepAnalysisAsleepUnspecified',
+               'HKCategoryValueSleepAnalysisAsleepCore',
+               'HKCategoryValueSleepAnalysisAsleepDeep',
+               'HKCategoryValueSleepAnalysisAsleepREM'
+             )
+           ) AT TIME ZONE $2::text) -
+           date_trunc('day', min(c.start_ts) FILTER (
+             WHERE cl.enum_name IN (
+               'HKCategoryValueSleepAnalysisAsleepUnspecified',
+               'HKCategoryValueSleepAnalysisAsleepCore',
+               'HKCategoryValueSleepAnalysisAsleepDeep',
+               'HKCategoryValueSleepAnalysisAsleepREM'
+             )
+           ) AT TIME ZONE $2::text))) / 60.0 AS bedtime_minutes,
+           count(*) FILTER (WHERE cl.enum_name = 'HKCategoryValueSleepAnalysisAwake')::int AS awake_periods
          FROM category_samples c
          JOIN sample_types st ON st.type_id = c.type_id
          JOIN category_labels cl ON cl.type_identifier = st.identifier AND cl.value = c.value
@@ -1178,13 +1197,15 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
           FROM per_source
       ),
       daily AS (
-        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+        SELECT day, asleep_minutes, max_in_bed AS in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes,
+               bedtime_minutes, awake_periods
           FROM ranked
          WHERE rn = 1
       ),
       bucketed AS (
         SELECT time_bucket($4::interval, day::timestamp)::date AS bucket_date,
-               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes
+               asleep_minutes, in_bed_minutes, core_minutes, deep_minutes, rem_minutes, unspecified_minutes, awake_minutes,
+               bedtime_minutes, awake_periods
           FROM daily
       )
       SELECT bucket_date::text AS date,
@@ -1195,6 +1216,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
              avg(rem_minutes)::float8 AS rem_minutes,
              avg(unspecified_minutes)::float8 AS unspecified_minutes,
              avg(awake_minutes)::float8 AS awake_minutes,
+             avg(bedtime_minutes)::float8 AS bedtime_minutes,
+             avg(awake_periods)::float8 AS awake_periods,
              count(*)::int AS nights
         FROM bucketed
        GROUP BY bucket_date
@@ -1211,6 +1234,8 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
       remMinutes: Number(r.rem_minutes) || 0,
       unspecifiedMinutes: Number(r.unspecified_minutes) || 0,
       awakeMinutes: Number(r.awake_minutes) || 0,
+      bedtimeMinutes: r.bedtime_minutes == null ? null : Number(r.bedtime_minutes),
+      awakePeriods: Number(r.awake_periods) || 0,
       nights: Number(r.nights) || 1,
     }));
     } catch (e) {
@@ -1222,6 +1247,147 @@ export async function getSleepHistory(userId: string, days = 14, bucket = "1 day
 
 export async function getSleepDays(userId: string, days = 14): Promise<SleepDay[]> {
   return getSleepHistory(userId, days, "1 day");
+}
+
+/**
+ * Return persisted Sleep Scores for the requested nights, calculating and
+ * persisting only dates that have never been scored before.
+ *
+ * A score is immutable once created for a date: later page loads read the
+ * stored value rather than recalculating it. This gives historical scores a
+ * stable snapshot while keeping the source sleep samples unchanged.
+ */
+export async function getOrCreateSleepScores(
+  userId: string,
+  nights: SleepDay[],
+  persistDates: string[] = nights.map((night) => night.date),
+): Promise<Array<{ night: SleepDay; score: SleepScore }>> {
+  const src = await source();
+  if (src !== "live") {
+    return nights.map((night, index) => ({
+      night,
+      score: calculateSleepScore(night, nights.slice(index + 1)),
+    }));
+  }
+
+  if (!nights.length) return [];
+
+  try {
+    const dates = persistDates;
+    const existing = await query<{
+      sleep_date: string;
+      score: number;
+      duration_points: number;
+      consistency_points: number;
+      interruption_points: number;
+      bedtime_deviation_minutes: number | null;
+      baseline_nights: number;
+      awake_minutes: number;
+      awake_periods: number;
+    }>(
+      `SELECT sleep_date::text,
+              score,
+              duration_points::float8,
+              consistency_points::float8,
+              interruption_points::float8,
+              bedtime_deviation_minutes,
+              baseline_nights,
+              awake_minutes,
+              awake_periods
+         FROM sleep_scores
+        WHERE user_id = $1::uuid
+          AND sleep_date = ANY($2::date[])`,
+      [userId, dates],
+    );
+
+    const cached = new Map(existing.map((row) => [row.sleep_date, row]));
+    const chronological = [...nights].sort((a, b) => a.date.localeCompare(b.date));
+
+    // Only the first load of a date reaches the scoring function and INSERT.
+    // The preceding nights are raw sleep data because consistency depends on
+    // bedtime history, not on the previous scores themselves.
+    const datesToPersist = new Set(persistDates);
+    for (const night of chronological) {
+      if (!datesToPersist.has(night.date) || cached.has(night.date)) continue;
+      const index = chronological.findIndex((candidate) => candidate.date === night.date);
+      const derived = calculateSleepScore(night, chronological.slice(0, index).reverse());
+      const inserted = await query<{
+        sleep_date: string;
+        score: number;
+        duration_points: number;
+        consistency_points: number;
+        interruption_points: number;
+        bedtime_deviation_minutes: number | null;
+        baseline_nights: number;
+        awake_minutes: number;
+        awake_periods: number;
+      }>(
+        `INSERT INTO sleep_scores (
+           user_id, sleep_date, score, duration_points, consistency_points,
+           interruption_points, bedtime_deviation_minutes, baseline_nights,
+           awake_minutes, awake_periods
+         )
+         VALUES (
+           $1::uuid, $2::date, $3, $4, $5, $6, $7, $8, $9, $10
+         )
+         ON CONFLICT (user_id, sleep_date) DO NOTHING
+         RETURNING sleep_date::text,
+                   score,
+                   duration_points::float8,
+                   consistency_points::float8,
+                   interruption_points::float8,
+                   bedtime_deviation_minutes,
+                   baseline_nights,
+                   awake_minutes,
+                   awake_periods`,
+        [
+          userId,
+          night.date,
+          derived.score,
+          derived.durationPoints,
+          derived.consistencyPoints,
+          derived.interruptionPoints,
+          derived.bedtimeDeviationMinutes,
+          derived.baselineNights,
+          derived.awakeMinutes,
+          derived.awakePeriods,
+        ],
+      );
+      const row = inserted[0];
+      if (row) cached.set(night.date, row);
+    }
+
+    // The caller may provide extra preceding nights solely to calculate
+    // bedtime-consistency baselines. They must not leak into the visible
+    // history or "scored nights" count.
+    return nights
+      .filter((night) => datesToPersist.has(night.date))
+      .map((night) => {
+        const row = cached.get(night.date);
+        if (!row) return null;
+        return {
+          night,
+          score: {
+            score: Number(row.score),
+            durationPoints: Number(row.duration_points),
+            consistencyPoints: Number(row.consistency_points),
+            interruptionPoints: Number(row.interruption_points),
+            bedtimeDeviationMinutes:
+              row.bedtime_deviation_minutes == null ? null : Number(row.bedtime_deviation_minutes),
+            baselineNights: Number(row.baseline_nights),
+            awakeMinutes: Number(row.awake_minutes),
+            awakePeriods: Number(row.awake_periods),
+          },
+        };
+      })
+      .filter((value): value is { night: SleepDay; score: SleepScore } => value !== null);
+  } catch (e) {
+    console.error("[queries] getOrCreateSleepScores failed:", e);
+    return nights.map((night, index) => ({
+      night,
+      score: calculateSleepScore(night, nights.slice(index + 1)),
+    }));
+  }
 }
 // ── workouts ─────────────────────────────────────────────────────────────
 export async function getWorkouts(userId: string, limit = 40): Promise<Workout[]> {

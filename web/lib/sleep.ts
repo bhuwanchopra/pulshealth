@@ -9,6 +9,21 @@ export interface SleepDay {
   awakeMinutes: number;
   /** Number of nights represented by this bucket (1 for a daily bucket). */
   nights?: number;
+  /** Local minutes after midnight when the first asleep sample began. */
+  bedtimeMinutes: number | null;
+  /** Number of distinct awake intervals recorded for the night. */
+  awakePeriods: number;
+}
+
+export interface SleepScore {
+  score: number;
+  durationPoints: number;
+  consistencyPoints: number;
+  interruptionPoints: number;
+  bedtimeDeviationMinutes: number | null;
+  baselineNights: number;
+  awakeMinutes: number;
+  awakePeriods: number;
 }
 
 export const SLEEP_RANGES = [
@@ -88,6 +103,83 @@ export function formatSleepPeriodLabel(date: string, interval: string): string {
   return monthDayYear.format(parsed);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Calculate a Puls Sleep Score using the same three component weights Apple
+ * documents for its watchOS 26 score: duration (50), bedtime consistency (30),
+ * and interruptions (20). Apple does not publish the exact scoring equations
+ * or expose the score through HealthKit, so this is intentionally a derived
+ * score and should not be presented as Apple's score.
+ *
+ * Bedtime consistency uses the previous 13 available nights, matching Apple's
+ * documented look-back window. Bedtime is compared circularly because 23:50
+ * and 00:10 are only 20 minutes apart.
+ */
+export function calculateSleepScore(night: SleepDay, recentNights: SleepDay[]): SleepScore {
+  const duration = night.asleepMinutes;
+  let durationPoints: number;
+  if (duration <= 240) durationPoints = 0;
+  else if (duration < 480) durationPoints = ((duration - 240) / 240) * 50;
+  else if (duration <= 540) durationPoints = 50;
+  else durationPoints = clamp(50 - ((duration - 540) / 180) * 50, 0, 50);
+
+  const baseline = recentNights
+    .filter((day) => day.date !== night.date && day.bedtimeMinutes != null)
+    .slice(0, 13);
+  let bedtimeDeviationMinutes: number | null = null;
+  let consistencyPoints = 0;
+  if (night.bedtimeMinutes != null && baseline.length > 0) {
+    const sorted = baseline.map((day) => day.bedtimeMinutes as number).sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const direct = Math.abs(night.bedtimeMinutes - median);
+    bedtimeDeviationMinutes = Math.round(Math.min(direct, 1440 - direct));
+    consistencyPoints = 30 * clamp(1 - bedtimeDeviationMinutes / 120, 0, 1);
+  } else if (night.bedtimeMinutes != null) {
+    consistencyPoints = 30;
+  }
+
+  const inBed = Math.max(night.inBedMinutes, night.asleepMinutes);
+  const awakeFraction = inBed > 0 ? night.awakeMinutes / inBed : 1;
+  const awakeDurationPoints = 10 * clamp(1 - awakeFraction / 0.20, 0, 1);
+  const awakeCountPoints = 10 * clamp(1 - Math.max(0, night.awakePeriods - 1) / 5, 0, 1);
+  const interruptionPoints = awakeDurationPoints + awakeCountPoints;
+
+  return {
+    score: Math.round(clamp(durationPoints + consistencyPoints + interruptionPoints, 0, 100)),
+    durationPoints: Math.round(durationPoints * 10) / 10,
+    consistencyPoints: Math.round(consistencyPoints * 10) / 10,
+    interruptionPoints: Math.round(interruptionPoints * 10) / 10,
+    bedtimeDeviationMinutes,
+    baselineNights: baseline.length,
+    awakeMinutes: night.awakeMinutes,
+    awakePeriods: night.awakePeriods,
+  };
+}
+
+/**
+ * Calculate scores for a chronological set of individual nights. Each night
+ * is scored against only the preceding 13 nights, so historical scores are
+ * reproducible and do not accidentally use future sleep data.
+ */
+export function calculateSleepScores(nights: SleepDay[]): Array<{ night: SleepDay; score: SleepScore }> {
+  const chronological = [...nights].sort((a, b) => a.date.localeCompare(b.date));
+  return chronological.map((night, index) => ({
+    night,
+    score: calculateSleepScore(night, chronological.slice(0, index).reverse()),
+  }));
+}
+
+export function sleepScoreClassification(score: number): string {
+  if (score >= 96) return "Very High";
+  if (score >= 81) return "High";
+  if (score >= 61) return "OK";
+  if (score >= 41) return "Low";
+  return "Very Low";
+}
+
 export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay[] {
   if (interval === "1 day") return days.map((day) => ({ ...day, nights: day.nights ?? 1 }));
 
@@ -118,6 +210,7 @@ export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay
     current.remMinutes += day.remMinutes;
     current.unspecifiedMinutes += day.unspecifiedMinutes;
     current.awakeMinutes += day.awakeMinutes;
+    current.awakePeriods += day.awakePeriods;
     current.nights = (current.nights ?? 0) + 1;
     current._count += 1;
   }
@@ -132,6 +225,8 @@ export function aggregateSleepDays(days: SleepDay[], interval: string): SleepDay
       remMinutes: day.remMinutes / _count,
       unspecifiedMinutes: day.unspecifiedMinutes / _count,
       awakeMinutes: day.awakeMinutes / _count,
+      bedtimeMinutes: null,
+      awakePeriods: Math.round(day.awakePeriods / _count),
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }

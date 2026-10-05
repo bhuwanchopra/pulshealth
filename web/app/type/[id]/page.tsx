@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { RangeSelector } from "@/components/RangeSelector";
 import { TrendChart } from "@/components/TrendChart";
+import { SleepHistoryChart } from "@/components/SleepHistoryChart";
+import { SleepRangeSelector } from "@/components/SleepRangeSelector";
 import { ChevronRight } from "@/components/Icons";
 import { GROUP_LABELS, typeByIdentifier } from "@/lib/catalog";
 import { GROUP_COLOR } from "@/lib/colors";
@@ -13,9 +15,10 @@ import {
   resolveCustomWindow,
   resolvePresetWindow,
 } from "@/lib/metrics";
-import { getLatestMany, getSeries, getStats, getTodayTotals } from "@/lib/queries";
+import { getLatestMany, getSeries, getSleepDays, getStats, getTodayTotals } from "@/lib/queries";
 import { viewerUser } from "@/lib/viewer";
 import { displayUnit, formatCompact, formatFull, formatValue, relativeTime } from "@/lib/format";
+import { aggregateSleepDays, parseSleepRange, sleepRangeBucket, sleepRangeDays } from "@/lib/sleep";
 
 // Always render live from the DB — no build-time demo snapshot, no stale cache.
 export const dynamic = "force-dynamic";
@@ -51,9 +54,58 @@ export default async function TypePage({
   if (type.kind === "workout") redirect("/workouts");
   if (type.kind !== "quantity" && type.kind !== "category") notFound();
 
+  const color = GROUP_COLOR[type.group];
+
+  // Sleep Analysis is a category-type detail page. Keep the category page
+  // focused on summary metrics and render the detailed stage history here.
+  if (id === "HKCategoryTypeIdentifierSleepAnalysis") {
+    const query = await searchParams;
+    const range = parseSleepRange(query.range);
+    const rangeDays = sleepRangeDays(range);
+    const user = await viewerUser();
+    const rawNights = await getSleepDays(user, rangeDays);
+    const nights = aggregateSleepDays(rawNights, sleepRangeBucket(range).interval);
+
+    return (
+      <>
+        <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--muted)", marginBottom: 22 }} className="rise">
+          <Link href="/category/sleep" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            Sleep
+          </Link>
+          <ChevronRight size={14} />
+          <span style={{ color: "var(--fg-soft)" }}>{type.name}</span>
+        </nav>
+
+        <PageHeader
+          eyebrow="Sleep"
+          accent={color}
+          title={type.name}
+          subtitle={
+            <span className="mono" style={{ fontSize: 12.5 }}>
+              {id}
+            </span>
+          }
+          right={<SleepRangeSelector value={range} />}
+        />
+
+        <div style={{ display: "grid", gap: 14 }}>
+          {nights.length === 0 ? (
+            <div className="panel" style={{ padding: 24 }}>
+              <div style={{ fontWeight: 600 }}>No sleep-stage data</div>
+              <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 6 }}>
+                Sync Sleep Analysis from Apple Health to see Core, Deep, REM, and Awake time.
+              </div>
+            </div>
+          ) : (
+            <SleepHistoryChart nights={nights} interval={sleepRangeBucket(range).interval} />
+          )}
+        </div>
+      </>
+    );
+  }
+
   const query = await searchParams;
   const range = parseRange(query.range);
-  const color = GROUP_COLOR[type.group];
   const cumulative = isCumulative(id);
 
   const user = await viewerUser();

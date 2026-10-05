@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { SleepDay } from "@/lib/sleep";
+import { type SleepDay } from "@/lib/sleep";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core" },
@@ -44,9 +44,9 @@ export function SleepCard({
 
   return (
     <Link href="/sleep" className="card" style={{ padding: compact ? 16 : 20, display: "block" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
         <div>
-          <div className="eyebrow" style={{ color: "var(--muted)" }}>Sleep</div>
+          <div className="eyebrow" style={{ color: "var(--muted)" }}>Sleep Duration</div>
           <div className="metric-num" style={{ fontSize: compact ? 28 : 34, fontWeight: 600, marginTop: 5 }}>
             {hoursAndMinutes(asleep)}
           </div>
