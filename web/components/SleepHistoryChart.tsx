@@ -244,7 +244,7 @@ export function SleepHistoryChart({
                             title={`${formatSleepPeriodLabel(night.date, interval)} — ${stage.label}: ${hoursAndMinutes(minutes)} · ${night.nights ?? 1} ${(night.nights ?? 1) === 1 ? "night" : "nights"}`}
                           />
                         );
-                      })})}
+                      })}
                     </div>
                   </div>
                 );
