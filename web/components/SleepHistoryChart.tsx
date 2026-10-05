@@ -1,4 +1,5 @@
 import { formatSleepPeriodLabel, type SleepDay } from "@/lib/sleep";
+import { smoothPath, type Pt } from "@/lib/chart";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core", color: "rgb(96 165 250)" },
@@ -137,26 +138,27 @@ export function SleepHistoryChart({
                 >
                   <polyline
                     fill="none"
-                    stroke="var(--fg)"
-                    strokeWidth="1"
+                    stroke="#5e5ce6"
+                    strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    points={displayNights
-                      .map((night, index) => {
-                        const x = index + 0.5;
-                        const totalSleep =
-                          night.coreMinutes +
-                          night.deepMinutes +
-                          night.remMinutes +
-                          night.unspecifiedMinutes;
-                        const y =
-                          chartHeight -
-                          (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
-                            chartHeight;
-                        return `${x},${y}`;
-                      })
-                      .join(" ")}
+                    d={smoothPath(
+                    displayNights.map((night, index): Pt => {
+                      const x = index + 0.5;
+                      const totalSleep =
+                        night.coreMinutes +
+                        night.deepMinutes +
+                        night.remMinutes +
+                        night.unspecifiedMinutes;
+                      const y =
+                        chartHeight -
+                        (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                          chartHeight;
+                      return [x, y];
+                    }),
+                    0.55,
+                  )}
                   />
                 </svg>
               )}
