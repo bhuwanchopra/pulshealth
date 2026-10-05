@@ -63,21 +63,29 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
   const points = aggregateScores(scores, interval);
   if (!points.length) return null;
 
-  const width = 1000;
-  const height = 280;
-  const left = 42;
-  const right = 16;
-  const top = 18;
-  const bottom = 42;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const x = (index: number) => left + (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
-  const y = (score: number) => top + ((100 - Math.max(0, Math.min(100, score))) / 100) * plotHeight;
-  const labelIndexes = new Set<number>();
-  const labelCount = Math.min(6, points.length);
-  const step = Math.max(1, Math.ceil(Math.max(0, points.length - 1) / Math.max(1, labelCount - 1)));
-  for (let i = 0; i < points.length; i += step) labelIndexes.add(i);
-  labelIndexes.add(points.length - 1);
+  const bucketMs =
+    interval === "7 days" ? 7 * 86_400_000 :
+    interval === "14 days" ? 14 * 86_400_000 :
+    interval === "1 month" ? 30 * 86_400_000 :
+    interval === "3 months" ? 90 * 86_400_000 :
+    86_400_000;
+
+  const series = {
+    identifier: "PulsHealthSleepScore",
+    unit: "score",
+    agg: "avg" as const,
+    bucketMs,
+    points: points.map((point) => {
+      const [year, month, day] = point.night.date.split("-").map(Number);
+      return {
+        t: Date.UTC(year, month - 1, day),
+        value: point.score.score,
+        min: null,
+        max: null,
+        count: point.night.nights ?? 1,
+      };
+    }),
+  };
 
   return (
     <section className="panel" style={{ padding: 20 }}>
@@ -89,77 +97,13 @@ export function SleepScoreHistoryChart({ scores, interval }: { scores: ScoredNig
             Derived score for every available night using the preceding 13 nights for bedtime consistency. Longer ranges are aggregated like the sleep-stage history.
           </div>
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 12 }}>{points.reduce((sum, point) => sum + (point.night.nights ?? 1), 0)} scored nights</div>
-      </div>
-
-      <div style={{ marginTop: 18, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto", paddingBottom: 4 }}>
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            role="img"
-            aria-label="Sleep Score history bar chart"
-            style={{ display: "block", width: "100%", height: "auto", minHeight: 180 }}
-          >
-            {[40, 60, 80, 95, 100].map((score) => (
-              <g key={score}>
-                <line
-                  x1={left}
-                  x2={width - right}
-                  y1={y(score)}
-                  y2={y(score)}
-                  stroke="var(--border)"
-                  strokeWidth="1"
-                  strokeDasharray={score === 100 ? undefined : "4 5"}
-                />
-                <text x={left - 8} y={y(score) + 4} textAnchor="end" fill="var(--faint)" fontSize="11">{score}</text>
-              </g>
-            ))}
-
-            {points.map((point, index) => {
-              const barWidth = Math.max(5, Math.min(18, (plotWidth / Math.max(points.length, 1)) * 0.7));
-              const barX = x(index) - barWidth / 2;
-              return (
-                <g key={point.night.date}>
-                  <rect
-                    x={barX}
-                    y={y(point.score.score)}
-                    width={barWidth}
-                    height={Math.max(0, y(0) - y(point.score.score))}
-                    rx="2"
-                    fill={scoreColor(point.score.score)}
-                  >
-                    <title>
-                      {formatSleepPeriodLabel(point.night.date, interval)} · {point.score.score}/100 · {sleepScoreClassification(point.score.score)} · Duration {Math.round(point.score.durationPoints)}/50 · Consistency {Math.round(point.score.consistencyPoints)}/30 · Interruptions {Math.round(point.score.interruptionPoints)}/20
-                    </title>
-                  </rect>
-                </g>
-              );
-            })}
-
-            {points.map((point, index) =>
-              labelIndexes.has(index) ? (
-                <text
-                  key={`label-${point.night.date}`}
-                  x={x(index)}
-                  y={height - 14}
-                  textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}
-                  fill="var(--muted)"
-                  fontSize="11"
-                >
-                  {formatSleepPeriodLabel(point.night.date, interval)}
-                </text>
-              ) : null,
-            )}
-          </svg>
+        <div style={{ color: "var(--faint)", fontSize: 12 }}>
+          {points.reduce((sum, point) => sum + (point.night.nights ?? 1), 0)} scored nights
         </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 4, color: "var(--faint)", fontSize: 11 }}>
-        <span style={{ color: scoreColors.veryLow }}>0–40 Very Low</span>
-        <span style={{ color: scoreColors.low }}>41–60 Low</span>
-        <span style={{ color: scoreColors.ok }}>61–80 OK</span>
-        <span style={{ color: scoreColors.high }}>81–95 High</span>
-        <span style={{ color: scoreColors.veryHigh }}>96–100 Very High</span>
+      <div style={{ marginTop: 18 }}>
+        <TrendChart series={series} color="#5e5ce6" name="Sleep Score" />
       </div>
     </section>
   );
