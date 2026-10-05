@@ -212,8 +212,8 @@ export function SleepHistoryChart({
                               position: "absolute",
                               left: 0,
                               right: 0,
-                              bottom: `${(lowerMinutes / axisMax) * 100}%`,
-                              height: `${Math.min(minutes, axisMax) / axisMax * 100}%`,
+                              bottom: `${total > 0 ? (lowerMinutes / total) * 100 : 0}%`,
+                              height: `${total > 0 ? (minutes / total) * 100 : 0}%`,
                               minHeight: 1,
                               background: stage.color,
                             }}
