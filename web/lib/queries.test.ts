@@ -252,6 +252,7 @@ describe("query semantics", () => {
     await queries.getWorkouts(USER_ID, 3);
     await queries.getWorkoutDetail(USER_ID, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     await queries.getWorkoutSeries(USER_ID, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    await queries.getSleepHistory(USER_ID, 14, "1 day");
     await queries.getProfile(USER_ID);
 
     const healthCalls = queryMock.mock.calls.filter(([sql]) =>
@@ -295,6 +296,8 @@ describe("query semantics", () => {
     calls.push(["getWorkouts", "workouts", (x) => x.getWorkouts(USER_ID, 3)]);
     calls.push(["getWorkoutDetail", "workout", (x) => x.getWorkoutDetail(USER_ID, WORKOUT)]);
     calls.push(["getWorkoutSeries", "workout series", (x) => x.getWorkoutSeries(USER_ID, WORKOUT)]);
+    calls.push(["getSleepHistory", "sleep history", (x) => x.getSleepHistory(USER_ID, 14, "1 day")]);
+    calls.push(["getSleepDays", "sleep days", (x) => x.getSleepDays(USER_ID, 14)]);
     calls.push(["getUser", "user", (x) => x.getUser(USER_ID)]);
     calls.push(["getProfile", "profile", (x) => x.getProfile(USER_ID)]);
     // Not health data, read outside any scope: the source probe and Basic

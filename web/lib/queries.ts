@@ -31,6 +31,7 @@
 export { getDataSource } from "./data/source";
 export { DataUnavailableError, isDataUnavailable } from "./data/unavailable";
 export { categoryAggregation, getDailySparklines, getLatestMany, getSeries, getTodayTotals, type CategoryAggregation } from "./data/series";
+export { getSleepDays, getSleepHistory } from "./data/sleep";
 export { getStats } from "./data/stats";
 export { getActivityRings } from "./data/rings";
 export { getWorkoutDetail, getWorkouts, getWorkoutSeries } from "./data/workouts";
