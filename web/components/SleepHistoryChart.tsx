@@ -1,4 +1,5 @@
 import { formatSleepPeriodLabel, type SleepDay } from "@/lib/sleep";
+import { smoothPath, type Pt } from "@/lib/chart";
 
 const STAGES = [
   { key: "coreMinutes", label: "Core", color: "rgb(96 165 250)" },
@@ -78,6 +79,10 @@ export function SleepHistoryChart({
             {stage.label}
           </div>
         ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden="true" style={{ width: 14, height: 2, borderRadius: 2, background: "var(--fg)" }} />
+          Total sleep
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0, 1fr)", gap: 10, marginTop: 18 }}>
@@ -111,6 +116,74 @@ export function SleepHistoryChart({
                 backgroundSize: `100% ${(axisStep / axisMax) * 100}%`,
               }}
             >
+              {displayNights.length > 0 && (
+                <svg
+                  aria-label="Total sleep duration"
+                  role="img"
+                  viewBox={`0 0 ${displayNights.length} ${chartHeight}`}
+                  preserveAspectRatio="none"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                    overflow: "visible",
+                    zIndex: 2,
+                  }}
+                >
+                  <path
+                    fill="none"
+                    stroke="#5e5ce6"
+                    strokeWidth="1.5"
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d={smoothPath(
+                      displayNights.map((night, index): Pt => {
+                        const x = index + 0.5;
+                        const totalSleep =
+                          night.coreMinutes +
+                          night.deepMinutes +
+                          night.remMinutes +
+                          night.unspecifiedMinutes;
+                        const y =
+                          chartHeight -
+                          (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                            chartHeight;
+                        return [x, y];
+                      }),
+                      0.55,
+                    )}
+                  />
+
+                  {displayNights.map((night, index) => {
+                    const x = index + 0.5;
+                    const totalSleep =
+                      night.coreMinutes +
+                      night.deepMinutes +
+                      night.remMinutes +
+                      night.unspecifiedMinutes;
+                    const y =
+                      chartHeight -
+                      (Math.min(axisMax, Math.max(0, totalSleep)) / axisMax) *
+                        chartHeight;
+                    return (
+                      <circle
+                        key={night.date}
+                        cx={x}
+                        cy={y}
+                        r="2.5"
+                        fill="var(--fg)"
+                        stroke="var(--bg)"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    );
+                  })}
+                </svg>
+              )}
+
               {displayNights.map((night) => {
                 const inBed = Math.max(0, night.inBedMinutes);
                 const stageTotal =
